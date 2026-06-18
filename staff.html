@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>作業内容登録</title>
+  <link rel="stylesheet" href="staff.css">
+</head>
+<body>
+  <main class="app">
+    <header>
+      <p>Worklog</p>
+      <h1>作業内容登録</h1>
+      <input id="workDate" type="date" aria-label="日付">
+    </header>
+
+    <section class="identity">
+      <label>
+        スタッフ
+        <select id="staff"></select>
+      </label>
+    </section>
+
+    <form id="entryForm" class="entry-card">
+      <label>
+        顧客
+        <select id="customer"></select>
+      </label>
+
+      <label>
+        業務
+        <select id="taskType" required></select>
+      </label>
+
+      <fieldset>
+        <legend>時間</legend>
+        <div class="duration-stepper" aria-label="作業時間">
+          <div class="duration-unit">
+            <span class="duration-label">時間</span>
+            <div class="duration-control">
+              <button id="minusHour" type="button" aria-label="時間を減らす">−</button>
+              <strong id="hourValue">1</strong>
+              <button id="plusHour" type="button" aria-label="時間を増やす">＋</button>
+            </div>
+          </div>
+          <div class="duration-unit">
+            <span class="duration-label">分</span>
+            <div class="duration-control">
+              <button id="minusMinute" type="button" aria-label="分を減らす">−</button>
+              <strong id="minuteValue">00</strong>
+              <button id="plusMinute" type="button" aria-label="分を増やす">＋</button>
+            </div>
+          </div>
+        </div>
+        <input id="hours" type="hidden" value="1">
+        <div id="durationTotal" class="duration-total">1時間00分</div>
+      </fieldset>
+
+      <label>
+        メモ
+        <input id="memo" type="text" maxlength="80" autocomplete="off" placeholder="任意">
+      </label>
+
+      <button class="primary" type="submit">追加</button>
+    </form>
+
+    <section class="today">
+      <div class="today-head">
+        <h2>入力済み</h2>
+        <strong id="totalHours">0.00h</strong>
+      </div>
+      <div id="todayList" class="today-list"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="config.js"></script>
+  <script src="backend.js"></script>
+  <script src="staff.js"></script>
+</body>
+</html>

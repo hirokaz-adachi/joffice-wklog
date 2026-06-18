@@ -1,0 +1,19 @@
+# 接続設定（APIトークンを含むため管理外。config.sample.js を複製して作成）
+config.js
+
+# 依存・ビルド
+node_modules/
+package-lock.json
+
+# safe-write のバックアップ
+*.safe_write_prev
+
+# サンドボックス作業の残骸（保険）
+.gittest_*
+.x_*
+
+# OS / エディタ
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

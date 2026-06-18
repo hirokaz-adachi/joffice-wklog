@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>経営ダッシュボード</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <header class="dashboard-header">
+    <div>
+      <p class="eyebrow">Worklog Analytics</p>
+      <h1>経営ダッシュボード</h1>
+    </div>
+    <nav class="header-nav" aria-label="画面移動">
+      <a href="index.html">工数管理</a>
+      <a href="staff.html">作業登録</a>
+    </nav>
+  </header>
+
+  <main class="dashboard-shell">
+    <section class="control-band" aria-label="集計条件">
+      <div class="period-control">
+        <button id="prevMonth" type="button" class="icon-button" aria-label="前月">‹</button>
+        <label>
+          対象月
+          <select id="monthSelect"></select>
+        </label>
+        <button id="nextMonth" type="button" class="icon-button" aria-label="翌月">›</button>
+      </div>
+      <div class="status-line">
+        <span id="dataStatus">データを読み込んでいます</span>
+        <button id="reloadData" type="button" class="secondary">再読込</button>
+      </div>
+    </section>
+
+    <section class="kpi-grid" aria-label="主要指標">
+      <article class="kpi">
+        <span>税抜売上</span>
+        <strong id="netRevenue">-</strong>
+        <small id="invoiceCount">-</small>
+      </article>
+      <article class="kpi">
+        <span>総工数</span>
+        <strong id="totalHours">-</strong>
+        <small id="directHours">-</small>
+      </article>
+      <article class="kpi">
+        <span>顧客業務比率</span>
+        <strong id="directRatio">-</strong>
+        <small>顧客直接工数 ÷ 総工数</small>
+      </article>
+      <article class="kpi">
+        <span>顧客平均時間単価</span>
+        <strong id="averageCustomerRate">-</strong>
+        <small>税抜売上 ÷ 顧客直接工数</small>
+      </article>
+      <article class="kpi accent-kpi">
+        <span>売上目標達成率</span>
+        <strong id="targetRate">-</strong>
+        <small id="targetAmount">-</small>
+      </article>
+    </section>
+
+    <section class="overview-grid">
+      <article class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="panel-label">Monthly Revenue</p>
+            <h2>売上と目標の推移</h2>
+          </div>
+        </div>
+        <div id="monthlyBars" class="monthly-bars"></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="panel-label">Revenue Mix</p>
+            <h2>請求項目別売上</h2>
+          </div>
+        </div>
+        <div id="revenueMix" class="mix-list"></div>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading table-heading">
+        <div>
+          <p class="panel-label">Staff Performance</p>
+          <h2>スタッフ別売上・生産性</h2>
+        </div>
+        <select id="staffSort" aria-label="スタッフ表示順">
+          <option value="revenue">帰属売上順</option>
+          <option value="achievement">目標達成率順</option>
+          <option value="directRate">直接時間単価順</option>
+          <option value="hours">総工数順</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>スタッフ</th>
+              <th class="num">帰属売上</th>
+              <th class="num">目標</th>
+              <th class="num">達成率</th>
+              <th class="num">顧客工数</th>
+              <th class="num">総工数</th>
+              <th class="num">直接時間単価</th>
+              <th class="num">総合生産性</th>
+            </tr>
+          </thead>
+          <tbody id="staffRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading table-heading">
+        <div>
+          <p class="panel-label">Client Profitability</p>
+          <h2>顧客別時間単価</h2>
+        </div>
+        <div class="table-controls">
+          <input id="customerSearch" type="search" placeholder="顧客名・顧客番号">
+          <select id="customerSort" aria-label="顧客表示順">
+            <option value="rateAsc">時間単価が低い順</option>
+            <option value="rateDesc">時間単価が高い順</option>
+            <option value="revenue">売上順</option>
+            <option value="hours">工数順</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>顧客</th>
+              <th class="num">税抜売上</th>
+              <th class="num">顧客工数</th>
+              <th class="num">時間単価</th>
+              <th>主担当</th>
+              <th>請求内訳</th>
+            </tr>
+          </thead>
+          <tbody id="customerRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="staffModal" class="modal-backdrop" hidden>
+    <section class="staff-modal" role="dialog" aria-modal="true" aria-labelledby="staffModalTitle">
+      <button id="closeStaffModal" type="button" class="modal-close" aria-label="スタッフ詳細を閉じる">×</button>
+      <div id="staffDetail" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="config.js"></script>
+  <script src="backend.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
