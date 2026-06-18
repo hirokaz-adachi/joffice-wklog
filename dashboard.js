@@ -14,6 +14,8 @@
     months: [],
     selectedMonth: "",
     selectedStaffCode: "",
+    selectedCustomerCode: "",
+    customerModalMonth: "",
     staffSort: "revenue",
     customerSort: "rateAsc",
     customerSearch: ""
@@ -43,6 +45,9 @@
     customerSearch: document.getElementById("customerSearch"),
     customerSort: document.getElementById("customerSort"),
     customerRows: document.getElementById("customerRows"),
+    customerModal: document.getElementById("customerModal"),
+    closeCustomerModal: document.getElementById("closeCustomerModal"),
+    customerDetail: document.getElementById("customerDetail"),
     toast: document.getElementById("toast")
   };
 
@@ -84,7 +89,9 @@
       if (event.target === el.staffModal) closeStaffModal();
     });
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && !el.staffModal.hidden) closeStaffModal();
+      if (event.key !== "Escape") return;
+      if (!el.staffModal.hidden) closeStaffModal();
+      if (!el.customerModal.hidden) closeCustomerModal();
     });
     el.customerSort.addEventListener("change", () => {
       state.customerSort = el.customerSort.value;
@@ -93,6 +100,35 @@
     el.customerSearch.addEventListener("input", () => {
       state.customerSearch = el.customerSearch.value.trim().toLowerCase();
       renderCustomerTable(buildMonthModel(state.selectedMonth));
+    });
+    el.customerRows.addEventListener("click", (event) => {
+      const row = event.target.closest("[data-customer-code]");
+      if (row) selectCustomer(row.dataset.customerCode);
+    });
+    el.customerRows.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const row = event.target.closest("[data-customer-code]");
+      if (!row) return;
+      event.preventDefault();
+      selectCustomer(row.dataset.customerCode);
+    });
+    el.closeCustomerModal.addEventListener("click", closeCustomerModal);
+    el.customerModal.addEventListener("click", (event) => {
+      if (event.target === el.customerModal) closeCustomerModal();
+    });
+    el.customerDetail.addEventListener("click", (event) => {
+      const column = event.target.closest("[data-trend-month]");
+      if (!column) return;
+      state.customerModalMonth = column.dataset.trendMonth;
+      renderCustomerDetail();
+    });
+    el.customerDetail.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const column = event.target.closest("[data-trend-month]");
+      if (!column) return;
+      event.preventDefault();
+      state.customerModalMonth = column.dataset.trendMonth;
+      renderCustomerDetail();
     });
   }
 
@@ -317,6 +353,10 @@
     renderStaffTable(model);
     if (!el.staffModal.hidden) renderStaffDetail(model);
     renderCustomerTable(model);
+    if (!el.customerModal.hidden) {
+      state.customerModalMonth = state.selectedMonth;
+      renderCustomerDetail();
+    }
     const monthIndex = state.months.indexOf(state.selectedMonth);
     el.prevMonth.disabled = monthIndex <= 0;
     el.nextMonth.disabled = monthIndex < 0 || monthIndex >= state.months.length - 1;
@@ -382,7 +422,8 @@
         totalHours: 0,
         revenue: 0,
         target: 0,
-        customerBreakdown: new Map()
+        customerBreakdown: new Map(),
+        workMap: new Map()
       });
     });
 
@@ -391,6 +432,15 @@
       if (!person) return;
       person.totalHours += entry.hours;
       if (entry.customerCode) person.directHours += entry.hours;
+      const workKey = entry.customerCode || "__internal__";
+      const work = person.workMap.get(workKey) || {
+        code: entry.customerCode || "",
+        name: entry.customerCode ? (entry.customer || entry.customerCode) : "社内 / その他（非生産工数）",
+        isInternal: !entry.customerCode,
+        hours: 0
+      };
+      work.hours += entry.hours;
+      person.workMap.set(workKey, work);
     });
 
     targets.forEach((target) => {
@@ -430,7 +480,18 @@
       directRate: person.directHours ? person.revenue / person.directHours : 0,
       productivity: person.totalHours ? person.revenue / person.totalHours : 0,
       directRatio: person.totalHours ? person.directHours / person.totalHours : 0,
-      customers: [...person.customerBreakdown.values()].sort((a, b) => b.revenue - a.revenue)
+      customers: [...person.customerBreakdown.values()].sort((a, b) => b.revenue - a.revenue),
+      workBreakdown: [...person.workMap.values()]
+        .map((work) => {
+          const allocated = person.customerBreakdown.get(work.code);
+          const revenue = work.isInternal || !allocated ? 0 : allocated.revenue;
+          return {
+            ...work,
+            revenue,
+            rate: !work.isInternal && work.hours ? revenue / work.hours : 0
+          };
+        })
+        .sort((a, b) => Number(a.isInternal) - Number(b.isInternal) || b.hours - a.hours)
     }));
 
     return {
@@ -552,14 +613,15 @@
       return;
     }
 
-    const customerRows = person.customers.slice(0, 5).map((customer) => `
-      <div class="staff-customer-row">
-        <strong>${escapeHtml(customer.code)} ${escapeHtml(customer.name)}</strong>
-        <span>${formatCurrency(customer.revenue)}</span>
-        <span>${formatNumber(customer.hours, 1)}h</span>
-        <span>${formatCurrency(customer.rate)}/h</span>
+    const workRows = person.workBreakdown.map((work) => `
+      <div class="staff-customer-row${work.isInternal ? " is-internal" : ""}">
+        <strong>${work.isInternal ? escapeHtml(work.name) : `${escapeHtml(work.code)} ${escapeHtml(work.name)}`}</strong>
+        <span>${formatNumber(work.hours, 1)}h</span>
+        <span>${work.revenue ? formatCurrency(work.revenue) : "—"}</span>
+        <span>${work.rate ? `${formatCurrency(work.rate)}/h` : "—"}</span>
       </div>
     `).join("");
+    const clientCount = person.workBreakdown.filter((work) => !work.isInternal).length;
 
     el.staffDetail.innerHTML = `
       <div class="staff-detail-heading">
@@ -567,7 +629,7 @@
           <p class="panel-label">Staff Monthly Summary</p>
           <h3 id="staffModalTitle">${escapeHtml(person.code)} ${escapeHtml(person.name)}</h3>
         </div>
-        <p>${formatMonthLabel(model.month)} / 担当顧客 ${person.customers.length}社</p>
+        <p>${formatMonthLabel(model.month)} / 担当顧客 ${clientCount}社</p>
       </div>
       <div class="staff-detail-kpis">
         ${staffDetailKpi("帰属売上", formatCurrency(person.revenue))}
@@ -578,8 +640,8 @@
         ${staffDetailKpi("直接時間単価", formatCurrency(person.directRate))}
       </div>
       <div class="staff-customer-list">
-        <p class="staff-detail-note">帰属売上が大きい担当顧客（上位5社）</p>
-        ${customerRows || "<p class=\"empty-row\">担当顧客がありません</p>"}
+        <p class="staff-detail-note">当月の工数内訳（顧客＋社内／非生産工数を含む・工数の多い順）　工数 / 帰属売上 / 時間単価</p>
+        ${workRows || "<p class=\"empty-row\">当月の工数がありません</p>"}
       </div>
     `;
   }
@@ -620,7 +682,11 @@
       })
       .sort(sorters[state.customerSort]);
     el.customerRows.innerHTML = rows.map((customer) => `
-      <tr>
+      <tr data-customer-code="${escapeHtml(customer.code)}"
+          tabindex="0"
+          role="button"
+          aria-label="${escapeHtml(customer.code)} ${escapeHtml(customer.name)} の詳細"
+          class="${customer.code === state.selectedCustomerCode ? "is-selected" : ""}">
         <td><span class="entity-code">${escapeHtml(customer.code)}</span><span class="entity-name">${escapeHtml(customer.name)}</span></td>
         <td class="num">${formatCurrency(customer.revenue)}</td>
         <td class="num">${formatNumber(customer.hours, 1)}h</td>
@@ -629,6 +695,173 @@
         <td><div class="invoice-tags">${customer.invoiceItems.map(([name]) => `<span class="invoice-tag">${escapeHtml(name)}</span>`).join("")}</div></td>
       </tr>
     `).join("") || `<tr><td class="empty-row" colspan="6">該当する顧客がありません</td></tr>`;
+  }
+
+  function selectCustomer(customerCode) {
+    state.selectedCustomerCode = customerCode;
+    state.customerModalMonth = state.selectedMonth;
+    renderCustomerTable(buildMonthModel(state.selectedMonth));
+    renderCustomerDetail();
+    openCustomerModal();
+  }
+
+  function renderCustomerDetail() {
+    if (!state.selectedCustomerCode) {
+      closeCustomerModal();
+      return;
+    }
+    const trendEnd = state.selectedMonth;
+    const detailMonth = state.customerModalMonth || trendEnd;
+    const customer = buildCustomerMonth(state.selectedCustomerCode, detailMonth);
+
+    const trend = buildCustomerTrend(customer.code, trendEnd);
+    const trendHours = sum(trend.map((point) => point.hours));
+    const trendRevenue = sum(trend.map((point) => point.revenue));
+    const avgRate = trendHours ? trendRevenue / trendHours : 0;
+    const maxRate = Math.max(1, ...trend.map((point) => point.rate));
+
+    const staffRows = [...customer.staffHours.entries()]
+      .map(([staffCode, hours]) => {
+        const revenue = customer.hours ? customer.revenue * (hours / customer.hours) : 0;
+        return { name: staffName(staffCode), hours, revenue, rate: hours ? revenue / hours : 0 };
+      })
+      .sort((a, b) => b.hours - a.hours)
+      .map((item) => `
+        <div class="staff-customer-row">
+          <strong>${escapeHtml(item.name)}</strong>
+          <span>${formatNumber(item.hours, 1)}h</span>
+          <span>${formatCurrency(item.revenue)}</span>
+          <span>${item.rate ? `${formatCurrency(item.rate)}/h` : "—"}</span>
+        </div>
+      `).join("");
+
+    const invoiceRows = customer.invoiceItems
+      .slice()
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, amount]) => `
+        <div class="staff-customer-row invoice-row">
+          <strong>${escapeHtml(name)}</strong>
+          <span>${formatCurrency(amount)}</span>
+        </div>
+      `).join("");
+
+    const trendBars = trend.map((point, index) => {
+      const height = point.rate > 0 ? Math.max(6, Math.round((point.rate / maxRate) * 120)) : 0;
+      const [year, month] = point.month.split("-");
+      const prevYear = index > 0 ? trend[index - 1].month.split("-")[0] : "";
+      const showYear = index === 0 || year !== prevYear;
+      const tip = `${formatMonthLabel(point.month)}：時間単価 ${formatCurrency(point.rate)} / 売上 ${formatCurrency(point.revenue)} / 工数 ${formatNumber(point.hours, 1)}h`;
+      const bar = point.rate > 0
+        ? `<div class="trend-bar ${customerRateClass(point.rate)}" style="height:${height}px"><span class="trend-value">${formatRateLabel(point.rate)}</span></div>`
+        : `<div class="trend-bar is-zero"></div>`;
+      const isActive = point.month === detailMonth;
+      return `
+        <div class="trend-column${isActive ? " is-active" : ""}" data-trend-month="${point.month}" role="button" tabindex="0" title="${escapeHtml(tip)}">
+          <div class="trend-bar-stage">${bar}</div>
+          <div class="trend-label">${Number(month)}月<small>${showYear ? year : ""}</small></div>
+        </div>
+      `;
+    }).join("");
+
+    el.customerDetail.innerHTML = `
+      <div class="staff-detail-heading">
+        <div>
+          <p class="panel-label">Client Profitability</p>
+          <h3 id="customerModalTitle">${escapeHtml(customer.code)} ${escapeHtml(customer.name)}</h3>
+        </div>
+        <p>${formatMonthLabel(detailMonth)} / 主担当 ${escapeHtml(customer.primaryStaff)}</p>
+      </div>
+      <div class="staff-detail-kpis">
+        ${staffDetailKpi("当月税抜売上", formatCurrency(customer.revenue))}
+        ${staffDetailKpi("当月顧客工数", `${formatNumber(customer.hours, 1)}h`)}
+        ${staffDetailKpi("当月時間単価", formatCurrency(customer.rate), customerRateClass(customer.rate))}
+        ${staffDetailKpi("12ヶ月平均単価", formatCurrency(avgRate))}
+        ${staffDetailKpi("12ヶ月売上", formatCurrency(trendRevenue))}
+        ${staffDetailKpi("12ヶ月工数", `${formatNumber(trendHours, 1)}h`)}
+      </div>
+      <div class="trend-block">
+        <p class="staff-detail-note">時間単価の推移（直近12ヶ月・データのない月は0）　バーをクリックでその月の内訳に切替</p>
+        <div class="customer-trend">${trendBars}</div>
+      </div>
+      <div class="customer-detail-cols">
+        <div class="staff-customer-list">
+          <p class="staff-detail-note">当月の関与スタッフ（工数の多い順）　工数 / 帰属売上 / 時間単価</p>
+          ${staffRows || "<p class=\"empty-row\">当月の工数がありません</p>"}
+        </div>
+        <div class="staff-customer-list">
+          <p class="staff-detail-note">当月の請求内訳</p>
+          ${invoiceRows || "<p class=\"empty-row\">当月の請求がありません</p>"}
+        </div>
+      </div>
+    `;
+  }
+
+  function buildCustomerMonth(customerCode, month) {
+    const master = state.customers.find((item) => item.code === customerCode);
+    const entries = state.entries.filter((entry) => entry.month === month && entry.customerCode === customerCode);
+    const billing = state.billing.filter((item) => item.billingMonth === month && item.customerCode === customerCode);
+    const hours = sum(entries.map((entry) => entry.hours));
+    const revenue = sum(billing.map((item) => item.netAmount));
+    const staffHours = new Map();
+    entries.forEach((entry) => staffHours.set(entry.staffCode, (staffHours.get(entry.staffCode) || 0) + entry.hours));
+    const invoiceMap = new Map();
+    billing.forEach((item) => invoiceMap.set(item.invoiceItem, (invoiceMap.get(item.invoiceItem) || 0) + item.netAmount));
+    return {
+      code: customerCode,
+      name: master ? master.name : customerCode,
+      month,
+      hours,
+      revenue,
+      rate: hours ? revenue / hours : 0,
+      staffHours,
+      invoiceItems: [...invoiceMap.entries()],
+      primaryStaff: primaryStaff(staffHours)
+    };
+  }
+
+  function buildCustomerTrend(customerCode, endMonth) {
+    return lastTwelveMonths(endMonth).map((month) => {
+      const hours = sum(state.entries
+        .filter((entry) => entry.month === month && entry.customerCode === customerCode)
+        .map((entry) => entry.hours));
+      const revenue = sum(state.billing
+        .filter((item) => item.billingMonth === month && item.customerCode === customerCode)
+        .map((item) => item.netAmount));
+      return { month, hours, revenue, rate: hours ? revenue / hours : 0 };
+    });
+  }
+
+  function lastTwelveMonths(endMonth) {
+    const [year, month] = String(endMonth || "").split("-").map(Number);
+    if (!year || !month) return [];
+    const result = [];
+    for (let offset = 11; offset >= 0; offset -= 1) {
+      const date = new Date(year, month - 1 - offset, 1);
+      result.push(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`);
+    }
+    return result;
+  }
+
+  function staffName(staffCode) {
+    const person = state.staff.find((item) => item.code === staffCode);
+    return person ? person.name : staffCode;
+  }
+
+  function formatRateLabel(value) {
+    return value > 0 ? Math.round(value).toLocaleString("ja-JP") : "";
+  }
+
+  function openCustomerModal() {
+    el.customerModal.hidden = false;
+    document.body.classList.add("has-modal");
+    window.setTimeout(() => el.closeCustomerModal.focus(), 0);
+  }
+
+  function closeCustomerModal() {
+    el.customerModal.hidden = true;
+    if (el.staffModal.hidden) document.body.classList.remove("has-modal");
+    const selectedRow = el.customerRows.querySelector(`[data-customer-code="${cssEscape(state.selectedCustomerCode)}"]`);
+    if (selectedRow) selectedRow.focus();
   }
 
   function groupSum(items, keyField, valueField) {

@@ -1,6 +1,10 @@
 # 接続設定（APIトークンを含むため管理外。config.sample.js を複製して作成）
 config.js
 
+# デプロイ認証（FTP情報を含むため管理外。deploy.config.sample.ps1 を複製して作成）
+scripts/deploy.config.ps1
+*.deploy.log
+
 # 依存・ビルド
 node_modules/
 package-lock.json

@@ -480,7 +480,7 @@ tbody tr:hover {
 
 .staff-customer-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto auto auto;
+  grid-template-columns: minmax(150px, 1fr) 64px 104px 100px;
   align-items: center;
   gap: 14px;
   border-top: 1px solid var(--line);
@@ -490,6 +490,20 @@ tbody tr:hover {
 
 .staff-customer-row strong {
   font-size: 13px;
+}
+
+.staff-customer-row span {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.staff-customer-row.is-internal {
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.staff-customer-row.is-internal strong {
+  font-weight: 600;
 }
 
 .modal-backdrop {
@@ -689,4 +703,136 @@ body.has-modal {
   .bar-value {
     font-size: 9px;
   }
+}
+
+
+/* ===== 顧客モーダル ===== */
+#customerRows tr[data-customer-code] {
+  cursor: pointer;
+}
+
+#customerRows tr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+#customerRows tr.is-selected {
+  background: var(--accent-soft);
+}
+
+.trend-block {
+  margin-top: 14px;
+}
+
+.customer-trend {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  align-items: end;
+  gap: 6px;
+  height: 150px;
+  padding-top: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.trend-column {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 6px;
+  min-width: 0;
+}
+
+.trend-bar-stage {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+}
+
+.trend-bar {
+  width: 60%;
+  max-width: 26px;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent);
+  position: relative;
+}
+
+.trend-bar.rate-good { background: var(--accent); }
+.trend-bar.rate-mid { background: var(--amber); }
+.trend-bar.rate-low { background: var(--red); }
+
+.trend-bar.is-zero {
+  height: 2px;
+  width: 60%;
+  max-width: 26px;
+  background: var(--line);
+  border-radius: 0;
+}
+
+.trend-column[data-trend-month] {
+  cursor: pointer;
+}
+
+.trend-column:hover .trend-bar {
+  filter: brightness(0.9);
+}
+
+.trend-column:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.trend-column.is-active .trend-label {
+  color: var(--accent-dark);
+  font-weight: 800;
+}
+
+.trend-column.is-active .trend-bar {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.trend-value {
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-label {
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.25;
+  color: var(--muted);
+}
+
+.trend-label small {
+  display: block;
+  min-height: 12px;
+  font-size: 9px;
+  color: var(--accent-dark);
+  font-weight: 700;
+}
+
+.customer-detail-cols {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.staff-customer-row.invoice-row {
+  grid-template-columns: minmax(150px, 1fr) auto;
+}
+
+@media (max-width: 720px) {
+  .customer-detail-cols { grid-template-columns: 1fr; gap: 14px; }
+  .customer-trend { gap: 3px; }
+  .trend-value { display: none; }
 }
