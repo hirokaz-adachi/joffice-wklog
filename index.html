@@ -37,6 +37,18 @@
     .card h2 { margin: 0 0 6px; font-size: 18px; }
     .card p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 
+    /* QRパネル */
+    .qr-panel { margin-top: 18px; display: flex; gap: 20px; align-items: center;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+      padding: 20px; box-shadow: var(--shadow); }
+    .qr-box { flex: 0 0 auto; background: #fff; border: 1px solid var(--line);
+      border-radius: 8px; padding: 8px; line-height: 0; }
+    .qr-img { display: block; width: 180px; height: 180px; image-rendering: pixelated; }
+    .qr-text h2 { margin: 0 0 6px; font-size: 17px; }
+    .qr-text p { margin: 0 0 10px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .qr-link { font-size: 13px; color: var(--accent-dark); word-break: break-all; }
+    @media (max-width: 560px) { .qr-panel { flex-direction: column; align-items: flex-start; } }
+
     /* パスワードゲート */
     .gate { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
       padding: 24px; background: linear-gradient(180deg, #eef4f3, #f4f7f7); }
@@ -92,6 +104,17 @@
         <p>売上・工数・時間単価・達成率を月次で可視化。</p>
       </a>
     </div>
+
+    <section class="qr-panel" aria-label="作業内容登録のQRコード">
+      <div class="qr-box">
+        <img class="qr-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASgAAAEoAQMAAADRyf5aAAAABlBMVEUXICb/////knIYAAABgUlEQVR42u2ay27DMAwEif7/PzOoxeVDlYKg6K0jG4lt6TQgV0va5p8MYxWrfrvK1vi+sXrkzxkzX/bJ+A+rTGCF6uH0HG0GXoOXLUbrXIjies3A687LW8TB6z0vSZagweudfq0b6b40DP36wSsuDgf744HXsBYrqkzCHwNeu34pF/UgrEUAhdfMx5CtlDBJvsjBq+fjFmluacDiF167fiWl0H/Ze/zEdX9su6RIufwGvDa9V4wpzrxbVnht+tXaGSFhWXmvzITX5u/bn/U+j+MnjvFlRSedatkMeE29F54qGavYZn885GN2u5oB6wkJr83fezer3ho81Nsn/ZpVUXOthp84+y/5VkVbVpHo11G/2iY5NkfHf13jq7ClplE/3uqhEquqvTPa4LX1J0Z/dfh+4uvSn8gXH1baLwMLr61+bM3V0bSICITXpl8235+VfuG/7ryGd/XmyeB14ZUf6YxKHF5H/cq+RPbzs7aE12F/zN59ZaLh7+/+iy8HWfXnq15gwC0G7WL9cwAAAABJRU5ErkJggg==" alt="作業内容登録（スタッフ用）のQRコード" width="180" height="180">
+      </div>
+      <div class="qr-text">
+        <h2>スタッフ用 作業登録 QR</h2>
+        <p>スマホのカメラで読み取ると「作業内容登録」画面が開きます。掲示・配布用にどうぞ。</p>
+        <a class="qr-link" href="staff.html">https://tools.h-linksystems.com/joffice/staff.html</a>
+      </div>
+    </section>
   </main>
 
   <script>
