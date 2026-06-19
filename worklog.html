@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>J-Office Insight ｜ 工数管理</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260618-2">
 </head>
 <body>
   <header class="topbar">
@@ -75,18 +75,19 @@
           <input id="memo" type="text" maxlength="80" autocomplete="off">
         </label>
 
-        <div class="duration-bar wide" aria-label="時間のクイック入力">
-          <button type="button" data-hours="0.25">15分</button>
-          <button type="button" data-hours="0.5">30分</button>
-          <button type="button" data-hours="1">1時間</button>
-          <button type="button" data-hours="2">2時間</button>
-        </div>
-
         <div class="form-actions wide">
           <button id="saveEntry" type="submit">登録</button>
           <button id="cancelEdit" type="button" class="secondary" hidden>編集取消</button>
         </div>
       </form>
+
+      <div class="card-day">
+        <div class="card-day-head">
+          <h3>選択スタッフの当日入力</h3>
+          <span id="cardDayMeta" class="card-day-meta"></span>
+        </div>
+        <div id="cardDayList" class="card-day-list"></div>
+      </div>
     </section>
 
     <section class="summary-panel" aria-labelledby="summaryTitle">
@@ -190,6 +191,6 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="config.js"></script>
   <script src="backend.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=20260618-3"></script>
 </body>
 </html>

@@ -50,6 +50,8 @@
     newCustomerCode: document.getElementById("newCustomerCode"),
     staffChips: document.getElementById("staffChips"),
     customerChips: document.getElementById("customerChips"),
+    cardDayList: document.getElementById("cardDayList"),
+    cardDayMeta: document.getElementById("cardDayMeta"),
     toast: document.getElementById("toast")
   };
 
@@ -88,7 +90,10 @@
 
   function bindEvents() {
     el.form.addEventListener("submit", saveEntry);
-    el.cancelEdit.addEventListener("click", resetForm);
+    el.cancelEdit.addEventListener("click", () => {
+      resetForm({ keepDate: true, keepStaff: true });
+      renderCardDayList();
+    });
     el.workDate.addEventListener("change", () => {
       syncCalendarToSelectedDate();
       render();
@@ -101,12 +106,8 @@
     el.staffForm.addEventListener("submit", addStaff);
     el.customerForm.addEventListener("submit", addCustomer);
 
-    document.querySelectorAll("[data-hours]").forEach((button) => {
-      button.addEventListener("click", () => {
-        el.hours.value = button.dataset.hours;
-        el.hours.focus();
-      });
-    });
+    el.staff.addEventListener("change", renderCardDayList);
+    el.taskType.addEventListener("change", syncCustomerForTask);
 
     [el.filterFrom, el.filterTo, el.filterStaff, el.filterCustomer].forEach((input) => {
       input.addEventListener("input", renderEntries);
@@ -153,6 +154,7 @@
     persist();
     resetForm({ keepDate: true, keepStaff: true });
     render();
+    if (!el.customer.disabled) el.customer.focus();
   }
 
   function editEntry(id) {
@@ -162,13 +164,15 @@
     el.editingId.value = entry.id;
     el.workDate.value = entry.date;
     el.staff.value = entry.staffCode || findMasterCodeByName("staff", entry.staff);
-    el.customer.value = entry.customerCode || findMasterCodeByName("customers", entry.customer);
     el.taskType.value = entry.taskType;
+    el.customer.value = entry.customerCode || findMasterCodeByName("customers", entry.customer);
     el.hours.value = entry.hours;
     el.memo.value = entry.memo || "";
     el.saveEntry.textContent = "更新";
     el.cancelEdit.hidden = false;
-    el.workDate.focus();
+    syncCalendarToSelectedDate();
+    render();
+    el.hours.focus();
   }
 
   async function deleteEntry(id) {
@@ -200,6 +204,7 @@
     el.hours.value = "1";
     el.saveEntry.textContent = "登録";
     el.cancelEdit.hidden = true;
+    syncCustomerForTask();
   }
 
   async function copyPreviousDay() {
@@ -345,9 +350,11 @@
 
   function render() {
     renderMasters();
+    syncCustomerForTask();
     renderCalendar();
     renderDailySummary();
     renderEntries();
+    renderCardDayList();
   }
 
   function renderCalendar() {
@@ -444,6 +451,56 @@
     el.dailyCustomers.textContent = String(customerCount);
     el.staffSummary.innerHTML = summaryMarkup(groupHours(entries, "staff"));
     el.customerSummary.innerHTML = summaryMarkup(groupHours(entries, "customer"));
+  }
+
+  function syncCustomerForTask() {
+    const internal = el.taskType.value === "社内/その他";
+    el.customer.disabled = internal;
+    if (internal) el.customer.value = "";
+  }
+
+  function renderCardDayList() {
+    const date = el.workDate.value;
+    const staffCode = el.staff.value;
+    const editingId = el.editingId.value;
+    const entries = state.entries
+      .filter((entry) => entry.date === date && (entry.staffCode || entry.staff) === staffCode)
+      .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+    const total = sum(entries, "hours");
+    el.cardDayMeta.textContent = entries.length ? `${entries.length}件 / ${total.toFixed(2)}h` : "";
+
+    if (!staffCode) {
+      el.cardDayList.innerHTML = `<div class="empty">スタッフを選択してください</div>`;
+      return;
+    }
+    if (entries.length === 0) {
+      el.cardDayList.innerHTML = `<div class="empty">当日の入力はありません</div>`;
+      return;
+    }
+
+    el.cardDayList.innerHTML = entries.map((entry) => `
+      <div class="card-day-row${entry.id === editingId ? " is-editing" : ""}" data-id="${escapeHtml(entry.id)}">
+        <div class="cd-main">
+          <span class="cd-task">${escapeHtml(entry.taskType)}</span>
+          <span class="cd-customer">${escapeHtml(displayCustomer(entry))}</span>
+          ${entry.memo ? `<span class="cd-memo">${escapeHtml(entry.memo)}</span>` : ""}
+        </div>
+        <div class="cd-side">
+          <span class="cd-hours">${Number(entry.hours).toFixed(2)}h</span>
+          <div class="row-actions">
+            <button type="button" class="secondary" data-edit="${escapeHtml(entry.id)}">編集</button>
+            <button type="button" class="danger" data-delete="${escapeHtml(entry.id)}">削除</button>
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+    el.cardDayList.querySelectorAll("[data-edit]").forEach((button) => {
+      button.addEventListener("click", () => editEntry(button.dataset.edit));
+    });
+    el.cardDayList.querySelectorAll("[data-delete]").forEach((button) => {
+      button.addEventListener("click", () => deleteEntry(button.dataset.delete));
+    });
   }
 
   function renderEntries() {

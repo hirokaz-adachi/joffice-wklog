@@ -560,6 +560,65 @@ tr:last-child td {
   text-align: center;
 }
 
+/* 入力カード内の当日リスト */
+.card-day {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.card-day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.card-day-head h3 { margin: 0; font-size: 14px; }
+
+.card-day-meta {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.card-day-list {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.card-day-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+}
+
+.card-day-row.is-editing {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.cd-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cd-task { font-size: 12px; color: var(--accent-dark); font-weight: 700; }
+.cd-customer { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-memo { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-side { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.cd-hours { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+select:disabled {
+  background: #f1f4f5;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
 .toast {
   position: fixed;
   right: 18px;
