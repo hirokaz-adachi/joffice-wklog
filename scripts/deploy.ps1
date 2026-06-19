@@ -29,7 +29,7 @@ if (-not $FtpHost -or -not $FtpUser -or -not $FtpPass -or -not $RemoteDir) {
 
 # 2) 配信対象（Webファイルのみ。gas/ docs/ scripts/ DEPLOY.md などは配信しない）
 $webFiles = @(
-  'index.html','staff.html','dashboard.html',
+  'index.html','worklog.html','staff.html','dashboard.html',
   'styles.css','staff.css','dashboard.css',
   'app.js','staff.js','dashboard.js','backend.js','config.js'
 )

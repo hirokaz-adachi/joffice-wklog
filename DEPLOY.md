@@ -2,7 +2,7 @@
 
 ## 構成
 
-- HLSレンタルサーバ: `index.html`, `staff.html`, `dashboard.html`, `styles.css`, `staff.css`, `dashboard.css`, `app.js`, `staff.js`, `dashboard.js`, `backend.js`, `config.js`
+- HLSレンタルサーバ: `index.html`, `worklog.html`, `staff.html`, `dashboard.html`, `styles.css`, `staff.css`, `dashboard.css`, `app.js`, `staff.js`, `dashboard.js`, `backend.js`, `config.js`
 - Googleスプレッドシート: `worklogs`, `staff_master`, `customer_master`, `task_master`, `billing_data`, `staff_target_master`
 - Google Apps Script: `gas/Code.gs`
 
@@ -40,6 +40,7 @@ window.WORKLOG_CONFIG = {
 `outputs/sharoshi-worklog-mvp/` 直下の次のファイルを同じディレクトリに配置する。
 
 - `index.html`
+- `worklog.html`
 - `staff.html`
 - `dashboard.html`
 - `styles.css`
