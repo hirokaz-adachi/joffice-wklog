@@ -527,22 +527,34 @@
   }
 
   function renderMonthlyBars() {
-    const models = state.months.map(buildMonthModel);
-    const maxValue = Math.max(1, ...models.flatMap((model) => [model.netRevenue, model.targetTotal]));
-    el.monthlyBars.innerHTML = models.map((model) => `
-      <div class="month-column">
-        <div class="bar-stage">
-          ${barMarkup("revenue", model.netRevenue, maxValue)}
-          ${barMarkup("target", model.targetTotal, maxValue)}
+    const months = lastTwelveMonths(anchorMonth());
+    const data = months.map((month) => ({
+      month,
+      net: sum(state.billing.filter((item) => item.billingMonth === month).map((item) => item.netAmount)),
+      target: sum(state.targets.filter((item) => item.targetMonth === month).map((item) => item.targetAmount))
+    }));
+    const maxValue = Math.max(1, ...data.flatMap((point) => [point.net, point.target]));
+    el.monthlyBars.innerHTML = data.map((point, index) => {
+      const [year, month] = point.month.split("-");
+      const prevYear = index > 0 ? data[index - 1].month.split("-")[0] : "";
+      const showYear = index === 0 || year !== prevYear;
+      const tip = `${formatMonthLabel(point.month)}：売上 ${formatCurrency(point.net)} / 目標 ${formatCurrency(point.target)}${point.target ? ` / 達成率 ${formatPercent(point.net / point.target)}` : ""}`;
+      return `
+        <div class="month-column" title="${escapeHtml(tip)}">
+          <div class="bar-stage">
+            ${barMarkup("revenue", point.net, maxValue, true)}
+            ${barMarkup("target", point.target, maxValue, false)}
+          </div>
+          <div class="month-label">${Number(month)}月<small>${showYear ? year : ""}</small></div>
         </div>
-        <div class="month-label">${formatMonthLabel(model.month)}<br><small>売上 / 目標</small></div>
-      </div>
-    `).join("");
+      `;
+    }).join("");
   }
 
-  function barMarkup(type, value, maxValue) {
-    const height = Math.max(4, Math.round((value / maxValue) * 160));
-    return `<div class="bar ${type}" style="height:${height}px"><span class="bar-value">${formatCompactCurrency(value)}</span></div>`;
+  function barMarkup(type, value, maxValue, showValue) {
+    const height = Math.max(3, Math.round((value / maxValue) * 150));
+    const label = showValue && value > 0 ? `<span class="bar-value">${formatCompactCurrency(value)}</span>` : "";
+    return `<div class="bar ${type}" style="height:${height}px">${label}</div>`;
   }
 
   function renderRevenueMix(model) {
@@ -710,7 +722,7 @@
       closeCustomerModal();
       return;
     }
-    const trendEnd = state.selectedMonth;
+    const trendEnd = anchorMonth();
     const detailMonth = state.customerModalMonth || trendEnd;
     const customer = buildCustomerMonth(state.selectedCustomerCode, detailMonth);
 
@@ -829,6 +841,13 @@
         .map((item) => item.netAmount));
       return { month, hours, revenue, rate: hours ? revenue / hours : 0 };
     });
+  }
+
+  function anchorMonth() {
+    const now = new Date();
+    const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const latest = state.months.length ? state.months[state.months.length - 1] : "";
+    return latest && latest > current ? latest : current;
   }
 
   function lastTwelveMonths(endMonth) {

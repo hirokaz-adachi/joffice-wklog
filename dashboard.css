@@ -242,33 +242,34 @@ h2 {
 }
 
 .monthly-bars {
-  min-height: 220px;
+  min-height: 210px;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(12, 1fr);
   align-items: end;
-  gap: clamp(16px, 4vw, 44px);
-  padding: 10px clamp(8px, 3vw, 28px) 0;
+  gap: clamp(3px, 0.6vw, 8px);
+  padding: 24px clamp(4px, 1vw, 12px) 0;
 }
 
 .month-column {
-  height: 205px;
+  height: 190px;
   display: grid;
   grid-template-rows: 1fr auto;
-  gap: 9px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .bar-stage {
   display: flex;
   align-items: end;
   justify-content: center;
-  gap: 12px;
+  gap: 3px;
   border-bottom: 1px solid var(--line);
 }
 
 .bar {
-  width: clamp(34px, 5vw, 58px);
-  min-height: 4px;
-  border-radius: 5px 5px 0 0;
+  width: clamp(7px, 1.3vw, 16px);
+  min-height: 3px;
+  border-radius: 3px 3px 0 0;
   position: relative;
 }
 
@@ -282,10 +283,10 @@ h2 {
 
 .bar-value {
   position: absolute;
-  top: -24px;
+  top: -15px;
   left: 50%;
-  color: var(--ink);
-  font-size: 11px;
+  color: var(--muted);
+  font-size: 9px;
   font-weight: 700;
   white-space: nowrap;
   transform: translateX(-50%);
@@ -293,9 +294,43 @@ h2 {
 
 .month-label {
   text-align: center;
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
 }
+
+.month-label small {
+  display: block;
+  min-height: 12px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--accent-dark);
+}
+
+.bar-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bar-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.bar-legend .lg {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.bar-legend .lg-rev { background: var(--accent); }
+.bar-legend .lg-tgt { background: #a8b5ba; }
 
 .mix-list {
   display: grid;
