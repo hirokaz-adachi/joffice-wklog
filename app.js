@@ -450,7 +450,7 @@
     el.dailyCount.textContent = String(entries.length);
     el.dailyCustomers.textContent = String(customerCount);
     el.staffSummary.innerHTML = summaryMarkup(groupHours(entries, "staff"));
-    el.customerSummary.innerHTML = summaryMarkup(groupHours(entries, "customer"));
+    el.customerSummary.innerHTML = summaryMarkup(groupHours(entries, "customer"), { demote: "顧客指定なし" });
   }
 
   function syncCustomerForTask() {
@@ -714,8 +714,15 @@
     if (preserveValue && Array.from(select.options).some((option) => option.value === current)) select.value = current;
   }
 
-  function summaryMarkup(groups) {
-    const items = Object.entries(groups).sort((a, b) => b[1] - a[1]);
+  function summaryMarkup(groups, options = {}) {
+    const demote = options.demote;
+    const items = Object.entries(groups).sort((a, b) => {
+      if (demote) {
+        if (a[0] === demote && b[0] !== demote) return 1;
+        if (b[0] === demote && a[0] !== demote) return -1;
+      }
+      return b[1] - a[1];
+    });
     if (items.length === 0) return `<div class="empty">入力はありません</div>`;
     return items.map(([name, hours]) => `
       <div class="summary-item">
