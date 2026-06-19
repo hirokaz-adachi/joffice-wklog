@@ -131,31 +131,35 @@ h2 {
   gap: 16px;
 }
 
-.period-control label {
+.period-label {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .period-control select {
-  display: block;
-  min-width: 150px;
-  min-height: 40px;
-  margin-top: 3px;
+  min-width: 175px;
+  min-height: 50px;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0 10px;
+  border-radius: 8px;
+  padding: 0 14px;
   color: var(--ink);
   background: #fff;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: clamp(22px, 2.2vw, 30px);
+  font-weight: 800;
+  line-height: 1.1;
+  cursor: pointer;
 }
 
 .icon-button {
-  width: 40px;
+  width: 50px;
+  height: 50px;
   padding: 0;
   color: var(--accent-dark);
   background: #fff;
+  font-size: 22px;
+  line-height: 1;
 }
 
 .status-line {
@@ -305,6 +309,17 @@ h2 {
   font-size: 9px;
   font-weight: 700;
   color: var(--accent-dark);
+}
+
+.month-column.is-active {
+  background: var(--accent-soft);
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px #bfe3dd;
+}
+
+.month-column.is-active .month-label {
+  color: var(--accent-dark);
+  font-weight: 800;
 }
 
 .bar-heading {

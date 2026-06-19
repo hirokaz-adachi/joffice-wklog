@@ -329,18 +329,25 @@
     return normalizeDate(value).slice(0, 7);
   }
 
+  function monthOptions() {
+    return lastTwelveMonths(anchorMonth());
+  }
+
   function renderMonthOptions() {
-    el.monthSelect.innerHTML = state.months
+    el.monthSelect.innerHTML = monthOptions()
+      .slice()
+      .reverse()
       .map((month) => `<option value="${month}">${formatMonthLabel(month)}</option>`)
       .join("");
     el.monthSelect.value = state.selectedMonth;
   }
 
   function shiftMonth(direction) {
-    const index = state.months.indexOf(state.selectedMonth);
-    const next = Math.max(0, Math.min(state.months.length - 1, index + direction));
+    const months = monthOptions();
+    const index = months.indexOf(state.selectedMonth);
+    const next = Math.max(0, Math.min(months.length - 1, index + direction));
     if (next === index || next < 0) return;
-    state.selectedMonth = state.months[next];
+    state.selectedMonth = months[next];
     el.monthSelect.value = state.selectedMonth;
     render();
   }
@@ -357,9 +364,10 @@
       state.customerModalMonth = state.selectedMonth;
       renderCustomerDetail();
     }
-    const monthIndex = state.months.indexOf(state.selectedMonth);
+    const months = monthOptions();
+    const monthIndex = months.indexOf(state.selectedMonth);
     el.prevMonth.disabled = monthIndex <= 0;
-    el.nextMonth.disabled = monthIndex < 0 || monthIndex >= state.months.length - 1;
+    el.nextMonth.disabled = monthIndex < 0 || monthIndex >= months.length - 1;
   }
 
   function buildMonthModel(month) {
@@ -539,8 +547,9 @@
       const prevYear = index > 0 ? data[index - 1].month.split("-")[0] : "";
       const showYear = index === 0 || year !== prevYear;
       const tip = `${formatMonthLabel(point.month)}：売上 ${formatCurrency(point.net)} / 目標 ${formatCurrency(point.target)}${point.target ? ` / 達成率 ${formatPercent(point.net / point.target)}` : ""}`;
+      const isActive = point.month === state.selectedMonth;
       return `
-        <div class="month-column" title="${escapeHtml(tip)}">
+        <div class="month-column${isActive ? " is-active" : ""}" title="${escapeHtml(tip)}">
           <div class="bar-stage">
             ${barMarkup("revenue", point.net, maxValue, true)}
             ${barMarkup("target", point.target, maxValue, false)}

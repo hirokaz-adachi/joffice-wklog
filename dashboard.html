@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>J-Office Insight ｜ 経営ダッシュボード</title>
-  <link rel="stylesheet" href="dashboard.css?v=20260618-4">
+  <link rel="stylesheet" href="dashboard.css?v=20260618-7">
 </head>
 <body>
   <header class="dashboard-header">
@@ -22,11 +22,9 @@
   <main class="dashboard-shell">
     <section class="control-band" aria-label="集計条件">
       <div class="period-control">
+        <span class="period-label">対象月</span>
         <button id="prevMonth" type="button" class="icon-button" aria-label="前月">‹</button>
-        <label>
-          対象月
-          <select id="monthSelect"></select>
-        </label>
+        <select id="monthSelect" aria-label="対象月"></select>
         <button id="nextMonth" type="button" class="icon-button" aria-label="翌月">›</button>
       </div>
       <div class="status-line">
@@ -169,6 +167,6 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="config.js"></script>
   <script src="backend.js"></script>
-  <script src="dashboard.js?v=20260618-4"></script>
+  <script src="dashboard.js?v=20260618-7"></script>
 </body>
 </html>
