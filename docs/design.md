@@ -285,7 +285,7 @@ sharoshi-worklog-mvp/
 - データモデル：`item_master`（品目コード表）を追加し6→**7シート**化。`bootstrap` は items も返す（未作成シートは安全に空配列）。
 - API：請求（`saveBilling`/`saveBillings`/`deleteBilling`）と売上目標（`saveTarget`/`saveTargets`/`deleteTarget`）の更新系を追加。`upsertMaster`/`removeMaster` の対応typeを staff/customers/tasks/items の4種へ拡張。
 - 運用：GASバックエンドを clasp でデプロイ可能に（`gas/.clasp.json`・`gas/appsscript.json` 追加。`appsscript.json` の `webapp` セクション必須＝欠落するとexec URLが停止）。`backend.js` を `?v=` キャッシュバスター対象に追加。
-- 残：第15-2（スタッフ・顧客を多角分析する**詳細分析画面**・工数先行/クロス集計まで）は未着手。案2（売上配賦の精緻化・第8章）も保留中。
+- 補足：本エントリ時点で残課題としていた第15-2（詳細分析画面）は、同日中に着手し上記「2026-06-22（詳細分析画面・工数フェーズ）」のとおり工数フェーズを実装済み。案2（売上配賦の精緻化・第8章）は引き続き保留中。
 
 ### 2026-06-22（バックログ整理）
 - 現状デモがFIX版でない旨を第1章に明記。デモ未実装の本番実装スコープを第15章として新設（マスタ独立画面化＋拡張／スタッフ別詳細分析・集計期間の動的設定／請求CSV取込／集計データ訂正編集）。既存バックログ（第14章）から第15章へ相互参照。
