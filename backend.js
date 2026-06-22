@@ -34,6 +34,36 @@
     return mutate("deleteEntry", { id });
   }
 
+  async function saveBilling(row) {
+    if (!isRemote()) return null;
+    return mutate("saveBilling", { row });
+  }
+
+  async function saveBillings(rows) {
+    if (!isRemote()) return null;
+    return mutate("saveBillings", { rows });
+  }
+
+  async function deleteBilling(invoiceId) {
+    if (!isRemote()) return null;
+    return mutate("deleteBilling", { invoiceId });
+  }
+
+  async function saveTarget(row) {
+    if (!isRemote()) return null;
+    return mutate("saveTarget", { row });
+  }
+
+  async function saveTargets(rows) {
+    if (!isRemote()) return null;
+    return mutate("saveTargets", { rows });
+  }
+
+  async function deleteTarget(targetMonth, staffCode) {
+    if (!isRemote()) return null;
+    return mutate("deleteTarget", { targetMonth, staffCode });
+  }
+
   async function upsertMaster(type, item, oldCode) {
     if (!isRemote()) return null;
     return mutate("upsertMaster", { type, item, oldCode: oldCode || "" });
@@ -107,6 +137,12 @@
     saveEntry,
     saveEntries,
     deleteEntry,
+    saveBilling,
+    saveBillings,
+    deleteBilling,
+    saveTarget,
+    saveTargets,
+    deleteTarget,
     upsertMaster,
     removeMaster
   };

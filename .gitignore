@@ -5,6 +5,12 @@ config.js
 scripts/deploy.config.ps1
 *.deploy.log
 
+# clasp（Apps Scriptデプロイ）認証・設定。リフレッシュトークン等を含むため管理外
+.clasp.json
+gas/.clasp.json
+.clasprc.json
+*.clasprc.json
+
 # 依存・ビルド
 node_modules/
 package-lock.json

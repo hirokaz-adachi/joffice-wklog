@@ -9,7 +9,8 @@ const CONFIG = {
     customers: "customer_master",
     tasks: "task_master",
     billing: "billing_data",
-    targets: "staff_target_master"
+    targets: "staff_target_master",
+    items: "item_master"
   },
   headers: {
     worklogs: ["id", "date", "staffCode", "staff", "customerCode", "customer", "taskType", "hours", "memo", "updatedAt"],
@@ -17,9 +18,17 @@ const CONFIG = {
     customers: ["code", "name"],
     tasks: ["name"],
     billing: ["invoiceId", "billingMonth", "customerCode", "customer", "invoiceItem", "paymentMethod", "netAmount", "taxAmount", "grossAmount", "issuedDate", "paymentDueDate", "paymentStatus", "memo"],
-    targets: ["targetMonth", "staffCode", "staff", "targetAmount"]
+    targets: ["targetMonth", "staffCode", "staff", "targetAmount"],
+    items: ["code", "name"]
   },
   defaultTasks: ["顧問対応", "給与計算", "手続き", "労務相談", "助成金", "スポット", "社内/その他"]
+};
+
+const MASTER_DEFS = {
+  staff:     { sheet: CONFIG.sheets.staff,     fields: ["code", "name"], key: "code" },
+  customers: { sheet: CONFIG.sheets.customers, fields: ["code", "name"], key: "code" },
+  tasks:     { sheet: CONFIG.sheets.tasks,     fields: ["name"],         key: "name" },
+  items:     { sheet: CONFIG.sheets.items,     fields: ["code", "name"], key: "code" }
 };
 
 function doGet(e) {
@@ -64,6 +73,24 @@ function route_(action, payload) {
       return mutateDashboardData_(() => {
         removeMaster_(payload.type, payload.code);
         return { type: payload.type, code: payload.code };
+      });
+    case "saveBilling":
+      return mutateDashboardData_(() => saveBilling_(payload.row));
+    case "saveBillings":
+      return mutateDashboardData_(() => (payload.rows || []).map(saveBilling_));
+    case "deleteBilling":
+      return mutateDashboardData_(() => {
+        deleteById_(CONFIG.sheets.billing, payload.invoiceId);
+        return { invoiceId: payload.invoiceId };
+      });
+    case "saveTarget":
+      return mutateDashboardData_(() => saveTarget_(payload.row));
+    case "saveTargets":
+      return mutateDashboardData_(() => (payload.rows || []).map(saveTarget_));
+    case "deleteTarget":
+      return mutateDashboardData_(() => {
+        deleteTarget_(payload.targetMonth, payload.staffCode);
+        return { targetMonth: payload.targetMonth, staffCode: payload.staffCode };
       });
     default:
       throw new Error("unknown action: " + action);
@@ -118,6 +145,7 @@ function bootstrap_() {
     staff: readObjects_(CONFIG.sheets.staff),
     customers: readObjects_(CONFIG.sheets.customers),
     taskTypes: readObjects_(CONFIG.sheets.tasks).map((row) => row.name).filter(Boolean),
+    items: readObjectsSafe_(CONFIG.sheets.items),
     entries: readObjects_(CONFIG.sheets.worklogs).map(normalizeWorklog_)
   };
 }
@@ -150,17 +178,62 @@ function saveEntry_(entry) {
   return entry;
 }
 
+function findTargetRow_(sheet, month, staffCode) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+  const values = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  for (let i = 0; i < values.length; i += 1) {
+    if (formatMonth_(values[i][0]) === String(month) && String(values[i][1]) === String(staffCode)) return i + 2;
+  }
+  return 0;
+}
+
+function saveTarget_(row) {
+  if (!row || !row.targetMonth || !row.staffCode) throw new Error("target targetMonth/staffCode is required");
+  const sheet = getSheet_(CONFIG.sheets.targets);
+  const values = CONFIG.headers.targets.map((key) => row[key] == null ? "" : row[key]);
+  const r = findTargetRow_(sheet, row.targetMonth, row.staffCode);
+  if (r) {
+    sheet.getRange(r, 1, 1, values.length).setValues([values]);
+  } else {
+    sheet.appendRow(values);
+  }
+  return row;
+}
+
+function deleteTarget_(month, staffCode) {
+  const sheet = getSheet_(CONFIG.sheets.targets);
+  const r = findTargetRow_(sheet, month, staffCode);
+  if (r) sheet.deleteRow(r);
+}
+
+function saveBilling_(row) {
+  if (!row || !row.invoiceId) throw new Error("billing.invoiceId is required");
+  const sheet = getSheet_(CONFIG.sheets.billing);
+  const values = CONFIG.headers.billing.map((key) => row[key] == null ? "" : row[key]);
+  const r = findRowByValue_(sheet, 1, row.invoiceId);
+  if (r) {
+    sheet.getRange(r, 1, 1, values.length).setValues([values]);
+  } else {
+    sheet.appendRow(values);
+  }
+  return row;
+}
+
 function upsertMaster_(type, item, oldCode) {
-  const sheetName = masterSheetName_(type);
-  if (!item || !item.code || !item.name) throw new Error("master code/name is required");
-  const sheet = getSheet_(sheetName);
-  const codeColumn = 1;
-  if (oldCode && oldCode !== item.code) {
-    const oldRow = findRowByValue_(sheet, codeColumn, oldCode);
+  const def = MASTER_DEFS[type];
+  if (!def) throw new Error("unknown master type: " + type);
+  if (!item) throw new Error("master item is required");
+  const keyVal = item[def.key];
+  if (!keyVal) throw new Error("master " + def.key + " is required");
+  if (def.fields.indexOf("name") >= 0 && !item.name) throw new Error("master name is required");
+  const sheet = ensureSheet_(def.sheet, def.fields);
+  if (oldCode && oldCode !== keyVal) {
+    const oldRow = findRowByValue_(sheet, 1, oldCode);
     if (oldRow) sheet.deleteRow(oldRow);
   }
-  const values = [item.code, item.name];
-  const row = findRowByValue_(sheet, codeColumn, item.code);
+  const values = def.fields.map((f) => item[f] == null ? "" : item[f]);
+  const row = findRowByValue_(sheet, 1, keyVal);
   if (row) {
     sheet.getRange(row, 1, 1, values.length).setValues([values]);
   } else {
@@ -170,8 +243,10 @@ function upsertMaster_(type, item, oldCode) {
 }
 
 function removeMaster_(type, code) {
-  const sheetName = masterSheetName_(type);
-  const sheet = getSheet_(sheetName);
+  const def = MASTER_DEFS[type];
+  if (!def) throw new Error("unknown master type: " + type);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(def.sheet);
+  if (!sheet) return;
   const row = findRowByValue_(sheet, 1, code);
   if (row) sheet.deleteRow(row);
 }
@@ -190,6 +265,7 @@ function ensureSheets_() {
   ensureSheet_(CONFIG.sheets.tasks, CONFIG.headers.tasks);
   ensureSheet_(CONFIG.sheets.billing, CONFIG.headers.billing);
   ensureSheet_(CONFIG.sheets.targets, CONFIG.headers.targets);
+  ensureSheet_(CONFIG.sheets.items, CONFIG.headers.items);
 }
 
 function readDashboardCache_() {
@@ -262,6 +338,12 @@ function getSheet_(name) {
     throw new Error("required sheet is missing: " + name + ". Run setup() first.");
   }
   return sheet;
+}
+
+function readObjectsSafe_(sheetName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return [];
+  return readObjects_(sheetName);
 }
 
 function readObjects_(sheetName) {
