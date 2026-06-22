@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>J-Office Insight ｜ マスタメンテナンス</title>
+  <link rel="stylesheet" href="styles.css?v=20260622-1">
+  <link rel="stylesheet" href="data-edit.css?v=20260622-1">
+  <link rel="stylesheet" href="master.css?v=20260622-1">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">J-Office Insight</p>
+      <h1>マスタメンテナンス</h1>
+    </div>
+    <div class="top-actions">
+      <a class="nav-button" href="index.html">メニュー</a>
+      <a class="nav-button" href="worklog.html">工数管理</a>
+      <a class="nav-button" href="data-edit.html">データ訂正・編集</a>
+      <a class="nav-button" href="dashboard.html">ダッシュボード</a>
+      <button id="reload" type="button" class="secondary">再読込</button>
+    </div>
+  </header>
+
+  <main class="edit-shell">
+    <section class="edit-panel">
+      <div class="edit-toolbar">
+        <div class="tabs" role="tablist" aria-label="マスタ選択">
+          <button type="button" class="tab is-active" data-master="staff" role="tab">スタッフ</button>
+          <button type="button" class="tab" data-master="customers" role="tab">顧客</button>
+          <button type="button" class="tab" data-master="tasks" role="tab">業務区分</button>
+          <button type="button" class="tab" data-master="items" role="tab">品目（請求項目）</button>
+        </div>
+        <div class="edit-actions">
+          <span id="dataStatus" class="edit-status">読み込み中…</span>
+        </div>
+      </div>
+
+      <p id="masterHint" class="edit-hint"></p>
+
+      <form id="masterForm" class="master-edit-form" autocomplete="off"></form>
+
+      <div class="master-search">
+        <input id="masterSearch" type="search" placeholder="絞り込み（コード・名称）">
+        <span id="masterCount" class="filter-count"></span>
+      </div>
+
+      <div class="table-wrap edit-grid">
+        <table id="masterTable">
+          <thead id="masterHead"></thead>
+          <tbody id="masterBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="config.js"></script>
+  <script src="backend.js?v=20260622-2"></script>
+  <script src="master.js?v=20260622-1"></script>
+</body>
+</html>

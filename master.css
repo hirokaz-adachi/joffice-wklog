@@ -1,0 +1,84 @@
+/* マスタメンテナンス画面 専用スタイル（styles.css / data-edit.css を併用） */
+.master-edit-form {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafb;
+}
+
+.master-edit-form label {
+  font-size: 12px;
+}
+
+.master-edit-form input {
+  width: auto;
+  min-width: 200px;
+}
+
+.master-edit-form .form-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.master-edit-form.is-editing {
+  border-color: #d8a657;
+  background: #fffbeb;
+}
+
+.master-edit-form.is-editing .primary {
+  background: #b45309;
+  border-color: #b45309;
+}
+
+.master-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.master-search input {
+  width: auto;
+  min-width: 240px;
+}
+
+.master-search .filter-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+#masterTable { min-width: 520px; }
+#masterTable th { background: #f8fafb; }
+#masterTable .col-key { width: 200px; color: var(--muted); font-weight: 800; }
+#masterTable .ops { width: 150px; text-align: right; }
+
+#masterTable .row-edit {
+  min-height: 30px;
+  padding: 0 10px;
+  color: var(--accent-dark);
+  background: #fff;
+  border-color: var(--accent);
+}
+#masterTable .row-edit:hover { background: var(--accent-soft); }
+
+#masterTable .row-del {
+  min-height: 30px;
+  padding: 0 10px;
+  color: var(--warn);
+  background: #fff;
+  border-color: #f3c6b1;
+}
+#masterTable .row-del:hover { background: #fff7ed; }
+
+@media (max-width: 640px) {
+  .master-edit-form input,
+  .master-search input { min-width: 0; width: 100%; }
+}

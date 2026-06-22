@@ -1,0 +1,208 @@
+/* データ訂正・編集画面 専用スタイル（styles.css を併用） */
+.edit-shell {
+  padding: 18px clamp(14px, 3vw, 32px) 40px;
+}
+
+.edit-panel {
+  padding: 16px;
+}
+
+.edit-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.tabs {
+  display: inline-flex;
+  gap: 6px;
+  background: #eef3f4;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.tab {
+  min-height: 36px;
+  padding: 0 16px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font-weight: 800;
+}
+
+.tab:hover {
+  background: #fff;
+  color: var(--accent-dark);
+}
+
+.tab.is-active {
+  color: #fff;
+  background: var(--accent);
+}
+
+.edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.edit-status {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dirty-info {
+  min-width: 96px;
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.edit-hint {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.edit-grid {
+  max-height: calc(100vh - 280px);
+  overflow: auto;
+}
+
+.edit-grid table {
+  min-width: 880px;
+}
+
+.bill-table {
+  min-width: 1320px;
+}
+
+.edit-grid th,
+.edit-grid td {
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+
+.edit-grid tbody tr.is-dirty td {
+  background: #fffbeb;
+}
+
+.edit-grid tbody tr.is-new td {
+  background: #fef9c3;
+}
+
+.edit-grid input,
+.edit-grid select {
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.edit-grid input:hover,
+.edit-grid select:hover {
+  border-color: var(--line);
+}
+
+.edit-grid input:focus,
+.edit-grid select:focus {
+  border-color: var(--accent);
+  background: #fff;
+  outline: 3px solid rgba(15, 118, 110, 0.13);
+}
+
+.edit-grid input.cell-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.edit-grid .cell-id {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 0 4px;
+}
+
+/* 列幅の目安 */
+.col-date input { width: 150px; }
+.col-staff select { width: 150px; }
+.col-customer select { width: 200px; }
+.col-task select { width: 140px; }
+.col-hours input { width: 84px; }
+.col-memo input { width: 220px; }
+.col-month input { width: 130px; }
+.col-item input { width: 150px; }
+.col-pay input { width: 110px; }
+.col-amt input { width: 104px; }
+.col-date2 input { width: 140px; }
+.col-status input { width: 110px; }
+.col-invid { min-width: 150px; }
+.col-ops { width: 78px; }
+
+.edit-grid .row-del {
+  min-height: 30px;
+  padding: 0 10px;
+  color: var(--warn);
+  background: #fff;
+  border-color: #f3c6b1;
+}
+
+.edit-grid .row-del:hover {
+  background: #fff7ed;
+}
+
+.grid-empty {
+  padding: 22px;
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .topbar { flex-direction: column; align-items: stretch; }
+  .top-actions { width: 100%; }
+  .edit-toolbar { flex-direction: column; align-items: stretch; }
+  .edit-actions { justify-content: space-between; }
+}
+
+
+/* 絞り込みバー */
+.grid-filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.grid-filters label {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.grid-filters input,
+.grid-filters select {
+  width: auto;
+  min-height: 38px;
+  min-width: 140px;
+  border-color: var(--line);
+}
+
+.grid-filters .filter-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
