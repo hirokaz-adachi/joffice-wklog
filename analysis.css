@@ -1,0 +1,311 @@
+/* 詳細分析画面 専用スタイル。ベース（header/panel/kpi/table/control-band/toast 等）は
+   dashboard.css を再利用し、ここでは分析画面に固有の要素のみ定義する。 */
+
+/* ── コントロールバンド ── */
+.analysis-controls {
+  flex-wrap: wrap;
+  gap: 18px 24px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.period-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.range-sep {
+  color: var(--muted);
+}
+
+.check-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.check-inline input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.analysis-controls .status-line {
+  margin-left: auto;
+  align-self: flex-end;
+}
+
+.period-note {
+  margin: -6px 2px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.analysis-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+/* ── 月次工数推移（スタックチャート） ── */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  max-width: 620px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.stack-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(6px, 1.5vw, 18px);
+  min-height: 250px;
+  padding: 10px 4px 0;
+  overflow-x: auto;
+}
+
+.stack-column {
+  flex: 1 1 0;
+  min-width: 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.stack-total {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  min-height: 14px;
+}
+
+.stack-stage {
+  display: flex;
+  align-items: flex-end;
+  height: 200px;
+}
+
+.stack-bar {
+  width: clamp(20px, 3vw, 40px);
+  display: flex;
+  flex-direction: column-reverse;
+  border-radius: 5px 5px 0 0;
+  overflow: hidden;
+  background: var(--surface-soft);
+}
+
+.stack-seg {
+  width: 100%;
+}
+
+.stack-seg + .stack-seg {
+  border-top: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.stack-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.stack-label small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  min-height: 12px;
+}
+
+/* ── ランキング・構成比 ── */
+.rank-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.rank-row {
+  display: grid;
+  grid-template-columns: 28px 14px minmax(120px, 1.4fr) minmax(80px, 2fr) 64px 56px 110px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rank-row:last-child {
+  border-bottom: none;
+}
+
+.rank-no {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.rank-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.rank-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rank-track {
+  height: 10px;
+  background: var(--surface-soft);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.rank-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.rank-hours {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.rank-share {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-dark);
+  font-weight: 700;
+}
+
+.rank-avg {
+  text-align: right;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .rank-row {
+    grid-template-columns: 24px 12px 1fr 56px 50px;
+  }
+  .rank-track,
+  .rank-avg {
+    display: none;
+  }
+}
+
+/* ── クロス集計（ピボット） ── */
+.pivot-controls {
+  gap: 14px;
+}
+
+.pivot-axis {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pivot-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 13px;
+}
+
+.pivot-table th,
+.pivot-table td {
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.pivot-table thead th {
+  background: var(--surface-soft);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-weight: 700;
+}
+
+.pivot-corner {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--surface-soft);
+  text-align: left;
+  color: var(--muted);
+}
+
+.pivot-rowhead {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+  text-align: left;
+  font-weight: 600;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pivot-cell {
+  font-variant-numeric: tabular-nums;
+}
+
+.pivot-zero {
+  color: #c2cdd2;
+}
+
+.pivot-total-col {
+  font-weight: 700;
+  background: var(--surface-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.pivot-grand {
+  font-weight: 800;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.pivot-table tfoot th,
+.pivot-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+}

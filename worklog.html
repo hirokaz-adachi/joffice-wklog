@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>J-Office Insight ｜ 工数管理</title>
-  <link rel="stylesheet" href="styles.css?v=20260618-2">
+  <link rel="stylesheet" href="styles.css?v=20260622-1">
 </head>
 <body>
   <header class="topbar">
@@ -150,47 +150,11 @@
         </table>
       </div>
     </section>
-
-    <section class="master-panel" aria-labelledby="masterTitle">
-      <div class="section-heading">
-        <h2 id="masterTitle">マスタメンテナンス</h2>
-      </div>
-      <div class="master-grid">
-        <form id="staffForm">
-          <input id="editingStaffCode" type="hidden">
-          <div class="master-form-title">スタッフ</div>
-          <label>
-            社員番号
-            <input id="newStaffCode" type="text" autocomplete="off">
-          </label>
-          <label>
-            氏名
-            <input id="newStaff" type="text" autocomplete="off">
-          </label>
-          <button type="submit">追加</button>
-          <div id="staffChips" class="master-list"></div>
-        </form>
-        <form id="customerForm">
-          <input id="editingCustomerCode" type="hidden">
-          <div class="master-form-title">顧客</div>
-          <label>
-            顧客番号
-            <input id="newCustomerCode" type="text" autocomplete="off">
-          </label>
-          <label>
-            顧客名
-            <input id="newCustomer" type="text" autocomplete="off">
-          </label>
-          <button type="submit">追加</button>
-          <div id="customerChips" class="master-list"></div>
-        </form>
-      </div>
-    </section>
   </main>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="config.js"></script>
   <script src="backend.js?v=20260622-2"></script>
-  <script src="app.js?v=20260618-4"></script>
+  <script src="app.js?v=20260622-1"></script>
 </body>
 </html>

@@ -40,16 +40,6 @@
     filterTo: document.getElementById("filterTo"),
     filterStaff: document.getElementById("filterStaff"),
     filterCustomer: document.getElementById("filterCustomer"),
-    staffForm: document.getElementById("staffForm"),
-    customerForm: document.getElementById("customerForm"),
-    editingStaffCode: document.getElementById("editingStaffCode"),
-    editingCustomerCode: document.getElementById("editingCustomerCode"),
-    newStaff: document.getElementById("newStaff"),
-    newStaffCode: document.getElementById("newStaffCode"),
-    newCustomer: document.getElementById("newCustomer"),
-    newCustomerCode: document.getElementById("newCustomerCode"),
-    staffChips: document.getElementById("staffChips"),
-    customerChips: document.getElementById("customerChips"),
     cardDayList: document.getElementById("cardDayList"),
     cardDayMeta: document.getElementById("cardDayMeta"),
     toast: document.getElementById("toast")
@@ -103,8 +93,6 @@
     el.copyPrevious.addEventListener("click", copyPreviousDay);
     el.exportCsv.addEventListener("click", exportCsv);
     el.importCsv.addEventListener("change", importCsv);
-    el.staffForm.addEventListener("submit", addStaff);
-    el.customerForm.addEventListener("submit", addCustomer);
 
     el.staff.addEventListener("change", renderCardDayList);
     el.taskType.addEventListener("change", syncCustomerForTask);
@@ -235,119 +223,6 @@
     showToast(`${source.length}件をコピーしました`);
   }
 
-  async function addStaff(event) {
-    event.preventDefault();
-    const oldCode = el.editingStaffCode.value;
-    const oldName = (state.staff.find((item) => item.code === oldCode) || {}).name || "";
-    const code = normalizeName(el.newStaffCode.value);
-    const name = normalizeName(el.newStaff.value);
-    if (!code || !name) return;
-    if (!validateMasterUnique("staff", code, name, oldCode)) return;
-    try {
-      await window.WorklogBackend.upsertMaster("staff", { code, name }, oldCode);
-    } catch (error) {
-      showToast(error.message);
-      return;
-    }
-    upsertMaster("staff", { code, name }, oldCode);
-    updateEntriesForMaster("staff", oldCode || code, code, oldName, name);
-    resetMasterForm("staff");
-    persist();
-    render();
-  }
-
-  async function addCustomer(event) {
-    event.preventDefault();
-    const oldCode = el.editingCustomerCode.value;
-    const oldName = (state.customers.find((item) => item.code === oldCode) || {}).name || "";
-    const code = normalizeName(el.newCustomerCode.value);
-    const name = normalizeName(el.newCustomer.value);
-    if (!code || !name) return;
-    if (!validateMasterUnique("customers", code, name, oldCode)) return;
-    try {
-      await window.WorklogBackend.upsertMaster("customers", { code, name }, oldCode);
-    } catch (error) {
-      showToast(error.message);
-      return;
-    }
-    upsertMaster("customers", { code, name }, oldCode);
-    updateEntriesForMaster("customers", oldCode || code, code, oldName, name);
-    resetMasterForm("customers");
-    persist();
-    render();
-  }
-
-  function editMaster(type, code) {
-    const item = state[type].find((current) => current.code === code);
-    if (!item) return;
-    if (type === "staff") {
-      el.editingStaffCode.value = item.code;
-      el.newStaffCode.value = item.code;
-      el.newStaff.value = item.name;
-      el.staffForm.classList.add("is-editing");
-      el.staffForm.querySelector("button[type='submit']").textContent = "更新";
-      el.newStaffCode.focus();
-    } else {
-      el.editingCustomerCode.value = item.code;
-      el.newCustomerCode.value = item.code;
-      el.newCustomer.value = item.name;
-      el.customerForm.classList.add("is-editing");
-      el.customerForm.querySelector("button[type='submit']").textContent = "更新";
-      el.newCustomerCode.focus();
-    }
-  }
-
-  function resetMasterForm(type) {
-    if (type === "staff") {
-      el.editingStaffCode.value = "";
-      el.newStaffCode.value = "";
-      el.newStaff.value = "";
-      el.staffForm.classList.remove("is-editing");
-      el.staffForm.querySelector("button[type='submit']").textContent = "追加";
-    } else {
-      el.editingCustomerCode.value = "";
-      el.newCustomerCode.value = "";
-      el.newCustomer.value = "";
-      el.customerForm.classList.remove("is-editing");
-      el.customerForm.querySelector("button[type='submit']").textContent = "追加";
-    }
-  }
-
-  async function removeMaster(type, code) {
-    const item = state[type].find((current) => current.code === code);
-    if (!item) return;
-    const ok = window.confirm(`${item.code} ${item.name} をマスタから外しますか？ 入力済みデータは残ります。`);
-    if (!ok) return;
-    try {
-      await window.WorklogBackend.removeMaster(type, code);
-    } catch (error) {
-      showToast(error.message);
-      return;
-    }
-    state[type] = state[type].filter((current) => current.code !== code);
-    persist();
-    render();
-  }
-
-  function validateMasterUnique(type, code, name, oldCode = "") {
-    const label = type === "staff" ? "スタッフ" : "顧客";
-    const codeLabel = type === "staff" ? "社員番号" : "顧客番号";
-    const nameLabel = type === "staff" ? "氏名" : "顧客名";
-    const duplicatedCode = state[type].find((item) => item.code === code && item.code !== oldCode);
-    if (duplicatedCode) {
-      showToast(`${label}の${codeLabel}が重複しています`);
-      return false;
-    }
-
-    const duplicatedName = state[type].find((item) => item.name === name && item.code !== oldCode);
-    if (duplicatedName) {
-      showToast(`${label}の${nameLabel}が重複しています`);
-      return false;
-    }
-
-    return true;
-  }
-
   function render() {
     renderMasters();
     syncCustomerForTask();
@@ -417,26 +292,13 @@
     calendarCursor = new Date(year, month - 1, 1);
   }
 
+  // マスタ編集UIは独立画面（master.html）へ切り出し済み。
+  // ここでは入力フォーム・フィルタのスタッフ／顧客／業務区分セレクトを最新マスタで埋めるのみ。
   function renderMasters() {
     fillMasterSelect(el.staff, state.staff, true);
     fillSelect(el.taskType, state.taskTypes, true);
     fillFilterStaffSelect(el.filterStaff, true);
     fillCustomerSelect(el.customer, true);
-    el.staffChips.innerHTML = masterListMarkup(state.staff, "staff", "社員番号", "氏名");
-    el.customerChips.innerHTML = masterListMarkup(state.customers, "customers", "顧客番号", "顧客名");
-
-    el.staffChips.querySelectorAll("[data-edit-master]").forEach((button) => {
-      button.addEventListener("click", () => editMaster("staff", button.dataset.code));
-    });
-    el.customerChips.querySelectorAll("[data-edit-master]").forEach((button) => {
-      button.addEventListener("click", () => editMaster("customers", button.dataset.code));
-    });
-    el.staffChips.querySelectorAll("[data-delete-master]").forEach((button) => {
-      button.addEventListener("click", () => removeMaster("staff", button.dataset.code));
-    });
-    el.customerChips.querySelectorAll("[data-delete-master]").forEach((button) => {
-      button.addEventListener("click", () => removeMaster("customers", button.dataset.code));
-    });
   }
 
   function renderDailySummary() {
@@ -732,29 +594,6 @@
     `).join("");
   }
 
-  function masterListMarkup(items, type, codeLabel, nameLabel) {
-    if (items.length === 0) {
-      return `<div class="empty">登録はありません</div>`;
-    }
-    return `
-      <div class="master-row">
-        <span class="master-code">${escapeHtml(codeLabel)}</span>
-        <span class="master-name">${escapeHtml(nameLabel)}</span>
-        <span></span>
-      </div>
-      ${items.map((item) => `
-        <div class="master-row">
-          <span class="master-code">${escapeHtml(item.code)}</span>
-          <span class="master-name">${escapeHtml(item.name)}</span>
-          <span class="master-actions">
-            <button type="button" class="edit-master" data-edit-master data-type="${type}" data-code="${escapeHtml(item.code)}" aria-label="${escapeHtml(item.name)}を編集">編集</button>
-            <button type="button" class="delete-master" data-delete-master data-type="${type}" data-code="${escapeHtml(item.code)}" aria-label="${escapeHtml(item.name)}を外す">削除</button>
-          </span>
-        </div>
-      `).join("")}
-    `;
-  }
-
   function groupHours(entries, key) {
     return entries.reduce((acc, entry) => {
       const groupKey = key === "customer" ? displayCustomer(entry) : entry[key];
@@ -779,20 +618,6 @@
       state[type].push(item);
     }
     state[type].sort((a, b) => a.code.localeCompare(b.code, "ja"));
-  }
-
-  function updateEntriesForMaster(type, oldCode, newCode, oldName, newName) {
-    if (!oldCode || !newCode) return;
-    state.entries.forEach((entry) => {
-      if (type === "staff" && (entry.staffCode === oldCode || (!entry.staffCode && entry.staff === oldName))) {
-        entry.staffCode = newCode;
-        entry.staff = newName;
-      }
-      if (type === "customers" && (entry.customerCode === oldCode || (!entry.customerCode && entry.customer === oldName))) {
-        entry.customerCode = newCode;
-        entry.customer = newName;
-      }
-    });
   }
 
   function upsertCustomerByName(name) {

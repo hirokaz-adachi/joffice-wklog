@@ -239,18 +239,13 @@ section {
 }
 
 .entry-panel,
-.summary-panel,
-.master-panel {
+.summary-panel {
   padding: 18px;
 }
 
 .list-panel {
   grid-column: 1 / -1;
   padding: 18px;
-}
-
-.master-panel {
-  grid-column: 1 / -1;
 }
 
 .section-heading {
@@ -454,106 +449,6 @@ tr:last-child td {
   background: #fff7ed;
 }
 
-.master-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  align-items: start;
-}
-
-.master-grid form {
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: end;
-}
-
-.master-grid form.is-editing > button[type="submit"] {
-  color: #fff;
-  background: #b45309;
-  border-color: #b45309;
-}
-
-.master-grid form.is-editing > button[type="submit"]:hover {
-  background: #92400e;
-  border-color: #92400e;
-}
-
-.master-form-title {
-  grid-column: 1 / -1;
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.master-list {
-  grid-column: 1 / -1;
-  display: grid;
-  gap: 0;
-  margin-top: 6px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.master-row {
-  min-height: 42px;
-  display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) 104px;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--line);
-  background: #fff;
-  font-size: 13px;
-}
-
-.master-row:last-child {
-  border-bottom: 0;
-}
-
-.master-code {
-  color: var(--muted);
-  font-weight: 800;
-}
-
-.master-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 700;
-}
-
-.master-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.master-row button {
-  min-height: 30px;
-  padding: 0 10px;
-}
-
-.master-row .edit-master {
-  color: var(--accent-dark);
-  background: #fff;
-  border-color: var(--accent);
-}
-
-.master-row .edit-master:hover {
-  background: var(--accent-soft);
-}
-
-.master-row .delete-master {
-  color: var(--warn);
-  background: #fff;
-  border-color: #f3c6b1;
-}
-
-.master-row .delete-master:hover {
-  background: #fff7ed;
-}
-
 .empty {
   padding: 18px;
   color: var(--muted);
@@ -645,8 +540,7 @@ select:disabled {
     grid-template-columns: 1fr;
   }
 
-  .split,
-  .master-grid {
+  .split {
     grid-template-columns: 1fr;
   }
 }
@@ -696,18 +590,5 @@ select:disabled {
   .filters input,
   .filters select {
     width: 100%;
-  }
-
-  .master-grid form,
-  .master-row {
-    grid-template-columns: 1fr;
-  }
-
-  .master-row {
-    align-items: start;
-  }
-
-  .master-actions {
-    justify-content: flex-start;
   }
 }
