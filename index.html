@@ -31,11 +31,23 @@
       transition: transform .08s ease, box-shadow .08s ease, border-color .08s ease;
     }
     .card:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 16px 36px rgba(23,32,38,.12); }
+    .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
     .badge { display: inline-flex; align-items: center; justify-content: center;
       width: 40px; height: 40px; border-radius: 9px; background: var(--accent-soft);
-      color: var(--accent-dark); font-weight: 800; font-size: 18px; margin-bottom: 14px; }
+      color: var(--accent-dark); font-weight: 800; font-size: 18px; }
     .card h2 { margin: 0 0 6px; font-size: 18px; }
     .card p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+    /* グループ見出し・デバイスバッジ */
+    .menu-group { margin-top: 28px; }
+    .menu-group:first-of-type { margin-top: 8px; }
+    .group-title { display: flex; align-items: center; gap: 8px; margin: 0 0 12px;
+      font-size: 14px; font-weight: 800; color: var(--accent-dark); }
+    .group-title::before { content: ""; width: 4px; height: 16px; border-radius: 2px; background: var(--accent); }
+    .group-note { color: var(--muted); font-weight: 600; font-size: 12px; }
+    .device { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .device.pc { background: #eef2ff; color: #3730a3; }
+    .device.mobile { background: #dff3ef; color: #0b5d57; }
 
     /* QRパネル */
     .qr-panel { margin-top: 18px; display: flex; gap: 20px; align-items: center;
@@ -87,43 +99,22 @@
 
   <main id="menu" class="menu" hidden>
     <p class="lead">利用する画面を選んでください。</p>
-    <div class="cards">
-      <a class="card" href="worklog.html">
-        <span class="badge">工</span>
-        <h2>工数管理</h2>
-        <p>顧客別の工数入力・一覧・マスタ管理・CSV入出力（PC向け）。</p>
-      </a>
-      <a class="card" href="staff.html">
-        <span class="badge">登</span>
-        <h2>作業内容登録</h2>
-        <p>スタッフが当日の作業時間を手早く登録（スマホ向け）。</p>
-      </a>
-      <a class="card" href="dashboard.html">
-        <span class="badge">経</span>
-        <h2>経営ダッシュボード</h2>
-        <p>売上・工数・時間単価・達成率を月次で可視化。</p>
-      </a>
-      <a class="card" href="analysis.html">
-        <span class="badge">析</span>
-        <h2>詳細分析</h2>
-        <p>任意期間でスタッフ・顧客・業務区分を多角的に分析（工数）。</p>
-      </a>
-      <a class="card" href="data-edit.html">
-        <span class="badge">訂</span>
-        <h2>データ訂正・編集</h2>
-        <p>登録済みの工数・売上をExcelライクに一括修正（PC向け）。</p>
-      </a>
-      <a class="card" href="master.html">
-        <span class="badge">マ</span>
-        <h2>マスタメンテナンス</h2>
-        <p>スタッフ・顧客・業務区分・品目を管理（PC向け）。</p>
-      </a>
-      <a class="card" href="targets.html">
-        <span class="badge">目</span>
-        <h2>売上目標登録</h2>
-        <p>スタッフ別の月次売上目標を登録（PC向け）。</p>
-      </a>
-    </div>
+
+    <section class="menu-group" aria-labelledby="grp-input">
+      <h2 class="group-title" id="grp-input">日常の入力 <span class="group-note">毎日の作業時間・工数を登録</span></h2>
+      <div class="cards">
+        <a class="card" href="staff.html">
+          <div class="card-top"><span class="badge">登</span><span class="device mobile">スマホ</span></div>
+          <h2>作業内容登録</h2>
+          <p>スタッフが当日の作業時間を手早く登録。担当顧客は上位に表示。</p>
+        </a>
+        <a class="card" href="worklog.html">
+          <div class="card-top"><span class="badge">工</span><span class="device pc">PC</span></div>
+          <h2>工数管理</h2>
+          <p>顧客別の工数入力・カレンダー・一覧・CSV入出力。</p>
+        </a>
+      </div>
+    </section>
 
     <section class="qr-panel" aria-label="作業内容登録のQRコード">
       <div class="qr-box">
@@ -133,6 +124,43 @@
         <h2>スタッフ用 作業登録 QR</h2>
         <p>スマホのカメラで読み取ると「作業内容登録」画面が開きます。掲示・配布用にどうぞ。</p>
         <a class="qr-link" href="staff.html">https://tools.h-linksystems.com/joffice/staff.html</a>
+      </div>
+    </section>
+
+    <section class="menu-group" aria-labelledby="grp-analyze">
+      <h2 class="group-title" id="grp-analyze">分析・可視化 <span class="group-note">売上・工数の状況を把握</span></h2>
+      <div class="cards">
+        <a class="card" href="dashboard.html">
+          <div class="card-top"><span class="badge">経</span><span class="device pc">PC</span></div>
+          <h2>経営ダッシュボード</h2>
+          <p>売上・工数・時間単価・達成率を月次で可視化。</p>
+        </a>
+        <a class="card" href="analysis.html">
+          <div class="card-top"><span class="badge">析</span><span class="device pc">PC</span></div>
+          <h2>詳細分析</h2>
+          <p>任意期間でスタッフ・顧客・業務区分を多角的に分析。</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="menu-group" aria-labelledby="grp-admin">
+      <h2 class="group-title" id="grp-admin">管理・設定 <span class="group-note">管理者向け（マスタ・目標・データ修正）</span></h2>
+      <div class="cards">
+        <a class="card" href="master.html">
+          <div class="card-top"><span class="badge">マ</span><span class="device pc">PC</span></div>
+          <h2>マスタメンテナンス</h2>
+          <p>スタッフ・顧客・業務区分・工程・顧客担当・品目・設定を管理。</p>
+        </a>
+        <a class="card" href="targets.html">
+          <div class="card-top"><span class="badge">目</span><span class="device pc">PC</span></div>
+          <h2>売上目標登録</h2>
+          <p>スタッフ別の月次売上目標を登録。</p>
+        </a>
+        <a class="card" href="data-edit.html">
+          <div class="card-top"><span class="badge">訂</span><span class="device pc">PC</span></div>
+          <h2>データ訂正・編集</h2>
+          <p>登録済みの工数・売上をExcelライクに一括修正。</p>
+        </a>
       </div>
     </section>
   </main>
