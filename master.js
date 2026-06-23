@@ -307,8 +307,8 @@
     const cell = (c, role) => {
       const val = resolvedStaff(c.code, role, month);
       const tag = thisMonthRow(c.code, role, month) ? `<span class="eff-tag eff-this">この月〜</span>`
-        : (val ? `<span class="eff-tag eff-inh">引継</span>` : "");
-      return `<td><select data-role="${role}">${opts(val)}</select>${tag}</td>`;
+        : (val ? `<span class="eff-tag eff-inh">引継</span>` : `<span class="eff-tag eff-none">未設定</span>`);
+      return `<td><div class="assignee-cell"><select data-role="${role}">${opts(val)}</select>${tag}</div></td>`;
     };
     el.body.innerHTML = rows.length ? rows.map((c) => {
       const hasTm = thisMonthRow(c.code, "PRE", month) || thisMonthRow(c.code, "REV", month);
