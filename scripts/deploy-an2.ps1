@@ -1,4 +1,4 @@
-# 案2 協調デプロイ（GAS反映 → setup()/rebuildDemo() 手動実行案内 → FTPS配信）
+﻿# 案2 協調デプロイ（GAS反映 → setup()/rebuildDemo() 手動実行案内 → FTPS配信）
 # 対話型。Windows / PowerShell 7 で、自分のターミナルから実行してください。
 #   powershell -ExecutionPolicy Bypass -File scripts\deploy-an2.ps1
 # 前提: clasp ログイン済み（gas/.clasp.json あり）、scripts\deploy.config.ps1 設定済み。
