@@ -5,7 +5,7 @@
   const TASK_INTERNAL = "社内/その他";
   const DEFAULT_TASKS = ["顧問対応", "給与計算", "手続き", "労務相談", "助成金", "スポット", TASK_INTERNAL];
 
-  const state = { staff: [], customers: [], taskTypes: DEFAULT_TASKS.slice(), work: [], bill: [] };
+  const state = { staff: [], customers: [], taskTypes: DEFAULT_TASKS.slice(), customerStaff: [], work: [], bill: [] };
   const dirtyWork = new Set();
   const dirtyBill = new Set();
   const newWork = new Set();
@@ -79,6 +79,8 @@
           state.staff = normMaster(st.staff);
           state.customers = normMaster(st.customers);
           state.taskTypes = Array.isArray(st.taskTypes) && st.taskTypes.length ? st.taskTypes : DEFAULT_TASKS.slice();
+          state.customerStaff = (Array.isArray(st.customerStaff) ? st.customerStaff : [])
+            .map((c) => ({ customerCode: String(c.customerCode), staffCode: String(c.staffCode), role: String(c.role || "") }));
           state.work = (st.entries || []).map(normWork);
         }
         if (db) {
@@ -245,7 +247,7 @@
     return `<tr data-kind="work" data-id="${esc(r.id)}" class="${rowClass("work", r.id)}">
       <td class="col-date"><input type="date" data-f="date" value="${esc(r.date)}"></td>
       <td class="col-staff">${staffSelect(r.staffCode)}</td>
-      <td class="col-customer">${customerSelect(r.customerCode)}</td>
+      <td class="col-customer">${customerSelect(r.customerCode, r.staffCode)}</td>
       <td class="col-task">${taskSelect(r.taskType)}</td>
       <td class="col-code"><input type="text" data-f="taskCode" value="${esc(r.taskCode)}" placeholder="業務コード"></td>
       <td class="col-phase">${phaseSelect(r.phaseCode)}</td>
@@ -283,12 +285,43 @@
     return `<select data-f="staffCode">${opts.join("")}</select>`;
   }
 
-  function customerSelect(code) {
-    const opts = [opt("", "顧客指定なし", !code)].concat(
-      state.customers.map((c) => opt(c.code, `${c.code} ${c.name}`, c.code === code))
-    );
-    if (code && !state.customers.some((c) => c.code === code)) opts.push(opt(code, code, true));
-    return `<select data-f="customerCode">${opts.join("")}</select>`;
+  // 顧客を行スタッフの役割でグループ化（①Prepare ②Review ③担当外、各コード昇順）。staffCode 無指定はフラット（売上行用）。
+  function roleFor(staffCode, custCode) {
+    if (!staffCode || !custCode) return "";
+    const cs = state.customerStaff.find((x) => x.customerCode === String(custCode) && x.staffCode === String(staffCode));
+    return cs ? cs.role : "";
+  }
+  function groupedCustomers(staffCode) {
+    const pre = [], rev = [], other = [];
+    state.customers.forEach((c) => {
+      const role = roleFor(staffCode, c.code);
+      if (role === "PRE") pre.push(c);
+      else if (role === "REV") rev.push(c);
+      else other.push(c);
+    });
+    const byCode = (a, b) => String(a.code).localeCompare(String(b.code), "ja");
+    return { pre: pre.sort(byCode), rev: rev.sort(byCode), other: other.sort(byCode) };
+  }
+
+  function customerSelect(code, staffCode) {
+    const label = (c, role) => `${c.code} ${c.name}${role ? ` (${role === "PRE" ? "Pre" : "Rev"})` : ""}`;
+    let body = opt("", "顧客指定なし", !code);
+    if (staffCode) {
+      const g = groupedCustomers(staffCode);
+      if (g.pre.length || g.rev.length) {
+        body += `<optgroup label="担当顧客">`
+          + g.pre.map((c) => opt(c.code, label(c, "PRE"), c.code === code)).join("")
+          + g.rev.map((c) => opt(c.code, label(c, "REV"), c.code === code)).join("")
+          + `</optgroup>`;
+      }
+      if (g.other.length) {
+        body += `<optgroup label="その他">` + g.other.map((c) => opt(c.code, label(c, ""), c.code === code)).join("") + `</optgroup>`;
+      }
+    } else {
+      body += state.customers.map((c) => opt(c.code, `${c.code} ${c.name}`, c.code === code)).join("");
+    }
+    if (code && !state.customers.some((c) => c.code === code)) body += opt(code, code, true);
+    return `<select data-f="customerCode">${body}</select>`;
   }
 
   function taskSelect(value) {
@@ -324,6 +357,12 @@
       value = Number(value || 0);
     }
     row[field] = value;
+
+    // 工数: スタッフ変更時、顧客プルダウンをそのスタッフの担当上位に再構築（選択値は保持）
+    if (kind === "work" && field === "staffCode") {
+      const td = tr.querySelector(".col-customer");
+      if (td) td.innerHTML = customerSelect(row.customerCode, row.staffCode);
+    }
 
     // 売上: 税抜・消費税の変更時に税込を自動計算（手動上書き前の補助）
     if (kind === "bill" && (field === "netAmount" || field === "taxAmount")) {
