@@ -226,9 +226,9 @@
     const direct = sum(periodAll.filter((entry) => entry.customerCode).map((entry) => entry.hours));
     const internal = total - direct;
     const monthCount = unique(periodAll.map((entry) => entry.month)).filter(Boolean).length;
-    el.sumTotal.textContent = `${formatNumber(total, 1)}h`;
-    el.sumDirect.textContent = `${formatNumber(direct, 1)}h`;
-    el.sumInternal.textContent = `${formatNumber(internal, 1)}h`;
+    el.sumTotal.textContent = `${formatNumber(total, 2)}h`;
+    el.sumDirect.textContent = `${formatNumber(direct, 2)}h`;
+    el.sumInternal.textContent = `${formatNumber(internal, 2)}h`;
     el.sumDirectRatio.textContent = formatPercent(total ? direct / total : 0);
     el.sumMonths.textContent = `${monthCount}ヶ月`;
     el.sumEntries.textContent = `${periodAll.length.toLocaleString("ja-JP")}件`;
@@ -281,7 +281,7 @@
 
   function isRevenue() { return state.measure === "attributed"; }
   function measureLabel() { return isRevenue() ? "帰属売上" : "工数"; }
-  function fmtVal(v) { return isRevenue() ? formatCurrency(v) : `${formatNumber(v, 1)}h`; }
+  function fmtVal(v) { return isRevenue() ? formatCurrency(v) : `${formatNumber(v, 2)}h`; }
   function fmtValShort(v) { return isRevenue() ? `${Math.round((v || 0) / 10000).toLocaleString("ja-JP")}万` : formatNumber(v, 0); }
 
   // 月内の役務売上を業務区分名で集計（業務区分軸の売上用）。
@@ -479,13 +479,13 @@
         const value = rowMap.get(colCat.key) || 0;
         if (!value) return `<td class="num pivot-cell pivot-zero">—</td>`;
         const alpha = (0.08 + 0.52 * (value / maxCell)).toFixed(3);
-        return `<td class="num pivot-cell" style="background:rgba(15,118,110,${alpha})" title="${escapeHtml(rowCat.label)} × ${escapeHtml(colCat.label)}：${formatNumber(value, 1)}h">${formatNumber(value, 1)}</td>`;
+        return `<td class="num pivot-cell" style="background:rgba(15,118,110,${alpha})" title="${escapeHtml(rowCat.label)} × ${escapeHtml(colCat.label)}：${formatNumber(value, 2)}h">${formatNumber(value, 2)}</td>`;
       }).join("");
       return `
         <tr>
           <th scope="row" class="pivot-rowhead">${escapeHtml(rowCat.label)}</th>
           ${tds}
-          <td class="num pivot-total-col">${formatNumber(rowCat.hours, 1)}</td>
+          <td class="num pivot-total-col">${formatNumber(rowCat.hours, 2)}</td>
         </tr>`;
     }).join("");
 
@@ -493,8 +493,8 @@
       <tfoot>
         <tr>
           <th scope="row" class="pivot-rowhead">合計</th>
-          ${colCats.map((cat) => `<td class="num pivot-total-col">${formatNumber(colTotals.get(cat.key) || 0, 1)}</td>`).join("")}
-          <td class="num pivot-grand">${formatNumber(grand, 1)}</td>
+          ${colCats.map((cat) => `<td class="num pivot-total-col">${formatNumber(colTotals.get(cat.key) || 0, 2)}</td>`).join("")}
+          <td class="num pivot-grand">${formatNumber(grand, 2)}</td>
         </tr>
       </tfoot>`;
 

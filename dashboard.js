@@ -184,8 +184,8 @@
     el.revenueBreakdown.textContent = `役務 ${formatCurrency(firm.serviceRevenue)}・対象外 ${formatCurrency(firm.excludedRevenue)}`;
     el.taxValue.textContent = formatCurrency(firm.tax);
     el.taxIncluded.textContent = `税込 ${formatCurrency(firm.taxIncluded)}`;
-    el.totalHours.textContent = `${formatNumber(firm.totalHours, 1)}h`;
-    el.directHours.textContent = `顧客直接 ${formatNumber(firm.directHours, 1)}h`;
+    el.totalHours.textContent = `${formatNumber(firm.totalHours, 2)}h`;
+    el.directHours.textContent = `顧客直接 ${formatNumber(firm.directHours, 2)}h`;
     el.directRatio.textContent = formatPercent(firm.totalHours ? firm.directHours / firm.totalHours : 0);
     el.averageCustomerRate.textContent = formatCurrency(firm.avgCustomerRate);
     el.targetRate.textContent = formatPercent(firm.achievement);
@@ -270,8 +270,8 @@
         <td class="num">${formatCurrency(p.attributedRevenue)}</td>
         <td class="num">${formatCurrency(p.target)}</td>
         <td class="num"><span class="${rateClass(p.achievement)}">${formatPercent(p.achievement)}</span></td>
-        <td class="num">${formatNumber(p.directHours, 1)}h</td>
-        <td class="num">${formatNumber(p.totalHours, 1)}h</td>
+        <td class="num">${formatNumber(p.directHours, 2)}h</td>
+        <td class="num">${formatNumber(p.totalHours, 2)}h</td>
         <td class="num ${rateClass(p.directRate / 10000)}">${formatCurrency(p.directRate)}</td>
         <td class="num">${formatCurrency(p.productivity)}</td>
       </tr>`).join("") || `<tr><td class="empty-row" colspan="8">データがありません</td></tr>`;
@@ -291,7 +291,7 @@
     const custRows = p.customers.map((c) => `
       <div class="staff-customer-row">
         <strong>${escapeHtml(c.code)} ${escapeHtml(c.name)}</strong>
-        <span>${formatNumber(c.hours, 1)}h</span>
+        <span>${formatNumber(c.hours, 2)}h</span>
         <span>${formatCurrency(c.attributed)}${c.hours <= 0 ? '<span class="rev-tag tag-fb">フォールバック</span>' : ""}</span>
         <span>${c.rate != null ? `${formatCurrency(c.rate)}/h` : "—"}</span>
       </div>`).join("");
@@ -304,13 +304,13 @@
       <div class="staff-detail-kpis">
         ${kpiBox("帰属売上", formatCurrency(p.attributedRevenue))}
         ${kpiBox("目標達成率", formatPercent(p.achievement), rateClass(p.achievement))}
-        ${kpiBox("顧客工数", `${formatNumber(p.directHours, 1)}h`)}
-        ${kpiBox("総工数", `${formatNumber(p.totalHours, 1)}h`)}
+        ${kpiBox("顧客工数", `${formatNumber(p.directHours, 2)}h`)}
+        ${kpiBox("総工数", `${formatNumber(p.totalHours, 2)}h`)}
         ${kpiBox("直接時間単価", formatCurrency(p.directRate))}
         ${kpiBox("総合生産性", formatCurrency(p.productivity))}
       </div>
       <div class="staff-customer-list">
-        <p class="staff-detail-note">担当顧客の内訳（帰属売上が大きい順）　工数 / 帰属売上 / 時間単価　※社内・非生産工数 ${formatNumber(p.internalHours, 1)}h</p>
+        <p class="staff-detail-note">担当顧客の内訳（帰属売上が大きい順）　工数 / 帰属売上 / 時間単価　※社内・非生産工数 ${formatNumber(p.internalHours, 2)}h</p>
         ${custRows || "<p class=\"empty-row\">当月の担当がありません</p>"}
       </div>`;
   }
@@ -329,7 +329,7 @@
       <tr data-customer-code="${escapeHtml(c.code)}" tabindex="0" role="button" class="${c.code === state.selectedCustomerCode ? "is-selected" : ""}">
         <td><span class="entity-code">${escapeHtml(c.code)}</span><span class="entity-name">${escapeHtml(c.name)}</span></td>
         <td class="num">${formatCurrency(c.grossRevenue)}</td>
-        <td class="num">${formatNumber(c.hours, 1)}h</td>
+        <td class="num">${formatNumber(c.hours, 2)}h</td>
         <td class="num ${c.rate != null ? customerRateClass(c.rate) : "rate-na"}">${c.rate != null ? formatCurrency(c.rate) : "—"}</td>
         <td>${escapeHtml(c.primaryStaff)}</td>
         <td><div class="invoice-tags">${(c.invoiceItems || []).map((it) => `<span class="invoice-tag">${escapeHtml(it.name)}</span>`).join("")}</div></td>
@@ -365,7 +365,7 @@
     const staffRows = c.staffBreakdown.map((s) => `
       <div class="staff-customer-row">
         <strong>${escapeHtml(s.name)}${s.role ? ` <span class="rev-tag">${escapeHtml(s.role)}</span>` : ""}</strong>
-        <span>${formatNumber(s.hours, 1)}h</span>
+        <span>${formatNumber(s.hours, 2)}h</span>
         <span>${formatCurrency(s.attributed)}${s.hours <= 0 ? '<span class="rev-tag tag-fb">FB</span>' : ""}</span>
         <span>${s.rate != null ? `${formatCurrency(s.rate)}/h` : "—"}</span>
       </div>`).join("");
@@ -382,7 +382,7 @@
       const [year, month] = t.month.split("-");
       const prevYear = index > 0 ? trend[index - 1].month.split("-")[0] : "";
       const showYear = index === 0 || year !== prevYear;
-      const tip = `${formatMonthLabel(t.month)}：時間単価 ${t.rate != null ? formatCurrency(t.rate) : "—"} / 役務 ${formatCurrency(t.service)} / 工数 ${formatNumber(t.hours, 1)}h`;
+      const tip = `${formatMonthLabel(t.month)}：時間単価 ${t.rate != null ? formatCurrency(t.rate) : "—"} / 役務 ${formatCurrency(t.service)} / 工数 ${formatNumber(t.hours, 2)}h`;
       const bar = has
         ? `<div class="trend-bar ${customerRateClass(t.rate)}" style="height:${height}px"><span class="trend-value">${Math.round(t.rate).toLocaleString("ja-JP")}</span></div>`
         : `<div class="trend-bar is-zero"></div>`;
@@ -404,7 +404,7 @@
         ${kpiBox("役務売上", formatCurrency(c.serviceRevenue))}
         ${kpiBox("対象外(立替)", formatCurrency(c.excludedRevenue))}
         ${kpiBox("消費税", formatCurrency(c.tax))}
-        ${kpiBox("顧客工数", `${formatNumber(c.hours, 1)}h`)}
+        ${kpiBox("顧客工数", `${formatNumber(c.hours, 2)}h`)}
         ${kpiBox("時間単価", c.rate != null ? formatCurrency(c.rate) : "—（工数未記録）", c.rate != null ? customerRateClass(c.rate) : "")}
       </div>
       <p class="staff-detail-note">うち工数未記録の役務売上（フォールバック）：${formatCurrency(c.unrecordedRevenue)}</p>

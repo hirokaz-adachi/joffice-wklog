@@ -453,6 +453,7 @@ tbody tr:hover {
 .num {
   text-align: right;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .entity-code {
