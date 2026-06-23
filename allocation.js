@@ -73,15 +73,17 @@
     const m = String(month || "");
     const latest = new Map(); // "cust|role" -> max effectiveFrom (<=month)
     rows.forEach((r) => {
-      if (String(r.effectiveFrom) > m) return; // 未来の設定は無視（"" は常に <= 対象月）
+      const ef = String(r.effectiveFrom || ""); // 欠落は "" (初期から有効) 扱い
+      if (ef > m) return; // 未来の設定は無視（"" は常に <= 対象月）
       const key = r.customerCode + "|" + r.role;
       const cur = latest.get(key);
-      if (cur === undefined || String(r.effectiveFrom) > cur) latest.set(key, String(r.effectiveFrom));
+      if (cur === undefined || ef > cur) latest.set(key, ef);
     });
     rows.forEach((r) => {
-      if (String(r.effectiveFrom) > m) return;
+      const ef = String(r.effectiveFrom || "");
+      if (ef > m) return;
       const key = r.customerCode + "|" + r.role;
-      if (String(r.effectiveFrom) !== latest.get(key)) return;
+      if (ef !== latest.get(key)) return;
       if (!r.staffCode) return; // 担当なし（解除）
       const cust = r.customerCode, role = r.role, sc = r.staffCode;
       if (!assigneesByCustomer.has(cust)) assigneesByCustomer.set(cust, {});

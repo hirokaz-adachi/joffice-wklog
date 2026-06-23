@@ -75,7 +75,7 @@
         ? remoteState.taskPhases.map((p) => ({ taskCode: String(p.taskCode), phaseCode: String(p.phaseCode), phaseName: p.phaseName, ratio: Number(p.ratio || 0), sortOrder: Number(p.sortOrder || 0) }))
         : [];
       state.customerStaff = Array.isArray(remoteState.customerStaff)
-        ? remoteState.customerStaff.map((c) => ({ customerCode: String(c.customerCode), staffCode: String(c.staffCode), role: String(c.role || "") }))
+        ? remoteState.customerStaff.map((c) => ({ customerCode: String(c.customerCode), staffCode: String(c.staffCode || ""), role: String(c.role || ""), effectiveFrom: String(c.effectiveFrom || "") }))
         : [];
       state.entries = normalizeEntries(remoteState.entries, staff, customers);
       fillMasterSelect(el.staff, state.staff);
@@ -92,7 +92,11 @@
 
   function bindEvents() {
     el.form.addEventListener("submit", saveEntry);
-    el.workDate.addEventListener("change", renderToday);
+    el.workDate.addEventListener("change", () => {
+      fillCustomerSelect(el.customer); // 作業月が変わると担当の並びが変わる
+      syncTask();                      // 工程の自動補完も作業月の担当で再評価
+      renderToday();
+    });
     el.staff.addEventListener("change", () => {
       localStorage.setItem(staffKey, el.staff.value);
       fillCustomerSelect(el.customer); // 担当の並びを選択スタッフに合わせて更新
@@ -204,11 +208,15 @@
     select.innerHTML = values.map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.code)} ${escapeHtml(item.name)}</option>`).join("");
   }
 
-  // 顧客を選択スタッフの役割でグループ化（①Prepare担当 ②Review担当 ③担当外、各コード昇順）。
-  function groupedCustomers(staffCode) {
+  // 顧客を選択スタッフの役割でグループ化（①Prepare担当 ②Review担当 ③担当外、各コード昇順）。作業月時点で解決。
+  function groupedCustomers(staffCode, month) {
+    const m = month != null ? month : workMonthVal();
+    const roleMap = window.JOfficeAllocation
+      ? window.JOfficeAllocation.resolveAssignees(state.customerStaff || [], m).roleByCustomerStaff
+      : new Map();
     const pre = [], rev = [], other = [];
     (state.customers || []).forEach((c) => {
-      const role = roleFor(staffCode, c.code);
+      const role = (roleMap.get(String(c.code)) || {})[String(staffCode)] || "";
       if (role === "PRE") pre.push(c);
       else if (role === "REV") rev.push(c);
       else other.push(c);
@@ -287,10 +295,12 @@
   function phasesFor(code) { const c = normCode(code); return (state.taskPhases || []).filter((p) => normCode(p.taskCode) === c && Number(p.ratio) > 0).sort((a, b) => a.sortOrder - b.sortOrder); }
   function taskName(code) { const c = normCode(code); const t = (state.tasks || []).find((x) => normCode(x.code) === c); return t ? t.name : code; }
   function currentPhaseCode(code) { const ph = phasesFor(code); if (ph.length >= 2) return el.phase.value || ph[0].phaseCode; return ph.length ? ph[0].phaseCode : "PRE"; }
-  function roleFor(staffCode, custCode) {
+  // 顧客担当は時系列マスタ。作業月時点で解決（month 省略時は作業日の月）。
+  function workMonthVal() { return String(el.workDate.value || "").slice(0, 7); }
+  function roleFor(staffCode, custCode, month) {
     if (!staffCode || !custCode) return "";
-    const cs = (state.customerStaff || []).find((x) => String(x.customerCode) === String(custCode) && String(x.staffCode) === String(staffCode));
-    return cs ? String(cs.role || "") : "";
+    const m = month != null ? month : workMonthVal();
+    return window.JOfficeAllocation ? window.JOfficeAllocation.roleAsOf(state.customerStaff || [], custCode, staffCode, m) : "";
   }
   function phaseBadge(code) {
     if (code === "PRE") return ' <span class="phase-badge phase-pre">Prepare</span>';

@@ -80,7 +80,7 @@
           state.customers = normMaster(st.customers);
           state.taskTypes = Array.isArray(st.taskTypes) && st.taskTypes.length ? st.taskTypes : DEFAULT_TASKS.slice();
           state.customerStaff = (Array.isArray(st.customerStaff) ? st.customerStaff : [])
-            .map((c) => ({ customerCode: String(c.customerCode), staffCode: String(c.staffCode), role: String(c.role || "") }));
+            .map((c) => ({ customerCode: String(c.customerCode), staffCode: String(c.staffCode || ""), role: String(c.role || ""), effectiveFrom: String(c.effectiveFrom || "") }));
           state.taskPhases = (Array.isArray(st.taskPhases) ? st.taskPhases : [])
             .map((p) => ({ taskCode: String(p.taskCode), phaseCode: String(p.phaseCode), ratio: Number(p.ratio || 0), sortOrder: Number(p.sortOrder || 0) }));
           state.tasks = (Array.isArray(st.tasks) ? st.tasks : [])
@@ -254,7 +254,7 @@
     return `<tr data-kind="work" data-id="${esc(r.id)}" class="${rowClass("work", r.id)}">
       <td class="col-date"><input type="date" data-f="date" value="${esc(r.date)}"></td>
       <td class="col-staff">${staffSelect(r.staffCode)}</td>
-      <td class="col-customer">${customerSelect(r.customerCode, r.staffCode)}</td>
+      <td class="col-customer">${customerSelect(r.customerCode, r.staffCode, monthOf(r.date))}</td>
       <td class="col-task">${taskSelect(r.taskType)}</td>
       <td class="col-code"><input type="text" data-f="taskCode" value="${esc(r.taskCode)}" placeholder="業務コード"></td>
       ${phaseTd(r)}
@@ -292,16 +292,19 @@
     return `<select data-f="staffCode">${opts.join("")}</select>`;
   }
 
-  // 顧客を行スタッフの役割でグループ化（①Prepare ②Review ③担当外、各コード昇順）。staffCode 無指定はフラット（売上行用）。
-  function roleFor(staffCode, custCode) {
+  // 顧客担当は時系列マスタ。行の日付の月時点で解決する（staffCode 無指定はフラット＝売上行用）。
+  function monthOf(d) { return String(d || "").slice(0, 7); }
+  function roleFor(staffCode, custCode, month) {
     if (!staffCode || !custCode) return "";
-    const cs = state.customerStaff.find((x) => x.customerCode === String(custCode) && x.staffCode === String(staffCode));
-    return cs ? cs.role : "";
+    return window.JOfficeAllocation ? window.JOfficeAllocation.roleAsOf(state.customerStaff || [], custCode, staffCode, month || "") : "";
   }
-  function groupedCustomers(staffCode) {
+  function groupedCustomers(staffCode, month) {
+    const roleMap = window.JOfficeAllocation
+      ? window.JOfficeAllocation.resolveAssignees(state.customerStaff || [], month || "").roleByCustomerStaff
+      : new Map();
     const pre = [], rev = [], other = [];
     state.customers.forEach((c) => {
-      const role = roleFor(staffCode, c.code);
+      const role = (roleMap.get(String(c.code)) || {})[String(staffCode)] || "";
       if (role === "PRE") pre.push(c);
       else if (role === "REV") rev.push(c);
       else other.push(c);
@@ -310,11 +313,11 @@
     return { pre: pre.sort(byCode), rev: rev.sort(byCode), other: other.sort(byCode) };
   }
 
-  function customerSelect(code, staffCode) {
+  function customerSelect(code, staffCode, month) {
     const label = (c, role) => `${c.code} ${c.name}${role ? ` (${role === "PRE" ? "Pre" : "Rev"})` : ""}`;
     let body = opt("", "顧客指定なし", !code);
     if (staffCode) {
-      const g = groupedCustomers(staffCode);
+      const g = groupedCustomers(staffCode, month);
       if (g.pre.length || g.rev.length) {
         body += `<optgroup label="担当顧客">`
           + g.pre.map((c) => opt(c.code, label(c, "PRE"), c.code === code)).join("")
@@ -373,7 +376,7 @@
 
   // 案1相当: 担当役割と工程の不一致（二工程の業務区分のみ判定。単一工程/未マッピングは対象外）。
   function phaseMismatch(r) {
-    const role = roleFor(r.staffCode, r.customerCode);
+    const role = roleFor(r.staffCode, r.customerCode, monthOf(r.date));
     if (!role || !r.phaseCode) return false;
     const vp = validPhases(r.taskCode);
     if (!vp || vp.length < 2) return false;
@@ -381,7 +384,7 @@
   }
   function phaseTd(r) {
     if (phaseMismatch(r)) {
-      const role = roleFor(r.staffCode, r.customerCode);
+      const role = roleFor(r.staffCode, r.customerCode, monthOf(r.date));
       const title = `担当役割（${phaseName(role)}）と工程（${phaseName(r.phaseCode)}）が一致しません`;
       return `<td class="col-phase is-mismatch" title="${esc(title)}">${phaseSelect(r.phaseCode, r.taskCode)}</td>`;
     }
@@ -391,7 +394,7 @@
     const bad = phaseMismatch(r);
     td.classList.toggle("is-mismatch", bad);
     if (bad) {
-      const role = roleFor(r.staffCode, r.customerCode);
+      const role = roleFor(r.staffCode, r.customerCode, monthOf(r.date));
       td.setAttribute("title", `担当役割（${phaseName(role)}）と工程（${phaseName(r.phaseCode)}）が一致しません`);
     } else {
       td.removeAttribute("title");
@@ -425,10 +428,10 @@
     }
     row[field] = value;
 
-    // 工数: スタッフ変更時、顧客プルダウンをそのスタッフの担当上位に再構築（選択値は保持）
-    if (kind === "work" && field === "staffCode") {
+    // 工数: スタッフ・日付変更時、顧客プルダウンをその行スタッフ・作業月の担当上位に再構築（選択値は保持）
+    if (kind === "work" && (field === "staffCode" || field === "date")) {
       const td = tr.querySelector(".col-customer");
-      if (td) td.innerHTML = customerSelect(row.customerCode, row.staffCode);
+      if (td) td.innerHTML = customerSelect(row.customerCode, row.staffCode, monthOf(row.date));
     }
     // 工数: 業務区分(名)変更 → 業務コードを同期（工程判定はコード基準のため）
     if (kind === "work" && field === "taskType") {
@@ -448,8 +451,8 @@
         if (ts) ts.value = nm;
       }
     }
-    // 工数: 工程の有効選択肢・不一致警告を関連項目の変更に追従させる
-    if (kind === "work" && (field === "staffCode" || field === "customerCode" || field === "taskCode" || field === "taskType")) {
+    // 工数: 工程の有効選択肢・不一致警告を関連項目の変更に追従させる（日付＝作業月の担当変化も反映）
+    if (kind === "work" && (field === "staffCode" || field === "customerCode" || field === "taskCode" || field === "taskType" || field === "date")) {
       renderPhaseCell(tr, row);
     } else if (kind === "work" && field === "phaseCode") {
       const td = tr.querySelector(".col-phase");
