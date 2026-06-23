@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>J-Office Insight ｜ 経営ダッシュボード</title>
-  <link rel="stylesheet" href="dashboard.css?v=20260618-7">
+  <link rel="stylesheet" href="dashboard.css?v=20260623-1">
 </head>
 <body>
   <header class="dashboard-header">
@@ -36,9 +36,14 @@
 
     <section class="kpi-grid" aria-label="主要指標">
       <article class="kpi">
-        <span>税抜売上</span>
+        <span>税抜売上(総)</span>
         <strong id="netRevenue">-</strong>
-        <small id="invoiceCount">-</small>
+        <small id="revenueBreakdown">-</small>
+      </article>
+      <article class="kpi">
+        <span>消費税</span>
+        <strong id="taxValue">-</strong>
+        <small id="taxIncluded">-</small>
       </article>
       <article class="kpi">
         <span>総工数</span>
@@ -53,7 +58,7 @@
       <article class="kpi">
         <span>顧客平均時間単価</span>
         <strong id="averageCustomerRate">-</strong>
-        <small>税抜売上 ÷ 顧客直接工数</small>
+        <small>工数対応売上 ÷ 顧客直接工数</small>
       </article>
       <article class="kpi accent-kpi">
         <span>売上目標達成率</span>
@@ -167,7 +172,8 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="config.js"></script>
-  <script src="backend.js?v=20260622-2"></script>
-  <script src="dashboard.js?v=20260618-7"></script>
+  <script src="backend.js?v=20260623-1"></script>
+  <script src="allocation.js?v=20260623-1"></script>
+  <script src="dashboard.js?v=20260623-1"></script>
 </body>
 </html>

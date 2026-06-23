@@ -74,6 +74,44 @@
     return mutate("removeMaster", { type, code });
   }
 
+  // 案2: 工程マスタ
+  async function saveTaskPhase(row) {
+    if (!isRemote()) return null;
+    return mutate("saveTaskPhase", { row });
+  }
+
+  async function saveTaskPhases(rows) {
+    if (!isRemote()) return null;
+    return mutate("saveTaskPhases", { rows });
+  }
+
+  async function deleteTaskPhase(taskCode, phaseCode) {
+    if (!isRemote()) return null;
+    return mutate("deleteTaskPhase", { taskCode, phaseCode });
+  }
+
+  // 案2: 顧客担当者マスタ
+  async function saveCustomerStaff(row) {
+    if (!isRemote()) return null;
+    return mutate("saveCustomerStaff", { row });
+  }
+
+  async function saveCustomerStaffs(rows) {
+    if (!isRemote()) return null;
+    return mutate("saveCustomerStaffs", { rows });
+  }
+
+  async function deleteCustomerStaff(customerCode, staffCode) {
+    if (!isRemote()) return null;
+    return mutate("deleteCustomerStaff", { customerCode, staffCode });
+  }
+
+  // 案2: 設定
+  async function saveSetting(key, value) {
+    if (!isRemote()) return null;
+    return mutate("saveSetting", { key, value });
+  }
+
   async function mutate(action, payload) {
     try {
       return await request(action, payload);
@@ -144,6 +182,13 @@
     saveTargets,
     deleteTarget,
     upsertMaster,
-    removeMaster
+    removeMaster,
+    saveTaskPhase,
+    saveTaskPhases,
+    deleteTaskPhase,
+    saveCustomerStaff,
+    saveCustomerStaffs,
+    deleteCustomerStaff,
+    saveSetting
   };
 })();

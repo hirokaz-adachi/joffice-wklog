@@ -1,16 +1,11 @@
 (function () {
   "use strict";
 
-  const DASHBOARD_CACHE_KEY = "worklog-dashboard-cache-v2";
-  const DASHBOARD_CACHE_TTL_MS = 30 * 60 * 1000;
-  const dashboardSource = String((window.WORKLOG_CONFIG || {}).apiBaseUrl || "");
+  // 案2: 配賦は共有エンジン allocation.js（JOfficeAllocation）に委譲する。
+  // taskType を捨てる旧ブラウザキャッシュとは相乗りせず、毎回フレッシュ取得（GAS側300秒キャッシュに依存）。
 
   const state = {
-    staff: [],
-    customers: [],
-    entries: [],
-    billing: [],
-    targets: [],
+    data: null,
     months: [],
     selectedMonth: "",
     selectedStaffCode: "",
@@ -28,7 +23,9 @@
     reloadData: document.getElementById("reloadData"),
     dataStatus: document.getElementById("dataStatus"),
     netRevenue: document.getElementById("netRevenue"),
-    invoiceCount: document.getElementById("invoiceCount"),
+    revenueBreakdown: document.getElementById("revenueBreakdown"),
+    taxValue: document.getElementById("taxValue"),
+    taxIncluded: document.getElementById("taxIncluded"),
     totalHours: document.getElementById("totalHours"),
     directHours: document.getElementById("directHours"),
     directRatio: document.getElementById("directRatio"),
@@ -51,805 +48,85 @@
     toast: document.getElementById("toast")
   };
 
+  const ENGINE = window.JOfficeAllocation;
+
   init();
 
   async function init() {
     bindEvents();
-    await loadData({ useBrowserCache: true });
+    await loadData();
   }
 
   function bindEvents() {
-    el.monthSelect.addEventListener("change", () => {
-      state.selectedMonth = el.monthSelect.value;
-      render();
-    });
+    el.monthSelect.addEventListener("change", () => { state.selectedMonth = el.monthSelect.value; render(); });
     el.prevMonth.addEventListener("click", () => shiftMonth(-1));
     el.nextMonth.addEventListener("click", () => shiftMonth(1));
-    el.reloadData.addEventListener("click", () => loadData({
-      useBrowserCache: false,
-      forceServerRefresh: true
-    }));
-    el.staffSort.addEventListener("change", () => {
-      state.staffSort = el.staffSort.value;
-      renderStaffTable(buildMonthModel(state.selectedMonth));
-    });
-    el.staffRows.addEventListener("click", (event) => {
-      const row = event.target.closest("[data-staff-code]");
-      if (row) selectStaff(row.dataset.staffCode);
-    });
-    el.staffRows.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      const row = event.target.closest("[data-staff-code]");
-      if (!row) return;
-      event.preventDefault();
-      selectStaff(row.dataset.staffCode);
+    el.reloadData.addEventListener("click", () => loadData(true));
+    el.staffSort.addEventListener("change", () => { state.staffSort = el.staffSort.value; renderStaffTable(currentModel()); });
+    el.staffRows.addEventListener("click", (e) => { const r = e.target.closest("[data-staff-code]"); if (r) selectStaff(r.dataset.staffCode); });
+    el.staffRows.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const r = e.target.closest("[data-staff-code]"); if (!r) return; e.preventDefault(); selectStaff(r.dataset.staffCode);
     });
     el.closeStaffModal.addEventListener("click", closeStaffModal);
-    el.staffModal.addEventListener("click", (event) => {
-      if (event.target === el.staffModal) closeStaffModal();
-    });
-    document.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape") return;
+    el.staffModal.addEventListener("click", (e) => { if (e.target === el.staffModal) closeStaffModal(); });
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
       if (!el.staffModal.hidden) closeStaffModal();
       if (!el.customerModal.hidden) closeCustomerModal();
     });
-    el.customerSort.addEventListener("change", () => {
-      state.customerSort = el.customerSort.value;
-      renderCustomerTable(buildMonthModel(state.selectedMonth));
-    });
-    el.customerSearch.addEventListener("input", () => {
-      state.customerSearch = el.customerSearch.value.trim().toLowerCase();
-      renderCustomerTable(buildMonthModel(state.selectedMonth));
-    });
-    el.customerRows.addEventListener("click", (event) => {
-      const row = event.target.closest("[data-customer-code]");
-      if (row) selectCustomer(row.dataset.customerCode);
-    });
-    el.customerRows.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      const row = event.target.closest("[data-customer-code]");
-      if (!row) return;
-      event.preventDefault();
-      selectCustomer(row.dataset.customerCode);
+    el.customerSort.addEventListener("change", () => { state.customerSort = el.customerSort.value; renderCustomerTable(currentModel()); });
+    el.customerSearch.addEventListener("input", () => { state.customerSearch = el.customerSearch.value.trim().toLowerCase(); renderCustomerTable(currentModel()); });
+    el.customerRows.addEventListener("click", (e) => { const r = e.target.closest("[data-customer-code]"); if (r) selectCustomer(r.dataset.customerCode); });
+    el.customerRows.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const r = e.target.closest("[data-customer-code]"); if (!r) return; e.preventDefault(); selectCustomer(r.dataset.customerCode);
     });
     el.closeCustomerModal.addEventListener("click", closeCustomerModal);
-    el.customerModal.addEventListener("click", (event) => {
-      if (event.target === el.customerModal) closeCustomerModal();
-    });
-    el.customerDetail.addEventListener("click", (event) => {
-      const column = event.target.closest("[data-trend-month]");
-      if (!column) return;
-      state.customerModalMonth = column.dataset.trendMonth;
-      renderCustomerDetail();
-    });
-    el.customerDetail.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      const column = event.target.closest("[data-trend-month]");
-      if (!column) return;
-      event.preventDefault();
-      state.customerModalMonth = column.dataset.trendMonth;
-      renderCustomerDetail();
+    el.customerModal.addEventListener("click", (e) => { if (e.target === el.customerModal) closeCustomerModal(); });
+    el.customerDetail.addEventListener("click", (e) => {
+      const col = e.target.closest("[data-trend-month]"); if (!col) return;
+      state.customerModalMonth = col.dataset.trendMonth; renderCustomerDetail();
     });
   }
 
-  async function loadData(options) {
-    const settings = {
-      useBrowserCache: false,
-      forceServerRefresh: false,
-      ...(options || {})
-    };
+  async function loadData(forceServerRefresh) {
     if (!window.WorklogBackend || !window.WorklogBackend.isRemote()) {
-      showToast("スプレッドシート接続が設定されていません");
+      el.dataStatus.textContent = "スプレッドシート接続が設定されていません";
+      showToast("config.js の接続設定が未設定です");
       return;
     }
-
     const startedAt = performance.now();
-    let renderedCachedData = false;
     el.reloadData.disabled = true;
-    if (settings.useBrowserCache) {
-      const cached = readBrowserCache();
-      if (cached) {
-        applyData(cached.data);
-        renderedCachedData = true;
-        const cachedTime = formatLoadedDateTime(cached.data.generatedAt || cached.savedAt);
-        el.dataStatus.textContent = `前回データ ${cachedTime}・更新中`;
-      }
-    }
-    if (!renderedCachedData) {
-      el.dataStatus.textContent = "データを読み込んでいます";
-    }
-
+    el.dataStatus.textContent = "データを読み込んでいます";
     try {
-      const data = await window.WorklogBackend.loadDashboard(settings.forceServerRefresh);
+      const data = await window.WorklogBackend.loadDashboard(Boolean(forceServerRefresh));
       applyData(data);
-      writeBrowserCache(data);
       const elapsed = (performance.now() - startedAt) / 1000;
-      const generatedAt = data.generatedAt || new Date().toISOString();
+      const generatedAt = (data && data.generatedAt) || new Date().toISOString();
       el.dataStatus.textContent = `データ時点 ${formatLoadedDateTime(generatedAt)}（取得 ${elapsed.toFixed(1)}秒）`;
     } catch (error) {
-      if (renderedCachedData) {
-        el.dataStatus.textContent = "前回データを表示中・更新に失敗";
-        showToast("最新データを取得できなかったため、前回データを表示しています");
-      } else {
-        el.dataStatus.textContent = "読込に失敗しました";
-        showToast(error.message || "データを読み込めませんでした");
-      }
+      el.dataStatus.textContent = "読込に失敗しました";
+      showToast((error && error.message) || "データを読み込めませんでした");
     } finally {
       el.reloadData.disabled = false;
     }
   }
 
   function applyData(data) {
-    const source = data || {};
-    state.staff = Array.isArray(source.staff) ? source.staff : [];
-    state.customers = Array.isArray(source.customers) ? source.customers : [];
-    state.entries = Array.isArray(source.entries) ? source.entries.map(normalizeEntry) : [];
-    state.billing = Array.isArray(source.billing) ? source.billing.map(normalizeBilling) : [];
-    state.targets = Array.isArray(source.targets) ? source.targets.map(normalizeTarget) : [];
-    state.months = unique([
-      ...state.entries.map((item) => item.month),
-      ...state.billing.map((item) => item.billingMonth),
-      ...state.targets.map((item) => item.targetMonth)
-    ]).filter(Boolean).sort();
-    state.selectedMonth = state.months.includes(state.selectedMonth)
-      ? state.selectedMonth
-      : state.months.at(-1) || "";
+    state.data = data || {};
+    const billingMonths = (state.data.billing || []).map((b) => String(b.billingMonth)).filter(Boolean);
+    const targetMonths = (state.data.targets || []).map((t) => String(t.targetMonth)).filter(Boolean);
+    state.months = unique(billingMonths.concat(targetMonths)).sort();
+    const anchor = anchorMonth();
+    const window12 = lastTwelveMonths(anchor);
+    if (!window12.includes(state.selectedMonth)) state.selectedMonth = state.months.at(-1) || anchor;
     renderMonthOptions();
     render();
   }
 
-  function readBrowserCache() {
-    try {
-      const value = window.localStorage.getItem(DASHBOARD_CACHE_KEY);
-      if (!value) return null;
-      const cached = JSON.parse(value);
-      const isInvalid = !cached
-        || !cached.data
-        || !cached.savedAt
-        || cached.source !== dashboardSource
-        || Date.now() - Number(cached.savedAt) > DASHBOARD_CACHE_TTL_MS;
-      if (isInvalid) {
-        window.localStorage.removeItem(DASHBOARD_CACHE_KEY);
-        return null;
-      }
-      return cached;
-    } catch (error) {
-      try {
-        window.localStorage.removeItem(DASHBOARD_CACHE_KEY);
-      } catch (storageError) {
-        // localStorageが利用できない場合は何もしない。
-      }
-      return null;
-    }
-  }
-
-  function writeBrowserCache(data) {
-    try {
-      window.localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({
-        savedAt: Date.now(),
-        source: dashboardSource,
-        data: minimizeDashboardData(data)
-      }));
-    } catch (error) {
-      // Storage容量超過やプライベートモード時も、通常表示は継続する。
-    }
-  }
-
-  function minimizeDashboardData(data) {
-    const source = data || {};
-    return {
-      generatedAt: source.generatedAt || new Date().toISOString(),
-      staff: (source.staff || []).map((item) => ({
-        code: item.code,
-        name: item.name
-      })),
-      customers: (source.customers || []).map((item) => ({
-        code: item.code,
-        name: item.name
-      })),
-      entries: (source.entries || []).map((item) => ({
-        date: item.date,
-        staffCode: item.staffCode,
-        customerCode: item.customerCode,
-        customer: item.customer,
-        hours: item.hours
-      })),
-      billing: (source.billing || []).map((item) => ({
-        billingMonth: item.billingMonth,
-        customerCode: item.customerCode,
-        customer: item.customer,
-        invoiceItem: item.invoiceItem,
-        netAmount: item.netAmount,
-        grossAmount: item.grossAmount
-      })),
-      targets: (source.targets || []).map((item) => ({
-        targetMonth: item.targetMonth,
-        staffCode: item.staffCode,
-        targetAmount: item.targetAmount
-      }))
-    };
-  }
-
-  function formatLoadedDateTime(value) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "時刻不明";
-    return date.toLocaleString("ja-JP", {
-      month: "numeric",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-  }
-
-  function normalizeEntry(entry) {
-    const date = normalizeDate(entry.date);
-    return {
-      ...entry,
-      date,
-      month: date.slice(0, 7),
-      hours: Number(entry.hours || 0)
-    };
-  }
-
-  function normalizeBilling(item) {
-    return {
-      ...item,
-      billingMonth: normalizeMonth(item.billingMonth),
-      netAmount: Number(item.netAmount || 0),
-      taxAmount: Number(item.taxAmount || 0),
-      grossAmount: Number(item.grossAmount || 0)
-    };
-  }
-
-  function normalizeTarget(item) {
-    return {
-      ...item,
-      targetMonth: normalizeMonth(item.targetMonth),
-      targetAmount: Number(item.targetAmount || 0)
-    };
-  }
-
-  function normalizeDate(value) {
-    const text = String(value || "");
-    if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
-    if (/^\d{4}\/\d{2}\/\d{2}/.test(text)) return text.slice(0, 10).replaceAll("/", "-");
-    const date = new Date(text);
-    if (Number.isNaN(date.getTime())) return "";
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Tokyo",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }).format(date);
-  }
-
-  function normalizeMonth(value) {
-    const text = String(value || "");
-    if (/^\d{4}[-/]\d{2}/.test(text)) return text.slice(0, 7).replace("/", "-");
-    return normalizeDate(value).slice(0, 7);
-  }
-
-  function monthOptions() {
-    return lastTwelveMonths(anchorMonth());
-  }
-
-  function renderMonthOptions() {
-    el.monthSelect.innerHTML = monthOptions()
-      .slice()
-      .reverse()
-      .map((month) => `<option value="${month}">${formatMonthLabel(month)}</option>`)
-      .join("");
-    el.monthSelect.value = state.selectedMonth;
-  }
-
-  function shiftMonth(direction) {
-    const months = monthOptions();
-    const index = months.indexOf(state.selectedMonth);
-    const next = Math.max(0, Math.min(months.length - 1, index + direction));
-    if (next === index || next < 0) return;
-    state.selectedMonth = months[next];
-    el.monthSelect.value = state.selectedMonth;
-    render();
-  }
-
-  function render() {
-    const model = buildMonthModel(state.selectedMonth);
-    renderKpis(model);
-    renderMonthlyBars();
-    renderRevenueMix(model);
-    renderStaffTable(model);
-    if (!el.staffModal.hidden) renderStaffDetail(model);
-    renderCustomerTable(model);
-    if (!el.customerModal.hidden) {
-      state.customerModalMonth = state.selectedMonth;
-      renderCustomerDetail();
-    }
-    const months = monthOptions();
-    const monthIndex = months.indexOf(state.selectedMonth);
-    el.prevMonth.disabled = monthIndex <= 0;
-    el.nextMonth.disabled = monthIndex < 0 || monthIndex >= months.length - 1;
-  }
-
-  function buildMonthModel(month) {
-    const entries = state.entries.filter((entry) => entry.month === month);
-    const billing = state.billing.filter((item) => item.billingMonth === month);
-    const targets = state.targets.filter((item) => item.targetMonth === month);
-    const totalHours = sum(entries.map((entry) => entry.hours));
-    const directEntries = entries.filter((entry) => entry.customerCode);
-    const directHours = sum(directEntries.map((entry) => entry.hours));
-    const netRevenue = sum(billing.map((item) => item.netAmount));
-    const grossRevenue = sum(billing.map((item) => item.grossAmount));
-    const targetTotal = sum(targets.map((item) => item.targetAmount));
-
-    const customerMap = new Map();
-    state.customers.forEach((customer) => {
-      customerMap.set(customer.code, {
-        code: customer.code,
-        name: customer.name,
-        hours: 0,
-        revenue: 0,
-        staffHours: new Map(),
-        invoiceItems: new Map()
-      });
-    });
-
-    directEntries.forEach((entry) => {
-      const customer = customerMap.get(entry.customerCode) || {
-        code: entry.customerCode,
-        name: entry.customer,
-        hours: 0,
-        revenue: 0,
-        staffHours: new Map(),
-        invoiceItems: new Map()
-      };
-      customer.hours += entry.hours;
-      customer.staffHours.set(entry.staffCode, (customer.staffHours.get(entry.staffCode) || 0) + entry.hours);
-      customerMap.set(entry.customerCode, customer);
-    });
-
-    billing.forEach((item) => {
-      const customer = customerMap.get(item.customerCode) || {
-        code: item.customerCode,
-        name: item.customer,
-        hours: 0,
-        revenue: 0,
-        staffHours: new Map(),
-        invoiceItems: new Map()
-      };
-      customer.revenue += item.netAmount;
-      customer.invoiceItems.set(item.invoiceItem, (customer.invoiceItems.get(item.invoiceItem) || 0) + item.netAmount);
-      customerMap.set(item.customerCode, customer);
-    });
-
-    const staffMap = new Map();
-    state.staff.forEach((person) => {
-      staffMap.set(person.code, {
-        code: person.code,
-        name: person.name,
-        directHours: 0,
-        totalHours: 0,
-        revenue: 0,
-        target: 0,
-        customerBreakdown: new Map(),
-        workMap: new Map()
-      });
-    });
-
-    entries.forEach((entry) => {
-      const person = staffMap.get(entry.staffCode);
-      if (!person) return;
-      person.totalHours += entry.hours;
-      if (entry.customerCode) person.directHours += entry.hours;
-      const workKey = entry.customerCode || "__internal__";
-      const work = person.workMap.get(workKey) || {
-        code: entry.customerCode || "",
-        name: entry.customerCode ? (entry.customer || entry.customerCode) : "社内 / その他（非生産工数）",
-        isInternal: !entry.customerCode,
-        hours: 0
-      };
-      work.hours += entry.hours;
-      person.workMap.set(workKey, work);
-    });
-
-    targets.forEach((target) => {
-      const person = staffMap.get(target.staffCode);
-      if (person) person.target += target.targetAmount;
-    });
-
-    customerMap.forEach((customer) => {
-      if (!customer.hours || !customer.revenue) return;
-      customer.staffHours.forEach((hours, staffCode) => {
-        const person = staffMap.get(staffCode);
-        if (!person) return;
-        const allocatedRevenue = customer.revenue * (hours / customer.hours);
-        person.revenue += allocatedRevenue;
-        person.customerBreakdown.set(customer.code, {
-          code: customer.code,
-          name: customer.name,
-          hours,
-          revenue: allocatedRevenue,
-          rate: hours ? allocatedRevenue / hours : 0
-        });
-      });
-    });
-
-    const customers = [...customerMap.values()]
-      .filter((customer) => customer.hours > 0 || customer.revenue > 0)
-      .map((customer) => ({
-        ...customer,
-        rate: customer.hours ? customer.revenue / customer.hours : 0,
-        primaryStaff: primaryStaff(customer.staffHours),
-        invoiceItems: [...customer.invoiceItems.entries()]
-      }));
-
-    const staff = [...staffMap.values()].map((person) => ({
-      ...person,
-      achievement: person.target ? person.revenue / person.target : 0,
-      directRate: person.directHours ? person.revenue / person.directHours : 0,
-      productivity: person.totalHours ? person.revenue / person.totalHours : 0,
-      directRatio: person.totalHours ? person.directHours / person.totalHours : 0,
-      customers: [...person.customerBreakdown.values()].sort((a, b) => b.revenue - a.revenue),
-      workBreakdown: [...person.workMap.values()]
-        .map((work) => {
-          const allocated = person.customerBreakdown.get(work.code);
-          const revenue = work.isInternal || !allocated ? 0 : allocated.revenue;
-          return {
-            ...work,
-            revenue,
-            rate: !work.isInternal && work.hours ? revenue / work.hours : 0
-          };
-        })
-        .sort((a, b) => Number(a.isInternal) - Number(b.isInternal) || b.hours - a.hours)
-    }));
-
-    return {
-      month,
-      entries,
-      billing,
-      totalHours,
-      directHours,
-      netRevenue,
-      grossRevenue,
-      targetTotal,
-      customers,
-      staff
-    };
-  }
-
-  function primaryStaff(staffHours) {
-    const best = [...staffHours.entries()].sort((a, b) => b[1] - a[1])[0];
-    if (!best) return "-";
-    const person = state.staff.find((item) => item.code === best[0]);
-    return person ? person.name : best[0];
-  }
-
-  function renderKpis(model) {
-    el.netRevenue.textContent = formatCurrency(model.netRevenue);
-    el.invoiceCount.textContent = `${model.billing.length}件 / 税込 ${formatCurrency(model.grossRevenue)}`;
-    el.totalHours.textContent = `${formatNumber(model.totalHours, 1)}h`;
-    el.directHours.textContent = `顧客直接 ${formatNumber(model.directHours, 1)}h`;
-    el.directRatio.textContent = formatPercent(model.totalHours ? model.directHours / model.totalHours : 0);
-    el.averageCustomerRate.textContent = formatCurrency(model.directHours ? model.netRevenue / model.directHours : 0);
-    el.targetRate.textContent = formatPercent(model.targetTotal ? model.netRevenue / model.targetTotal : 0);
-    el.targetAmount.textContent = `目標 ${formatCurrency(model.targetTotal)}`;
-  }
-
-  function renderMonthlyBars() {
-    const months = lastTwelveMonths(anchorMonth());
-    const data = months.map((month) => ({
-      month,
-      net: sum(state.billing.filter((item) => item.billingMonth === month).map((item) => item.netAmount)),
-      target: sum(state.targets.filter((item) => item.targetMonth === month).map((item) => item.targetAmount))
-    }));
-    const maxValue = Math.max(1, ...data.flatMap((point) => [point.net, point.target]));
-    el.monthlyBars.innerHTML = data.map((point, index) => {
-      const [year, month] = point.month.split("-");
-      const prevYear = index > 0 ? data[index - 1].month.split("-")[0] : "";
-      const showYear = index === 0 || year !== prevYear;
-      const tip = `${formatMonthLabel(point.month)}：売上 ${formatCurrency(point.net)} / 目標 ${formatCurrency(point.target)}${point.target ? ` / 達成率 ${formatPercent(point.net / point.target)}` : ""}`;
-      const isActive = point.month === state.selectedMonth;
-      return `
-        <div class="month-column${isActive ? " is-active" : ""}" title="${escapeHtml(tip)}">
-          <div class="bar-stage">
-            ${barMarkup("revenue", point.net, maxValue, true)}
-            ${barMarkup("target", point.target, maxValue, false)}
-          </div>
-          <div class="month-label">${Number(month)}月<small>${showYear ? year : ""}</small></div>
-        </div>
-      `;
-    }).join("");
-  }
-
-  function barMarkup(type, value, maxValue, showValue) {
-    const height = Math.max(3, Math.round((value / maxValue) * 150));
-    const label = showValue && value > 0 ? `<span class="bar-value">${formatCompactCurrency(value)}</span>` : "";
-    return `<div class="bar ${type}" style="height:${height}px">${label}</div>`;
-  }
-
-  function renderRevenueMix(model) {
-    const mix = groupSum(model.billing, "invoiceItem", "netAmount");
-    const max = Math.max(1, ...mix.map((item) => item.value));
-    el.revenueMix.innerHTML = mix
-      .sort((a, b) => b.value - a.value)
-      .map((item) => `
-        <div class="mix-row">
-          <span>${escapeHtml(item.key)}</span>
-          <div class="mix-track"><div class="mix-fill" style="width:${(item.value / max) * 100}%"></div></div>
-          <strong>${formatCurrency(item.value)}</strong>
-        </div>
-      `).join("") || `<p class="empty-row">請求データがありません</p>`;
-  }
-
-  function renderStaffTable(model) {
-    const sorters = {
-      revenue: (a, b) => b.revenue - a.revenue,
-      achievement: (a, b) => b.achievement - a.achievement,
-      directRate: (a, b) => b.directRate - a.directRate,
-      hours: (a, b) => b.totalHours - a.totalHours
-    };
-    const rows = [...model.staff].sort(sorters[state.staffSort]);
-    const achievementScale = Math.max(
-      1.25,
-      Math.ceil(Math.max(0, ...rows.map((person) => person.achievement)) * 4) / 4
-    );
-    const targetPosition = Math.min(100, (1 / achievementScale) * 100);
-    el.staffRows.innerHTML = rows.map((person) => `
-      <tr data-staff-code="${escapeHtml(person.code)}"
-          tabindex="0"
-          aria-selected="${person.code === state.selectedStaffCode}"
-          class="${person.code === state.selectedStaffCode ? "is-selected" : ""}">
-        <td><span class="entity-code">${escapeHtml(person.code)}</span><span class="entity-name">${escapeHtml(person.name)}</span></td>
-        <td class="num">${formatCurrency(person.revenue)}</td>
-        <td class="num">${formatCurrency(person.target)}</td>
-        <td class="achievement-cell">
-          <span class="achievement-value ${rateClass(person.achievement)}">${formatPercent(person.achievement)}</span>
-          <div class="achievement-track" title="目標線 100% / 表示上限 ${formatPercent(achievementScale)}">
-            <div class="achievement-fill" style="width:${Math.min(targetPosition, (person.achievement / achievementScale) * 100)}%"></div>
-            ${person.achievement > 1
-              ? `<div class="achievement-fill excess" style="left:${targetPosition}%;width:${Math.min(100 - targetPosition, ((person.achievement - 1) / achievementScale) * 100)}%"></div>`
-              : ""}
-            <span class="achievement-target" style="left:${targetPosition}%"></span>
-          </div>
-        </td>
-        <td class="num">${formatNumber(person.directHours, 1)}h</td>
-        <td class="num">${formatNumber(person.totalHours, 1)}h</td>
-        <td class="num ${rateClass(person.directRate / 10000)}">${formatCurrency(person.directRate)}</td>
-        <td class="num">${formatCurrency(person.productivity)}</td>
-      </tr>
-    `).join("");
-  }
-
-  function selectStaff(staffCode) {
-    state.selectedStaffCode = staffCode;
-    const model = buildMonthModel(state.selectedMonth);
-    renderStaffTable(model);
-    renderStaffDetail(model);
-    openStaffModal();
-  }
-
-  function renderStaffDetail(model) {
-    const person = model.staff.find((item) => item.code === state.selectedStaffCode);
-    if (!person) {
-      closeStaffModal();
-      return;
-    }
-
-    const workRows = person.workBreakdown.map((work) => `
-      <div class="staff-customer-row${work.isInternal ? " is-internal" : ""}">
-        <strong>${work.isInternal ? escapeHtml(work.name) : `${escapeHtml(work.code)} ${escapeHtml(work.name)}`}</strong>
-        <span>${formatNumber(work.hours, 1)}h</span>
-        <span>${work.revenue ? formatCurrency(work.revenue) : "—"}</span>
-        <span>${work.rate ? `${formatCurrency(work.rate)}/h` : "—"}</span>
-      </div>
-    `).join("");
-    const clientCount = person.workBreakdown.filter((work) => !work.isInternal).length;
-
-    el.staffDetail.innerHTML = `
-      <div class="staff-detail-heading">
-        <div>
-          <p class="panel-label">Staff Monthly Summary</p>
-          <h3 id="staffModalTitle">${escapeHtml(person.code)} ${escapeHtml(person.name)}</h3>
-        </div>
-        <p>${formatMonthLabel(model.month)} / 担当顧客 ${clientCount}社</p>
-      </div>
-      <div class="staff-detail-kpis">
-        ${staffDetailKpi("帰属売上", formatCurrency(person.revenue))}
-        ${staffDetailKpi("目標達成率", formatPercent(person.achievement), rateClass(person.achievement))}
-        ${staffDetailKpi("顧客工数", `${formatNumber(person.directHours, 1)}h`)}
-        ${staffDetailKpi("総工数", `${formatNumber(person.totalHours, 1)}h`)}
-        ${staffDetailKpi("顧客業務比率", formatPercent(person.directRatio))}
-        ${staffDetailKpi("直接時間単価", formatCurrency(person.directRate))}
-      </div>
-      <div class="staff-customer-list">
-        <p class="staff-detail-note">当月の工数内訳（顧客＋社内／非生産工数を含む・工数の多い順）　工数 / 帰属売上 / 時間単価</p>
-        ${workRows || "<p class=\"empty-row\">当月の工数がありません</p>"}
-      </div>
-    `;
-  }
-
-  function openStaffModal() {
-    el.staffModal.hidden = false;
-    document.body.classList.add("has-modal");
-    window.setTimeout(() => el.closeStaffModal.focus(), 0);
-  }
-
-  function closeStaffModal() {
-    el.staffModal.hidden = true;
-    document.body.classList.remove("has-modal");
-    const selectedRow = el.staffRows.querySelector(`[data-staff-code="${cssEscape(state.selectedStaffCode)}"]`);
-    if (selectedRow) selectedRow.focus();
-  }
-
-  function staffDetailKpi(label, value, className) {
-    return `
-      <div class="staff-detail-kpi">
-        <span>${escapeHtml(label)}</span>
-        <strong class="${className || ""}">${escapeHtml(value)}</strong>
-      </div>
-    `;
-  }
-
-  function renderCustomerTable(model) {
-    const sorters = {
-      rateAsc: (a, b) => a.rate - b.rate,
-      rateDesc: (a, b) => b.rate - a.rate,
-      revenue: (a, b) => b.revenue - a.revenue,
-      hours: (a, b) => b.hours - a.hours
-    };
-    const rows = model.customers
-      .filter((customer) => {
-        if (!state.customerSearch) return true;
-        return `${customer.code} ${customer.name}`.toLowerCase().includes(state.customerSearch);
-      })
-      .sort(sorters[state.customerSort]);
-    el.customerRows.innerHTML = rows.map((customer) => `
-      <tr data-customer-code="${escapeHtml(customer.code)}"
-          tabindex="0"
-          role="button"
-          aria-label="${escapeHtml(customer.code)} ${escapeHtml(customer.name)} の詳細"
-          class="${customer.code === state.selectedCustomerCode ? "is-selected" : ""}">
-        <td><span class="entity-code">${escapeHtml(customer.code)}</span><span class="entity-name">${escapeHtml(customer.name)}</span></td>
-        <td class="num">${formatCurrency(customer.revenue)}</td>
-        <td class="num">${formatNumber(customer.hours, 1)}h</td>
-        <td class="num ${customerRateClass(customer.rate)}">${formatCurrency(customer.rate)}</td>
-        <td>${escapeHtml(customer.primaryStaff)}</td>
-        <td><div class="invoice-tags">${customer.invoiceItems.map(([name]) => `<span class="invoice-tag">${escapeHtml(name)}</span>`).join("")}</div></td>
-      </tr>
-    `).join("") || `<tr><td class="empty-row" colspan="6">該当する顧客がありません</td></tr>`;
-  }
-
-  function selectCustomer(customerCode) {
-    state.selectedCustomerCode = customerCode;
-    state.customerModalMonth = state.selectedMonth;
-    renderCustomerTable(buildMonthModel(state.selectedMonth));
-    renderCustomerDetail();
-    openCustomerModal();
-  }
-
-  function renderCustomerDetail() {
-    if (!state.selectedCustomerCode) {
-      closeCustomerModal();
-      return;
-    }
-    const trendEnd = anchorMonth();
-    const detailMonth = state.customerModalMonth || trendEnd;
-    const customer = buildCustomerMonth(state.selectedCustomerCode, detailMonth);
-
-    const trend = buildCustomerTrend(customer.code, trendEnd);
-    const trendHours = sum(trend.map((point) => point.hours));
-    const trendRevenue = sum(trend.map((point) => point.revenue));
-    const avgRate = trendHours ? trendRevenue / trendHours : 0;
-    const maxRate = Math.max(1, ...trend.map((point) => point.rate));
-
-    const staffRows = [...customer.staffHours.entries()]
-      .map(([staffCode, hours]) => {
-        const revenue = customer.hours ? customer.revenue * (hours / customer.hours) : 0;
-        return { name: staffName(staffCode), hours, revenue, rate: hours ? revenue / hours : 0 };
-      })
-      .sort((a, b) => b.hours - a.hours)
-      .map((item) => `
-        <div class="staff-customer-row">
-          <strong>${escapeHtml(item.name)}</strong>
-          <span>${formatNumber(item.hours, 1)}h</span>
-          <span>${formatCurrency(item.revenue)}</span>
-          <span>${item.rate ? `${formatCurrency(item.rate)}/h` : "—"}</span>
-        </div>
-      `).join("");
-
-    const invoiceRows = customer.invoiceItems
-      .slice()
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, amount]) => `
-        <div class="staff-customer-row invoice-row">
-          <strong>${escapeHtml(name)}</strong>
-          <span>${formatCurrency(amount)}</span>
-        </div>
-      `).join("");
-
-    const trendBars = trend.map((point, index) => {
-      const height = point.rate > 0 ? Math.max(6, Math.round((point.rate / maxRate) * 120)) : 0;
-      const [year, month] = point.month.split("-");
-      const prevYear = index > 0 ? trend[index - 1].month.split("-")[0] : "";
-      const showYear = index === 0 || year !== prevYear;
-      const tip = `${formatMonthLabel(point.month)}：時間単価 ${formatCurrency(point.rate)} / 売上 ${formatCurrency(point.revenue)} / 工数 ${formatNumber(point.hours, 1)}h`;
-      const bar = point.rate > 0
-        ? `<div class="trend-bar ${customerRateClass(point.rate)}" style="height:${height}px"><span class="trend-value">${formatRateLabel(point.rate)}</span></div>`
-        : `<div class="trend-bar is-zero"></div>`;
-      const isActive = point.month === detailMonth;
-      return `
-        <div class="trend-column${isActive ? " is-active" : ""}" data-trend-month="${point.month}" role="button" tabindex="0" title="${escapeHtml(tip)}">
-          <div class="trend-bar-stage">${bar}</div>
-          <div class="trend-label">${Number(month)}月<small>${showYear ? year : ""}</small></div>
-        </div>
-      `;
-    }).join("");
-
-    el.customerDetail.innerHTML = `
-      <div class="staff-detail-heading">
-        <div>
-          <p class="panel-label">Client Profitability</p>
-          <h3 id="customerModalTitle">${escapeHtml(customer.code)} ${escapeHtml(customer.name)}</h3>
-        </div>
-        <p>${formatMonthLabel(detailMonth)} / 主担当 ${escapeHtml(customer.primaryStaff)}</p>
-      </div>
-      <div class="staff-detail-kpis">
-        ${staffDetailKpi("当月税抜売上", formatCurrency(customer.revenue))}
-        ${staffDetailKpi("当月顧客工数", `${formatNumber(customer.hours, 1)}h`)}
-        ${staffDetailKpi("当月時間単価", formatCurrency(customer.rate), customerRateClass(customer.rate))}
-        ${staffDetailKpi("12ヶ月平均単価", formatCurrency(avgRate))}
-        ${staffDetailKpi("12ヶ月売上", formatCurrency(trendRevenue))}
-        ${staffDetailKpi("12ヶ月工数", `${formatNumber(trendHours, 1)}h`)}
-      </div>
-      <div class="trend-block">
-        <p class="staff-detail-note">時間単価の推移（直近12ヶ月・データのない月は0）　バーをクリックでその月の内訳に切替</p>
-        <div class="customer-trend">${trendBars}</div>
-      </div>
-      <div class="customer-detail-cols">
-        <div class="staff-customer-list">
-          <p class="staff-detail-note">当月の関与スタッフ（工数の多い順）　工数 / 帰属売上 / 時間単価</p>
-          ${staffRows || "<p class=\"empty-row\">当月の工数がありません</p>"}
-        </div>
-        <div class="staff-customer-list">
-          <p class="staff-detail-note">当月の請求内訳</p>
-          ${invoiceRows || "<p class=\"empty-row\">当月の請求がありません</p>"}
-        </div>
-      </div>
-    `;
-  }
-
-  function buildCustomerMonth(customerCode, month) {
-    const master = state.customers.find((item) => item.code === customerCode);
-    const entries = state.entries.filter((entry) => entry.month === month && entry.customerCode === customerCode);
-    const billing = state.billing.filter((item) => item.billingMonth === month && item.customerCode === customerCode);
-    const hours = sum(entries.map((entry) => entry.hours));
-    const revenue = sum(billing.map((item) => item.netAmount));
-    const staffHours = new Map();
-    entries.forEach((entry) => staffHours.set(entry.staffCode, (staffHours.get(entry.staffCode) || 0) + entry.hours));
-    const invoiceMap = new Map();
-    billing.forEach((item) => invoiceMap.set(item.invoiceItem, (invoiceMap.get(item.invoiceItem) || 0) + item.netAmount));
-    return {
-      code: customerCode,
-      name: master ? master.name : customerCode,
-      month,
-      hours,
-      revenue,
-      rate: hours ? revenue / hours : 0,
-      staffHours,
-      invoiceItems: [...invoiceMap.entries()],
-      primaryStaff: primaryStaff(staffHours)
-    };
-  }
-
-  function buildCustomerTrend(customerCode, endMonth) {
-    return lastTwelveMonths(endMonth).map((month) => {
-      const hours = sum(state.entries
-        .filter((entry) => entry.month === month && entry.customerCode === customerCode)
-        .map((entry) => entry.hours));
-      const revenue = sum(state.billing
-        .filter((item) => item.billingMonth === month && item.customerCode === customerCode)
-        .map((item) => item.netAmount));
-      return { month, hours, revenue, rate: hours ? revenue / hours : 0 };
-    });
+  function currentModel() {
+    return ENGINE.buildMonthModel(state.data || {}, state.selectedMonth);
   }
 
   function anchorMonth() {
@@ -864,105 +141,317 @@
     if (!year || !month) return [];
     const result = [];
     for (let offset = 11; offset >= 0; offset -= 1) {
-      const date = new Date(year, month - 1 - offset, 1);
-      result.push(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`);
+      const d = new Date(year, month - 1 - offset, 1);
+      result.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
     }
     return result;
   }
 
-  function staffName(staffCode) {
-    const person = state.staff.find((item) => item.code === staffCode);
-    return person ? person.name : staffCode;
+  function renderMonthOptions() {
+    el.monthSelect.innerHTML = lastTwelveMonths(anchorMonth()).slice().reverse()
+      .map((m) => `<option value="${m}">${formatMonthLabel(m)}</option>`).join("");
+    el.monthSelect.value = state.selectedMonth;
   }
 
-  function formatRateLabel(value) {
-    return value > 0 ? Math.round(value).toLocaleString("ja-JP") : "";
+  function shiftMonth(direction) {
+    const months = lastTwelveMonths(anchorMonth());
+    const index = months.indexOf(state.selectedMonth);
+    const next = Math.max(0, Math.min(months.length - 1, index + direction));
+    if (next === index || next < 0) return;
+    state.selectedMonth = months[next];
+    el.monthSelect.value = state.selectedMonth;
+    render();
   }
 
-  function openCustomerModal() {
-    el.customerModal.hidden = false;
-    document.body.classList.add("has-modal");
-    window.setTimeout(() => el.closeCustomerModal.focus(), 0);
+  function render() {
+    if (!state.data) return;
+    const model = currentModel();
+    renderKpis(model.firm);
+    renderMonthlyBars();
+    renderRevenueMix(model);
+    renderStaffTable(model);
+    if (!el.staffModal.hidden) renderStaffDetail(model);
+    renderCustomerTable(model);
+    if (!el.customerModal.hidden) { state.customerModalMonth = state.selectedMonth; renderCustomerDetail(); }
+    const months = lastTwelveMonths(anchorMonth());
+    const i = months.indexOf(state.selectedMonth);
+    el.prevMonth.disabled = i <= 0;
+    el.nextMonth.disabled = i < 0 || i >= months.length - 1;
   }
 
-  function closeCustomerModal() {
-    el.customerModal.hidden = true;
-    if (el.staffModal.hidden) document.body.classList.remove("has-modal");
-    const selectedRow = el.customerRows.querySelector(`[data-customer-code="${cssEscape(state.selectedCustomerCode)}"]`);
-    if (selectedRow) selectedRow.focus();
+  function renderKpis(firm) {
+    el.netRevenue.textContent = formatCurrency(firm.grossRevenue);
+    el.revenueBreakdown.textContent = `役務 ${formatCurrency(firm.serviceRevenue)}・対象外 ${formatCurrency(firm.excludedRevenue)}`;
+    el.taxValue.textContent = formatCurrency(firm.tax);
+    el.taxIncluded.textContent = `税込 ${formatCurrency(firm.taxIncluded)}`;
+    el.totalHours.textContent = `${formatNumber(firm.totalHours, 1)}h`;
+    el.directHours.textContent = `顧客直接 ${formatNumber(firm.directHours, 1)}h`;
+    el.directRatio.textContent = formatPercent(firm.totalHours ? firm.directHours / firm.totalHours : 0);
+    el.averageCustomerRate.textContent = formatCurrency(firm.avgCustomerRate);
+    el.targetRate.textContent = formatPercent(firm.achievement);
+    el.targetRate.className = rateClass(firm.achievement);
+    el.targetAmount.textContent = `目標 ${formatCurrency(firm.targetTotal)}`;
   }
 
-  function groupSum(items, keyField, valueField) {
-    const map = new Map();
-    items.forEach((item) => map.set(item[keyField], (map.get(item[keyField]) || 0) + Number(item[valueField] || 0)));
-    return [...map.entries()].map(([key, value]) => ({ key, value }));
+  // 月次 役務売上 vs 目標（軽量集計・フル配賦は呼ばない）
+  function monthlyServiceTarget(month) {
+    const taskType = {};
+    (state.data.tasks || []).forEach((t) => { taskType[String(t.code)] = t.allocationType || "service"; });
+    const service = (state.data.billing || [])
+      .filter((b) => String(b.billingMonth) === month)
+      .filter((b) => (taskType[String(b.invoiceItemCode || "")] || "service") === "service")
+      .reduce((a, b) => a + Number(b.netAmount || 0), 0);
+    const target = (state.data.targets || [])
+      .filter((t) => String(t.targetMonth) === month)
+      .reduce((a, t) => a + Number(t.targetAmount || 0), 0);
+    return { service, target };
   }
 
-  function rateClass(value) {
-    if (value >= 1) return "rate-good";
-    if (value >= 0.85) return "rate-mid";
-    return "rate-low";
+  function renderMonthlyBars() {
+    const months = lastTwelveMonths(anchorMonth());
+    const data = months.map((m) => Object.assign({ month: m }, monthlyServiceTarget(m)));
+    const maxValue = Math.max(1, ...data.flatMap((p) => [p.service, p.target]));
+    el.monthlyBars.innerHTML = data.map((p, index) => {
+      const [year, month] = p.month.split("-");
+      const prevYear = index > 0 ? data[index - 1].month.split("-")[0] : "";
+      const showYear = index === 0 || year !== prevYear;
+      const tip = `${formatMonthLabel(p.month)}：役務売上 ${formatCurrency(p.service)} / 目標 ${formatCurrency(p.target)}${p.target ? ` / 達成率 ${formatPercent(p.service / p.target)}` : ""}`;
+      const isActive = p.month === state.selectedMonth;
+      return `
+        <div class="month-column${isActive ? " is-active" : ""}" title="${escapeHtml(tip)}">
+          <div class="bar-stage">
+            ${barMarkup("revenue", p.service, maxValue, true)}
+            ${barMarkup("target", p.target, maxValue, false)}
+          </div>
+          <div class="month-label">${Number(month)}月<small>${showYear ? year : ""}</small></div>
+        </div>`;
+    }).join("");
   }
 
-  function customerRateClass(rate) {
-    if (rate >= 10000) return "rate-good";
-    if (rate >= 7500) return "rate-mid";
-    return "rate-low";
+  function barMarkup(type, value, maxValue, showValue) {
+    const height = Math.max(3, Math.round((value / maxValue) * 150));
+    const label = showValue && value > 0 ? `<span class="bar-value">${formatCompactCurrency(value)}</span>` : "";
+    return `<div class="bar ${type}" style="height:${height}px">${label}</div>`;
   }
 
-  function formatCurrency(value) {
-    return new Intl.NumberFormat("ja-JP", {
-      style: "currency",
-      currency: "JPY",
-      maximumFractionDigits: 0
-    }).format(Math.round(value || 0));
+  function renderRevenueMix(model) {
+    const agg = new Map();
+    model.customers.forEach((c) => (c.invoiceItems || []).forEach((it) => {
+      const cur = agg.get(it.code) || { name: it.name, type: it.type, value: 0 };
+      cur.value += it.amount; agg.set(it.code, cur);
+    }));
+    const mix = [...agg.values()].sort((a, b) => b.value - a.value);
+    const max = Math.max(1, ...mix.map((m) => m.value));
+    el.revenueMix.innerHTML = mix.map((m) => `
+        <div class="mix-row">
+          <span>${escapeHtml(m.name)}${typeTag(m.type)}</span>
+          <div class="mix-track"><div class="mix-fill" style="width:${(m.value / max) * 100}%"></div></div>
+          <strong>${formatCurrency(m.value)}</strong>
+        </div>`).join("") || `<p class="empty-row">請求データがありません</p>`;
   }
 
-  function formatCompactCurrency(value) {
-    return `${Math.round((value || 0) / 10000).toLocaleString("ja-JP")}万`;
+  function typeTag(type) {
+    if (type === "tax") return ` <span class="rev-tag tag-tax">税</span>`;
+    if (type === "excluded") return ` <span class="rev-tag tag-excluded">対象外</span>`;
+    return "";
   }
 
-  function formatNumber(value, digits) {
-    return Number(value || 0).toLocaleString("ja-JP", {
-      minimumFractionDigits: digits,
-      maximumFractionDigits: digits
+  function renderStaffTable(model) {
+    const sorters = {
+      revenue: (a, b) => b.attributedRevenue - a.attributedRevenue,
+      achievement: (a, b) => b.achievement - a.achievement,
+      directRate: (a, b) => b.directRate - a.directRate,
+      hours: (a, b) => b.totalHours - a.totalHours
+    };
+    const rows = [...model.staff].sort(sorters[state.staffSort] || sorters.revenue);
+    el.staffRows.innerHTML = rows.map((p) => `
+      <tr data-staff-code="${escapeHtml(p.code)}" tabindex="0" class="${p.code === state.selectedStaffCode ? "is-selected" : ""}">
+        <td><span class="entity-code">${escapeHtml(p.code)}</span><span class="entity-name">${escapeHtml(p.name)}</span></td>
+        <td class="num">${formatCurrency(p.attributedRevenue)}</td>
+        <td class="num">${formatCurrency(p.target)}</td>
+        <td class="num"><span class="${rateClass(p.achievement)}">${formatPercent(p.achievement)}</span></td>
+        <td class="num">${formatNumber(p.directHours, 1)}h</td>
+        <td class="num">${formatNumber(p.totalHours, 1)}h</td>
+        <td class="num ${rateClass(p.directRate / 10000)}">${formatCurrency(p.directRate)}</td>
+        <td class="num">${formatCurrency(p.productivity)}</td>
+      </tr>`).join("") || `<tr><td class="empty-row" colspan="8">データがありません</td></tr>`;
+  }
+
+  function selectStaff(code) {
+    state.selectedStaffCode = code;
+    const model = currentModel();
+    renderStaffTable(model);
+    renderStaffDetail(model);
+    openStaffModal();
+  }
+
+  function renderStaffDetail(model) {
+    const p = model.staff.find((s) => s.code === state.selectedStaffCode);
+    if (!p) { closeStaffModal(); return; }
+    const custRows = p.customers.map((c) => `
+      <div class="staff-customer-row">
+        <strong>${escapeHtml(c.code)} ${escapeHtml(c.name)}</strong>
+        <span>${formatNumber(c.hours, 1)}h</span>
+        <span>${formatCurrency(c.attributed)}${c.hours <= 0 ? '<span class="rev-tag tag-fb">フォールバック</span>' : ""}</span>
+        <span>${c.rate != null ? `${formatCurrency(c.rate)}/h` : "—"}</span>
+      </div>`).join("");
+    el.staffDetail.innerHTML = `
+      <div class="staff-detail-heading">
+        <div><p class="panel-label">Staff Monthly Summary</p>
+          <h3 id="staffModalTitle">${escapeHtml(p.code)} ${escapeHtml(p.name)}</h3></div>
+        <p>${formatMonthLabel(model.firm.billingMonth)} / 担当顧客 ${p.customers.length}社</p>
+      </div>
+      <div class="staff-detail-kpis">
+        ${kpiBox("帰属売上", formatCurrency(p.attributedRevenue))}
+        ${kpiBox("目標達成率", formatPercent(p.achievement), rateClass(p.achievement))}
+        ${kpiBox("顧客工数", `${formatNumber(p.directHours, 1)}h`)}
+        ${kpiBox("総工数", `${formatNumber(p.totalHours, 1)}h`)}
+        ${kpiBox("直接時間単価", formatCurrency(p.directRate))}
+        ${kpiBox("総合生産性", formatCurrency(p.productivity))}
+      </div>
+      <div class="staff-customer-list">
+        <p class="staff-detail-note">担当顧客の内訳（帰属売上が大きい順）　工数 / 帰属売上 / 時間単価　※社内・非生産工数 ${formatNumber(p.internalHours, 1)}h</p>
+        ${custRows || "<p class=\"empty-row\">当月の担当がありません</p>"}
+      </div>`;
+  }
+
+  function renderCustomerTable(model) {
+    const sorters = {
+      rateAsc: (a, b) => rateVal(a.rate) - rateVal(b.rate),
+      rateDesc: (a, b) => rateVal(b.rate) - rateVal(a.rate),
+      revenue: (a, b) => b.grossRevenue - a.grossRevenue,
+      hours: (a, b) => b.hours - a.hours
+    };
+    const rows = model.customers
+      .filter((c) => !state.customerSearch || `${c.code} ${c.name}`.toLowerCase().includes(state.customerSearch))
+      .sort(sorters[state.customerSort] || sorters.rateAsc);
+    el.customerRows.innerHTML = rows.map((c) => `
+      <tr data-customer-code="${escapeHtml(c.code)}" tabindex="0" role="button" class="${c.code === state.selectedCustomerCode ? "is-selected" : ""}">
+        <td><span class="entity-code">${escapeHtml(c.code)}</span><span class="entity-name">${escapeHtml(c.name)}</span></td>
+        <td class="num">${formatCurrency(c.grossRevenue)}</td>
+        <td class="num">${formatNumber(c.hours, 1)}h</td>
+        <td class="num ${c.rate != null ? customerRateClass(c.rate) : "rate-na"}">${c.rate != null ? formatCurrency(c.rate) : "—"}</td>
+        <td>${escapeHtml(c.primaryStaff)}</td>
+        <td><div class="invoice-tags">${(c.invoiceItems || []).map((it) => `<span class="invoice-tag">${escapeHtml(it.name)}</span>`).join("")}</div></td>
+      </tr>`).join("") || `<tr><td class="empty-row" colspan="6">該当する顧客がありません</td></tr>`;
+  }
+
+  function rateVal(r) { return r == null ? Infinity : r; } // 「—」は末尾へ
+
+  function selectCustomer(code) {
+    state.selectedCustomerCode = code;
+    state.customerModalMonth = state.selectedMonth;
+    renderCustomerTable(currentModel());
+    renderCustomerDetail();
+    openCustomerModal();
+  }
+
+  function renderCustomerDetail() {
+    if (!state.selectedCustomerCode) { closeCustomerModal(); return; }
+    const detailMonth = state.customerModalMonth || state.selectedMonth;
+    const model = ENGINE.buildMonthModel(state.data || {}, detailMonth);
+    const c = model.customers.find((x) => x.code === state.selectedCustomerCode)
+      || { code: state.selectedCustomerCode, name: (state.data.customers || []).reduce((n, x) => x.code === state.selectedCustomerCode ? x.name : n, state.selectedCustomerCode), grossRevenue: 0, serviceRevenue: 0, excludedRevenue: 0, tax: 0, backedRevenue: 0, unrecordedRevenue: 0, hours: 0, rate: null, primaryStaff: "—", invoiceItems: [], staffBreakdown: [] };
+
+    // 12ヶ月 時間単価トレンド（エンジンを月ごとに評価）
+    const months = lastTwelveMonths(anchorMonth());
+    const trend = months.map((m) => {
+      const mm = ENGINE.buildMonthModel(state.data || {}, m);
+      const cc = mm.customers.find((x) => x.code === c.code);
+      return { month: m, rate: cc ? cc.rate : null, hours: cc ? cc.hours : 0, service: cc ? cc.serviceRevenue : 0 };
     });
+    const maxRate = Math.max(1, ...trend.map((t) => t.rate || 0));
+
+    const staffRows = c.staffBreakdown.map((s) => `
+      <div class="staff-customer-row">
+        <strong>${escapeHtml(s.name)}${s.role ? ` <span class="rev-tag">${escapeHtml(s.role)}</span>` : ""}</strong>
+        <span>${formatNumber(s.hours, 1)}h</span>
+        <span>${formatCurrency(s.attributed)}${s.hours <= 0 ? '<span class="rev-tag tag-fb">FB</span>' : ""}</span>
+        <span>${s.rate != null ? `${formatCurrency(s.rate)}/h` : "—"}</span>
+      </div>`).join("");
+
+    const itemRows = c.invoiceItems.map((it) => `
+      <div class="staff-customer-row invoice-row">
+        <strong>${escapeHtml(it.name)}${typeTag(it.type)}</strong>
+        <span>${formatCurrency(it.amount)}</span>
+      </div>`).join("");
+
+    const trendBars = trend.map((t, index) => {
+      const has = t.rate != null && t.rate > 0;
+      const height = has ? Math.max(6, Math.round((t.rate / maxRate) * 120)) : 0;
+      const [year, month] = t.month.split("-");
+      const prevYear = index > 0 ? trend[index - 1].month.split("-")[0] : "";
+      const showYear = index === 0 || year !== prevYear;
+      const tip = `${formatMonthLabel(t.month)}：時間単価 ${t.rate != null ? formatCurrency(t.rate) : "—"} / 役務 ${formatCurrency(t.service)} / 工数 ${formatNumber(t.hours, 1)}h`;
+      const bar = has
+        ? `<div class="trend-bar ${customerRateClass(t.rate)}" style="height:${height}px"><span class="trend-value">${Math.round(t.rate).toLocaleString("ja-JP")}</span></div>`
+        : `<div class="trend-bar is-zero"></div>`;
+      return `
+        <div class="trend-column${t.month === detailMonth ? " is-active" : ""}" data-trend-month="${t.month}" role="button" tabindex="0" title="${escapeHtml(tip)}">
+          <div class="trend-bar-stage">${bar}</div>
+          <div class="trend-label">${Number(month)}月<small>${showYear ? year : ""}</small></div>
+        </div>`;
+    }).join("");
+
+    el.customerDetail.innerHTML = `
+      <div class="staff-detail-heading">
+        <div><p class="panel-label">Client Profitability</p>
+          <h3 id="customerModalTitle">${escapeHtml(c.code)} ${escapeHtml(c.name)}</h3></div>
+        <p>${formatMonthLabel(detailMonth)} / 主担当 ${escapeHtml(c.primaryStaff)}</p>
+      </div>
+      <div class="staff-detail-kpis">
+        ${kpiBox("税抜売上(総)", formatCurrency(c.grossRevenue))}
+        ${kpiBox("役務売上", formatCurrency(c.serviceRevenue))}
+        ${kpiBox("対象外(立替)", formatCurrency(c.excludedRevenue))}
+        ${kpiBox("消費税", formatCurrency(c.tax))}
+        ${kpiBox("顧客工数", `${formatNumber(c.hours, 1)}h`)}
+        ${kpiBox("時間単価", c.rate != null ? formatCurrency(c.rate) : "—（工数未記録）", c.rate != null ? customerRateClass(c.rate) : "")}
+      </div>
+      <p class="staff-detail-note">うち工数未記録の役務売上（フォールバック）：${formatCurrency(c.unrecordedRevenue)}</p>
+      <div class="trend-block">
+        <p class="staff-detail-note">時間単価の推移（直近12ヶ月・工数未記録/データなしは0）　バーをクリックでその月の内訳に切替</p>
+        <div class="customer-trend">${trendBars}</div>
+      </div>
+      <div class="customer-detail-cols">
+        <div class="staff-customer-list">
+          <p class="staff-detail-note">当月の関与スタッフ（役割／工数 / 帰属売上 / 時間単価）</p>
+          ${staffRows || "<p class=\"empty-row\">当月の関与がありません</p>"}
+        </div>
+        <div class="staff-customer-list">
+          <p class="staff-detail-note">当月の請求内訳</p>
+          ${itemRows || "<p class=\"empty-row\">当月の請求がありません</p>"}
+        </div>
+      </div>`;
   }
 
-  function formatPercent(value) {
-    return `${(Number(value || 0) * 100).toFixed(1)}%`;
+  function kpiBox(label, value, className) {
+    return `<div class="staff-detail-kpi"><span>${escapeHtml(label)}</span><strong class="${className || ""}">${escapeHtml(value)}</strong></div>`;
   }
 
-  function formatMonthLabel(month) {
-    const [year, value] = String(month || "").split("-");
-    return year && value ? `${year}年${Number(value)}月` : month;
-  }
+  function openStaffModal() { el.staffModal.hidden = false; document.body.classList.add("has-modal"); window.setTimeout(() => el.closeStaffModal.focus(), 0); }
+  function closeStaffModal() { el.staffModal.hidden = true; if (el.customerModal.hidden) document.body.classList.remove("has-modal"); }
+  function openCustomerModal() { el.customerModal.hidden = false; document.body.classList.add("has-modal"); window.setTimeout(() => el.closeCustomerModal.focus(), 0); }
+  function closeCustomerModal() { el.customerModal.hidden = true; if (el.staffModal.hidden) document.body.classList.remove("has-modal"); }
 
-  function sum(values) {
-    return values.reduce((total, value) => total + Number(value || 0), 0);
+  // ---- 整形・しきい値（design.md 7-3） ----
+  function rateClass(value) { if (value >= 1) return "rate-good"; if (value >= 0.85) return "rate-mid"; return "rate-low"; }
+  function customerRateClass(rate) { if (rate >= 10000) return "rate-good"; if (rate >= 7500) return "rate-mid"; return "rate-low"; }
+  function formatCurrency(value) { return new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 }).format(Math.round(value || 0)); }
+  function formatCompactCurrency(value) { return `${Math.round((value || 0) / 10000).toLocaleString("ja-JP")}万`; }
+  function formatNumber(value, digits) { return Number(value || 0).toLocaleString("ja-JP", { minimumFractionDigits: digits, maximumFractionDigits: digits }); }
+  function formatPercent(value) { return `${(Number(value || 0) * 100).toFixed(1)}%`; }
+  function formatMonthLabel(month) { const [y, v] = String(month || "").split("-"); return y && v ? `${y}年${Number(v)}月` : month; }
+  function formatLoadedDateTime(value) {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "時刻不明";
+    return d.toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
   }
-
-  function unique(values) {
-    return [...new Set(values)];
-  }
-
+  function unique(values) { return [...new Set(values)]; }
   function escapeHtml(value) {
-    return String(value || "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
+    return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
   }
-
-  function cssEscape(value) {
-    if (window.CSS && typeof window.CSS.escape === "function") return window.CSS.escape(String(value || ""));
-    return String(value || "").replace(/["\\]/g, "\\$&");
-  }
-
   function showToast(message) {
-    el.toast.textContent = message;
-    el.toast.classList.add("is-visible");
+    el.toast.textContent = message; el.toast.classList.add("is-visible");
     window.clearTimeout(showToast.timer);
     showToast.timer = window.setTimeout(() => el.toast.classList.remove("is-visible"), 3200);
   }

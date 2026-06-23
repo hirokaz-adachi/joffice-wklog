@@ -2,14 +2,19 @@
   "use strict";
 
   const storageKey = "sharoshiWorklogMvp.v1";
+  const INTERNAL_VALUE = "__internal__"; // 案2: 社内/非生産工数（顧客なし）
   const initialState = {
     staff: [],
     customers: [],
     taskTypes: ["顧問対応", "給与計算", "手続き", "労務相談", "助成金", "スポット", "社内/その他"],
+    tasks: [],
+    taskPhases: [],
     entries: []
   };
 
   const state = loadState();
+  if (!Array.isArray(state.tasks)) state.tasks = [];
+  if (!Array.isArray(state.taskPhases)) state.taskPhases = [];
   let calendarCursor = new Date();
   const el = {
     form: document.getElementById("entryForm"),
@@ -18,6 +23,8 @@
     staff: document.getElementById("staff"),
     customer: document.getElementById("customer"),
     taskType: document.getElementById("taskType"),
+    phase: document.getElementById("phase"),
+    phaseField: document.getElementById("phaseField"),
     hours: document.getElementById("hours"),
     memo: document.getElementById("memo"),
     saveEntry: document.getElementById("saveEntry"),
@@ -70,6 +77,12 @@
       state.staff = staff;
       state.customers = customers;
       state.taskTypes = Array.isArray(remoteState.taskTypes) && remoteState.taskTypes.length ? remoteState.taskTypes : initialState.taskTypes;
+      state.tasks = Array.isArray(remoteState.tasks)
+        ? remoteState.tasks.map((t) => ({ code: String(t.code), name: String(t.name || ""), allocationType: t.allocationType || "service" })).filter((t) => t.code)
+        : [];
+      state.taskPhases = Array.isArray(remoteState.taskPhases)
+        ? remoteState.taskPhases.map((p) => ({ taskCode: String(p.taskCode), phaseCode: String(p.phaseCode), phaseName: p.phaseName, ratio: Number(p.ratio || 0), sortOrder: Number(p.sortOrder || 0) }))
+        : [];
       state.entries = normalizeEntries(remoteState.entries, staff, customers);
       persist();
       showToast("スプレッドシートから読み込みました");
@@ -105,21 +118,26 @@
   async function saveEntry(event) {
     event.preventDefault();
     const hours = Number(el.hours.value);
+    const taskValue = el.taskType.value;
+    const internal = taskValue === INTERNAL_VALUE || !taskValue || taskValue === "社内/その他";
+    const taskCode = internal ? "" : taskValue;
+    const phaseCode = internal ? "" : currentPhaseCode(taskCode);
     const entry = {
       id: el.editingId.value || makeId(),
       date: el.workDate.value,
       staffCode: el.staff.value,
       staff: getMasterName("staff", el.staff.value),
-      customerCode: el.customer.value,
-      customer: el.customer.value ? getMasterName("customers", el.customer.value) : "",
-      taskType: el.taskType.value,
+      customerCode: internal ? "" : el.customer.value,
+      customer: internal ? "" : (el.customer.value ? getMasterName("customers", el.customer.value) : ""),
+      taskType: internal ? "社内/その他" : taskName(taskCode),
+      taskCode: taskCode,
+      phaseCode: phaseCode,
       hours,
       memo: el.memo.value.trim(),
       updatedAt: new Date().toISOString()
     };
-    const requiresCustomer = entry.taskType !== "社内/その他";
 
-    if (!entry.date || !entry.staff || (requiresCustomer && !entry.customer) || !entry.taskType || !Number.isFinite(hours) || hours <= 0) {
+    if (!entry.date || !entry.staff || (!internal && !entry.customer) || (!internal && !taskCode) || !Number.isFinite(hours) || hours <= 0) {
       showToast("未入力または時間の値を確認してください");
       return;
     }
@@ -149,11 +167,14 @@
     const entry = state.entries.find((item) => item.id === id);
     if (!entry) return;
 
+    const isInternal = !entry.customerCode && !entry.taskCode;
     el.editingId.value = entry.id;
     el.workDate.value = entry.date;
     el.staff.value = entry.staffCode || findMasterCodeByName("staff", entry.staff);
-    el.taskType.value = entry.taskType;
+    el.taskType.value = isInternal ? INTERNAL_VALUE : (entry.taskCode || INTERNAL_VALUE);
     el.customer.value = entry.customerCode || findMasterCodeByName("customers", entry.customer);
+    syncCustomerForTask();
+    if (el.phase && entry.phaseCode) el.phase.value = entry.phaseCode;
     el.hours.value = entry.hours;
     el.memo.value = entry.memo || "";
     el.saveEntry.textContent = "更新";
@@ -296,10 +317,46 @@
   // ここでは入力フォーム・フィルタのスタッフ／顧客／業務区分セレクトを最新マスタで埋めるのみ。
   function renderMasters() {
     fillMasterSelect(el.staff, state.staff, true);
-    fillSelect(el.taskType, state.taskTypes, true);
+    fillTaskSelect(el.taskType, true);
     fillFilterStaffSelect(el.filterStaff, true);
     fillCustomerSelect(el.customer, true);
   }
+
+  // 案2: 業務区分セレクト（役務タスク＋社内/その他）。工程はマスタ未取得時は taskTypes 名称にフォールバック。
+  function fillTaskSelect(select, preserve) {
+    const cur = preserve ? select.value : "";
+    const svc = serviceTasks();
+    let opts;
+    if (svc.length) {
+      opts = svc.slice().sort((a, b) => String(a.code).localeCompare(String(b.code), "ja"))
+        .map((t) => `<option value="${escapeHtml(t.code)}">${escapeHtml(t.code)} ${escapeHtml(t.name)}</option>`);
+    } else {
+      // 未接続フォールバック（コードなし・名称のみ）
+      opts = (state.taskTypes || []).filter((n) => n !== "社内/その他").map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`);
+    }
+    opts.push(`<option value="${INTERNAL_VALUE}">社内 / その他（非生産）</option>`);
+    select.innerHTML = opts.join("");
+    if (preserve && Array.from(select.options).some((o) => o.value === cur)) select.value = cur;
+  }
+
+  function fillPhaseSelect(code) {
+    if (!el.phase || !el.phaseField) return;
+    const phases = code ? phasesFor(code) : [];
+    if (phases.length >= 2) {
+      const cur = el.phase.value;
+      el.phase.innerHTML = phases.map((p) => `<option value="${escapeHtml(p.phaseCode)}">${escapeHtml(p.phaseName || p.phaseCode)}</option>`).join("");
+      if (phases.some((p) => p.phaseCode === cur)) el.phase.value = cur;
+      el.phaseField.hidden = false;
+    } else {
+      el.phaseField.hidden = true;
+      el.phase.innerHTML = phases.length ? `<option value="${escapeHtml(phases[0].phaseCode)}">${escapeHtml(phases[0].phaseName || phases[0].phaseCode)}</option>` : "";
+    }
+  }
+
+  function serviceTasks() { return (state.tasks || []).filter((t) => t.allocationType === "service"); }
+  function phasesFor(code) { return (state.taskPhases || []).filter((p) => p.taskCode === String(code) && Number(p.ratio) > 0).sort((a, b) => a.sortOrder - b.sortOrder); }
+  function taskName(code) { const t = (state.tasks || []).find((x) => x.code === String(code)); return t ? t.name : code; }
+  function currentPhaseCode(code) { const ph = phasesFor(code); if (ph.length >= 2) return el.phase.value || ph[0].phaseCode; return ph.length ? ph[0].phaseCode : "PRE"; }
 
   function renderDailySummary() {
     const date = el.workDate.value;
@@ -316,9 +373,11 @@
   }
 
   function syncCustomerForTask() {
-    const internal = el.taskType.value === "社内/その他";
+    const taskValue = el.taskType.value;
+    const internal = taskValue === INTERNAL_VALUE || !taskValue;
     el.customer.disabled = internal;
     if (internal) el.customer.value = "";
+    fillPhaseSelect(internal ? "" : taskValue);
   }
 
   function renderCardDayList() {
@@ -418,7 +477,7 @@
 
   function exportCsv() {
     const rows = getFilteredEntries();
-    const header = ["date", "staff_code", "staff", "customer_code", "customer", "task_type", "hours", "memo", "updated_at"];
+    const header = ["date", "staff_code", "staff", "customer_code", "customer", "task_type", "task_code", "phase_code", "hours", "memo", "updated_at"];
     const body = rows.map((entry) => [
       entry.date,
       entry.staffCode || "",
@@ -426,6 +485,8 @@
       entry.customerCode || "",
       entry.customer,
       entry.taskType,
+      entry.taskCode || "",
+      entry.phaseCode || "",
       entry.hours,
       entry.memo || "",
       entry.updatedAt || ""
@@ -489,9 +550,12 @@
     const staffCode = value("staff_code") || value("社員番号");
     const customer = value("customer") || value("顧客");
     const customerCode = value("customer_code") || value("顧客番号");
-    const taskType = value("task_type") || value("業務区分") || "顧問対応";
+    const taskCode = value("task_code") || value("業務コード");
+    const phaseCode = value("phase_code") || value("工程");
+    const taskType = value("task_type") || value("業務区分") || (taskCode ? taskName(taskCode) : "顧問対応");
     const hours = Number(value("hours") || value("時間"));
-    if (!date || !staff || (taskType !== "社内/その他" && !customer) || !Number.isFinite(hours) || hours <= 0) return null;
+    const internal = !customerCode && !taskCode && (taskType === "社内/その他" || !customer);
+    if (!date || !staff || (!internal && !customer) || !Number.isFinite(hours) || hours <= 0) return null;
     return {
       id: makeId(),
       date,
@@ -500,6 +564,8 @@
       customerCode,
       customer,
       taskType,
+      taskCode,
+      phaseCode,
       hours,
       memo: value("memo") || value("メモ"),
       updatedAt: new Date().toISOString()

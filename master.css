@@ -82,3 +82,10 @@
   .master-edit-form input,
   .master-search input { min-width: 0; width: 100%; }
 }
+
+/* 案2: 業務区分フォームの配賦区分・工程比、顧客担当グリッドのセレクト */
+.master-edit-form select { min-width: 160px; min-height: 36px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; }
+.master-edit-form .phase-input input { min-width: 90px; }
+#masterTable .num { text-align: right; font-variant-numeric: tabular-nums; }
+#masterBody select { width: 100%; min-height: 34px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; }
+#masterTable .row-edit[data-save] { color: #fff; background: var(--accent); border-color: var(--accent); }

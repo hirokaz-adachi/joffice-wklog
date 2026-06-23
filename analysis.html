@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>J-Office Insight ｜ 詳細分析</title>
-  <link rel="stylesheet" href="dashboard.css?v=20260618-7">
-  <link rel="stylesheet" href="analysis.css?v=20260622-1">
+  <link rel="stylesheet" href="dashboard.css?v=20260623-1">
+  <link rel="stylesheet" href="analysis.css?v=20260623-1">
 </head>
 <body>
   <header class="dashboard-header">
@@ -36,6 +36,13 @@
           <option value="staff">スタッフ別</option>
           <option value="customer">顧客別</option>
           <option value="taskType">業務区分別</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <span class="control-label">指標</span>
+        <select id="measure" aria-label="指標">
+          <option value="hours">工数</option>
+          <option value="attributed">帰属売上（配賦）</option>
         </select>
       </div>
       <div class="control-group">
@@ -80,6 +87,16 @@
         <span>記録件数</span>
         <strong id="sumEntries">-</strong>
         <small>工数レコード数</small>
+      </article>
+      <article class="kpi">
+        <span>役務売上</span>
+        <strong id="sumService">-</strong>
+        <small>期間内・配賦対象</small>
+      </article>
+      <article class="kpi">
+        <span>平均時間単価</span>
+        <strong id="sumAvgRate">-</strong>
+        <small>工数対応売上 ÷ 直接工数</small>
       </article>
     </section>
 
@@ -135,7 +152,8 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="config.js"></script>
-  <script src="backend.js?v=20260622-2"></script>
-  <script src="analysis.js?v=20260622-1"></script>
+  <script src="backend.js?v=20260623-1"></script>
+  <script src="allocation.js?v=20260623-1"></script>
+  <script src="analysis.js?v=20260623-1"></script>
 </body>
 </html>

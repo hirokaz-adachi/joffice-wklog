@@ -886,3 +886,20 @@ body.has-modal {
   .customer-trend { gap: 3px; }
   .trend-value { display: none; }
 }
+
+/* 案2: 売上区分タグ・フォールバック・未記録（—）表示 */
+.rev-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  vertical-align: middle;
+}
+.rev-tag.tag-tax { background: #eef2ff; color: #3730a3; }
+.rev-tag.tag-excluded { background: #fff7ed; color: var(--amber); }
+.rev-tag.tag-fb { background: #fef2f2; color: var(--red); }
+.rate-na { color: var(--muted); }

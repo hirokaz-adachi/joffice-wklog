@@ -6,7 +6,7 @@
   <title>J-Office Insight ｜ マスタメンテナンス</title>
   <link rel="stylesheet" href="styles.css?v=20260622-1">
   <link rel="stylesheet" href="data-edit.css?v=20260622-1">
-  <link rel="stylesheet" href="master.css?v=20260622-1">
+  <link rel="stylesheet" href="master.css?v=20260623-1">
 </head>
 <body>
   <header class="topbar">
@@ -29,8 +29,10 @@
         <div class="tabs" role="tablist" aria-label="マスタ選択">
           <button type="button" class="tab is-active" data-master="staff" role="tab">スタッフ</button>
           <button type="button" class="tab" data-master="customers" role="tab">顧客</button>
-          <button type="button" class="tab" data-master="tasks" role="tab">業務区分</button>
+          <button type="button" class="tab" data-master="tasks" role="tab">業務区分・工程</button>
+          <button type="button" class="tab" data-master="assignees" role="tab">顧客担当</button>
           <button type="button" class="tab" data-master="items" role="tab">品目（請求項目）</button>
+          <button type="button" class="tab" data-master="settings" role="tab">設定</button>
         </div>
         <div class="edit-actions">
           <span id="dataStatus" class="edit-status">読み込み中…</span>
@@ -57,7 +59,7 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="config.js"></script>
-  <script src="backend.js?v=20260622-2"></script>
-  <script src="master.js?v=20260622-1"></script>
+  <script src="backend.js?v=20260623-1"></script>
+  <script src="master.js?v=20260623-1"></script>
 </body>
 </html>

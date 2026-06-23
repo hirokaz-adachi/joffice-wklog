@@ -26,6 +26,7 @@
   const TOP_SERIES = 8;
 
   const state = {
+    data: null,
     staff: [],
     customers: [],
     entries: [],
@@ -34,15 +35,19 @@
     startMonth: "",
     endMonth: "",
     mainAxis: "staff",
+    measure: "hours", // hours | attributed（帰属売上）
     includeInternal: true,
     pivotRow: "staff",
     pivotCol: "taskType"
   };
 
+  const ENGINE = window.JOfficeAllocation;
+
   const el = {
     startMonth: document.getElementById("startMonth"),
     endMonth: document.getElementById("endMonth"),
     mainAxis: document.getElementById("mainAxis"),
+    measure: document.getElementById("measure"),
     includeInternal: document.getElementById("includeInternal"),
     pivotRow: document.getElementById("pivotRow"),
     pivotCol: document.getElementById("pivotCol"),
@@ -55,6 +60,8 @@
     sumDirectRatio: document.getElementById("sumDirectRatio"),
     sumMonths: document.getElementById("sumMonths"),
     sumEntries: document.getElementById("sumEntries"),
+    sumService: document.getElementById("sumService"),
+    sumAvgRate: document.getElementById("sumAvgRate"),
     trendTitle: document.getElementById("trendTitle"),
     trendLegend: document.getElementById("trendLegend"),
     trendChart: document.getElementById("trendChart"),
@@ -90,6 +97,10 @@
     });
     el.mainAxis.addEventListener("change", () => {
       state.mainAxis = el.mainAxis.value;
+      render();
+    });
+    el.measure.addEventListener("change", () => {
+      state.measure = el.measure.value;
       render();
     });
     el.includeInternal.addEventListener("change", () => {
@@ -132,6 +143,7 @@
 
   function applyData(data) {
     const source = data || {};
+    state.data = source;
     state.staff = Array.isArray(source.staff) ? source.staff : [];
     state.customers = Array.isArray(source.customers) ? source.customers : [];
     state.entries = Array.isArray(source.entries) ? source.entries.map(normalizeEntry) : [];
@@ -194,10 +206,9 @@
     });
     renderPeriodNote();
     renderSummary(periodAll);
-    const scoped = periodEntries();
-    renderTrend(scoped);
-    renderRanking(scoped);
-    renderPivot(scoped);
+    renderTrend();
+    renderRanking();
+    renderPivot(periodEntries());
   }
 
   function renderPeriodNote() {
@@ -221,6 +232,17 @@
     el.sumDirectRatio.textContent = formatPercent(total ? direct / total : 0);
     el.sumMonths.textContent = `${monthCount}ヶ月`;
     el.sumEntries.textContent = `${periodAll.length.toLocaleString("ja-JP")}件`;
+
+    // 売上サマリ（配賦エンジン・期間合計）
+    let service = 0, backed = 0, directH = 0;
+    if (ENGINE && state.data) {
+      monthsInRange().forEach((m) => {
+        const f = ENGINE.buildMonthModel(state.data, m).firm;
+        service += f.serviceRevenue; backed += f.backedRevenue; directH += f.directHours;
+      });
+    }
+    if (el.sumService) el.sumService.textContent = formatCurrency(service);
+    if (el.sumAvgRate) el.sumAvgRate.textContent = directH ? formatCurrency(backed / directH) : "—";
   }
 
   // 選択中の主軸でエントリを分類する。{ key, label } を返す。
@@ -257,74 +279,129 @@
     return map;
   }
 
-  function renderTrend(entries) {
-    el.trendTitle.textContent = `月次工数推移（${AXES[state.mainAxis]}別）`;
-    const months = monthsInRange();
-    const ranked = aggregateByAxis(entries, state.mainAxis);
+  function isRevenue() { return state.measure === "attributed"; }
+  function measureLabel() { return isRevenue() ? "帰属売上" : "工数"; }
+  function fmtVal(v) { return isRevenue() ? formatCurrency(v) : `${formatNumber(v, 1)}h`; }
+  function fmtValShort(v) { return isRevenue() ? `${Math.round((v || 0) / 10000).toLocaleString("ja-JP")}万` : formatNumber(v, 0); }
 
+  // 月内の役務売上を業務区分名で集計（業務区分軸の売上用）。
+  function taskServiceByName(month) {
+    const out = new Map();
+    const tmap = {};
+    ((state.data && state.data.tasks) || []).forEach((t) => { tmap[String(t.code)] = { name: t.name, type: t.allocationType || "service" }; });
+    ((state.data && state.data.billing) || []).forEach((b) => {
+      if (String(b.billingMonth) !== month) return;
+      const t = tmap[String(b.invoiceItemCode || "")];
+      if ((t ? t.type : "service") !== "service") return;
+      const name = t ? t.name : (b.invoiceItem || b.invoiceItemCode);
+      out.set(name, (out.get(name) || 0) + Number(b.netAmount || 0));
+    });
+    return out;
+  }
+
+  // 月 × カテゴリの値（measure に応じ 工数 or 帰属売上）。Map(key -> {label, value})
+  function monthValues(month) {
+    const axis = state.mainAxis;
+    const map = new Map();
+    if (!isRevenue()) {
+      state.entries.forEach((e) => {
+        if (e.month !== month) return;
+        if (!state.includeInternal && !e.customerCode) return;
+        const { key, label } = axisOf(e, axis);
+        const r = map.get(key) || { label, value: 0 };
+        r.value += e.hours; map.set(key, r);
+      });
+      return map;
+    }
+    if (!ENGINE || !state.data) return map;
+    if (axis === "staff" || axis === "customer") {
+      const model = ENGINE.buildMonthModel(state.data, month);
+      if (axis === "staff") model.staff.forEach((s) => { if (s.attributedRevenue > 0) map.set(s.code, { label: staffLabel(s.code, s.name), value: s.attributedRevenue }); });
+      else model.customers.forEach((c) => { if (c.serviceRevenue > 0) map.set(c.code, { label: customerLabel(c.code, c.name), value: c.serviceRevenue }); });
+    } else {
+      taskServiceByName(month).forEach((v, name) => { if (v > 0) map.set(name, { label: name, value: v }); });
+    }
+    return map;
+  }
+
+  // 期間集計（ランキング用）: [{key,label,value,hours,directHours,revenue,backed,rate}]
+  function periodAgg() {
+    const axis = state.mainAxis;
+    const months = monthsInRange();
+    const map = new Map();
+    const ens = (key, label) => { let r = map.get(key); if (!r) { r = { key, label, hours: 0, directHours: 0, revenue: 0, backed: 0 }; map.set(key, r); } return r; };
+    periodEntries().forEach((e) => { const { key, label } = axisOf(e, axis); const r = ens(key, label); r.hours += e.hours; if (e.customerCode) r.directHours += e.hours; });
+    if (ENGINE && state.data) {
+      months.forEach((m) => {
+        if (axis === "staff" || axis === "customer") {
+          const model = ENGINE.buildMonthModel(state.data, m);
+          if (axis === "staff") model.staff.forEach((s) => { const r = ens(s.code, staffLabel(s.code, s.name)); r.revenue += s.attributedRevenue; r.backed += s.backedRevenue; });
+          else model.customers.forEach((c) => { const r = ens(c.code, customerLabel(c.code, c.name)); r.revenue += c.serviceRevenue; r.backed += c.backedRevenue; });
+        } else {
+          taskServiceByName(m).forEach((v, name) => { const r = ens(name, name); r.revenue += v; r.backed += v; });
+        }
+      });
+    }
+    map.forEach((r) => {
+      r.value = isRevenue() ? r.revenue : r.hours;
+      r.rate = r.directHours ? (axis === "taskType" ? r.revenue / r.directHours : r.backed / r.directHours) : null;
+    });
+    return [...map.values()].sort((a, b) => b.value - a.value);
+  }
+
+  function renderTrend() {
+    el.trendTitle.textContent = `月次${measureLabel()}推移（${AXES[state.mainAxis]}別）`;
+    const months = monthsInRange();
     if (!months.length) {
       el.trendLegend.innerHTML = "";
       el.trendChart.innerHTML = `<p class="empty-row">集計期間が選択されていません</p>`;
       return;
     }
-
+    const ranked = periodAgg().filter((cat) => cat.value > 0 || !isRevenue());
     const topKeys = ranked.slice(0, TOP_SERIES).map((cat) => cat.key);
     const topKeySet = new Set(topKeys);
     const hasOther = ranked.length > TOP_SERIES;
 
-    // 凡例（上位カテゴリ + その他）
     const legendItems = ranked.slice(0, TOP_SERIES).map((cat, index) => legendItem(PALETTE[index], cat.label));
     if (hasOther) legendItems.push(legendItem(OTHER_COLOR, `その他（${ranked.length - TOP_SERIES}件）`));
     el.trendLegend.innerHTML = legendItems.join("");
 
-    // 月 × カテゴリ の工数を集計
     const perMonth = months.map((month) => {
-      const monthEntries = entries.filter((entry) => entry.month === month);
+      const mv = monthValues(month);
       const segMap = new Map();
       let total = 0;
-      monthEntries.forEach((entry) => {
-        const { key, label } = axisOf(entry, state.mainAxis);
+      mv.forEach((o, key) => {
         const bucketKey = topKeySet.has(key) ? key : "__other__";
         const seg = segMap.get(bucketKey) || {
-          key: bucketKey,
-          label: bucketKey === "__other__" ? "その他" : label,
+          label: bucketKey === "__other__" ? "その他" : o.label,
           color: bucketKey === "__other__" ? OTHER_COLOR : PALETTE[topKeys.indexOf(key)],
-          hours: 0
+          value: 0
         };
-        seg.hours += entry.hours;
-        total += entry.hours;
-        segMap.set(bucketKey, seg);
+        seg.value += o.value; total += o.value; segMap.set(bucketKey, seg);
       });
-      // 凡例と同じ並び（上位→その他）でスタックを積む
       const order = [...topKeys, "__other__"];
-      const segments = order
-        .map((k) => segMap.get(k))
-        .filter(Boolean)
-        .filter((seg) => seg.hours > 0);
+      const segments = order.map((k) => segMap.get(k)).filter(Boolean).filter((s) => s.value > 0);
       return { month, total, segments };
     });
 
-    const maxTotal = Math.max(1, ...perMonth.map((point) => point.total));
+    const maxTotal = Math.max(1, ...perMonth.map((p) => p.total));
     el.trendChart.innerHTML = perMonth.map((point, index) => {
       const [year, month] = point.month.split("-");
       const prevYear = index > 0 ? perMonth[index - 1].month.split("-")[0] : "";
       const showYear = index === 0 || year !== prevYear;
       const stackHeight = Math.round((point.total / maxTotal) * 200);
-      const tipLines = point.segments
-        .map((seg) => `${seg.label}：${formatNumber(seg.hours, 1)}h`)
-        .join(" / ");
-      const tip = `${formatMonthLabel(point.month)}　合計 ${formatNumber(point.total, 1)}h${tipLines ? `（${tipLines}）` : ""}`;
+      const tipLines = point.segments.map((seg) => `${seg.label}：${fmtVal(seg.value)}`).join(" / ");
+      const tip = `${formatMonthLabel(point.month)}　合計 ${fmtVal(point.total)}${tipLines ? `（${tipLines}）` : ""}`;
       const segHtml = point.segments.map((seg) => {
-        const h = point.total ? Math.max(2, Math.round((seg.hours / point.total) * stackHeight)) : 0;
-        return `<div class="stack-seg" style="height:${h}px;background:${seg.color}" title="${escapeHtml(seg.label)}：${formatNumber(seg.hours, 1)}h"></div>`;
+        const h = point.total ? Math.max(2, Math.round((seg.value / point.total) * stackHeight)) : 0;
+        return `<div class="stack-seg" style="height:${h}px;background:${seg.color}" title="${escapeHtml(seg.label)}：${fmtVal(seg.value)}"></div>`;
       }).join("");
       return `
         <div class="stack-column" title="${escapeHtml(tip)}">
-          <span class="stack-total">${point.total > 0 ? formatNumber(point.total, 0) : ""}</span>
+          <span class="stack-total">${point.total > 0 ? fmtValShort(point.total) : ""}</span>
           <div class="stack-stage"><div class="stack-bar" style="height:${stackHeight}px">${segHtml}</div></div>
           <div class="stack-label">${Number(month)}月<small>${showYear ? year : ""}</small></div>
-        </div>
-      `;
+        </div>`;
     }).join("");
   }
 
@@ -332,29 +409,30 @@
     return `<span class="legend-item"><span class="legend-swatch" style="background:${color}"></span>${escapeHtml(label)}</span>`;
   }
 
-  function renderRanking(entries) {
-    el.rankTitle.textContent = `工数ランキング・構成比（${AXES[state.mainAxis]}別）`;
-    const ranked = aggregateByAxis(entries, state.mainAxis);
-    const grand = sum(ranked.map((cat) => cat.hours));
+  function renderRanking() {
+    el.rankTitle.textContent = `${measureLabel()}ランキング・構成比（${AXES[state.mainAxis]}別）`;
+    let ranked = periodAgg();
+    if (isRevenue()) ranked = ranked.filter((cat) => cat.value > 0);
+    const grand = sum(ranked.map((cat) => cat.value));
     const colorMap = buildColorMap(ranked);
     const monthCount = Math.max(1, monthsInRange().length);
-
     if (!ranked.length) {
       el.rankList.innerHTML = `<p class="empty-row">対象期間のデータがありません</p>`;
       return;
     }
-    const max = Math.max(1, ...ranked.map((cat) => cat.hours));
+    const max = Math.max(1, ...ranked.map((cat) => cat.value));
     el.rankList.innerHTML = ranked.map((cat, index) => {
-      const share = grand ? cat.hours / grand : 0;
+      const share = grand ? cat.value / grand : 0;
       return `
         <div class="rank-row">
           <span class="rank-no">${index + 1}</span>
           <span class="rank-swatch" style="background:${colorMap.get(cat.key)}"></span>
           <span class="rank-name">${escapeHtml(cat.label)}</span>
-          <div class="rank-track"><div class="rank-fill" style="width:${(cat.hours / max) * 100}%;background:${colorMap.get(cat.key)}"></div></div>
-          <span class="rank-hours">${formatNumber(cat.hours, 1)}h</span>
+          <div class="rank-track"><div class="rank-fill" style="width:${(cat.value / max) * 100}%;background:${colorMap.get(cat.key)}"></div></div>
+          <span class="rank-hours">${fmtVal(cat.value)}</span>
           <span class="rank-share">${formatPercent(share)}</span>
-          <span class="rank-avg">月平均 ${formatNumber(cat.hours / monthCount, 1)}h</span>
+          <span class="rank-avg">月平均 ${fmtVal(cat.value / monthCount)}</span>
+          <span class="rank-rate">${cat.rate != null ? `${formatCurrency(cat.rate)}/h` : "—"}</span>
         </div>
       `;
     }).join("");
@@ -509,6 +587,10 @@
 
   function formatPercent(value) {
     return `${(Number(value || 0) * 100).toFixed(1)}%`;
+  }
+
+  function formatCurrency(value) {
+    return new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 }).format(Math.round(value || 0));
   }
 
   function formatMonthLabel(month) {

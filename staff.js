@@ -2,14 +2,19 @@
   "use strict";
 
   const storageKey = "sharoshiWorklogMvp.v1";
+  const INTERNAL_VALUE = "__internal__"; // 案2: 社内/非生産工数（顧客なし）
   const initialState = {
     staff: [],
     customers: [],
     taskTypes: ["顧問対応", "給与計算", "手続き", "労務相談", "助成金", "スポット", "社内/その他"],
+    tasks: [],
+    taskPhases: [],
     entries: []
   };
 
   const state = loadState();
+  if (!Array.isArray(state.tasks)) state.tasks = [];
+  if (!Array.isArray(state.taskPhases)) state.taskPhases = [];
   const staffKey = "sharoshiWorklogMvp.selectedStaff";
   const el = {
     form: document.getElementById("entryForm"),
@@ -17,6 +22,8 @@
     staff: document.getElementById("staff"),
     customer: document.getElementById("customer"),
     taskType: document.getElementById("taskType"),
+    phase: document.getElementById("phase"),
+    phaseField: document.getElementById("phaseField"),
     hours: document.getElementById("hours"),
     minusHour: document.getElementById("minusHour"),
     plusHour: document.getElementById("plusHour"),
@@ -37,7 +44,8 @@
     el.workDate.value = toDateInput(new Date());
     fillMasterSelect(el.staff, state.staff);
     fillCustomerSelect(el.customer);
-    fillSelect(el.taskType, state.taskTypes);
+    fillTaskSelect(el.taskType);
+    syncTask();
 
     const savedStaff = localStorage.getItem(staffKey);
     if (savedStaff && state.staff.some((item) => item.code === savedStaff)) el.staff.value = savedStaff;
@@ -58,10 +66,17 @@
       state.staff = staff;
       state.customers = customers;
       state.taskTypes = Array.isArray(remoteState.taskTypes) && remoteState.taskTypes.length ? remoteState.taskTypes : initialState.taskTypes;
+      state.tasks = Array.isArray(remoteState.tasks)
+        ? remoteState.tasks.map((t) => ({ code: String(t.code), name: String(t.name || ""), allocationType: t.allocationType || "service" })).filter((t) => t.code)
+        : [];
+      state.taskPhases = Array.isArray(remoteState.taskPhases)
+        ? remoteState.taskPhases.map((p) => ({ taskCode: String(p.taskCode), phaseCode: String(p.phaseCode), phaseName: p.phaseName, ratio: Number(p.ratio || 0), sortOrder: Number(p.sortOrder || 0) }))
+        : [];
       state.entries = normalizeEntries(remoteState.entries, staff, customers);
       fillMasterSelect(el.staff, state.staff);
       fillCustomerSelect(el.customer);
-      fillSelect(el.taskType, state.taskTypes);
+      fillTaskSelect(el.taskType);
+      syncTask();
       const savedStaff = localStorage.getItem(staffKey);
       if (savedStaff && state.staff.some((item) => item.code === savedStaff)) el.staff.value = savedStaff;
       persist();
@@ -77,6 +92,7 @@
       localStorage.setItem(staffKey, el.staff.value);
       renderToday();
     });
+    el.taskType.addEventListener("change", syncTask);
     el.minusHour.addEventListener("click", () => changeDuration(-60));
     el.plusHour.addEventListener("click", () => changeDuration(60));
     el.minusMinute.addEventListener("click", () => changeDuration(-15));
@@ -86,21 +102,26 @@
   async function saveEntry(event) {
     event.preventDefault();
     const hours = Number(el.hours.value);
+    const taskValue = el.taskType.value;
+    const internal = taskValue === INTERNAL_VALUE || !taskValue || taskValue === "社内/その他";
+    const taskCode = internal ? "" : taskValue;
+    const phaseCode = internal ? "" : currentPhaseCode(taskCode);
     const entry = {
       id: makeId(),
       date: el.workDate.value,
       staffCode: el.staff.value,
       staff: getMasterName("staff", el.staff.value),
-      customerCode: el.customer.value,
-      customer: el.customer.value ? getMasterName("customers", el.customer.value) : "",
-      taskType: el.taskType.value,
+      customerCode: internal ? "" : el.customer.value,
+      customer: internal ? "" : (el.customer.value ? getMasterName("customers", el.customer.value) : ""),
+      taskType: internal ? "社内/その他" : taskName(taskCode),
+      taskCode: taskCode,
+      phaseCode: phaseCode,
       hours,
       memo: el.memo.value.trim(),
       updatedAt: new Date().toISOString()
     };
-    const requiresCustomer = entry.taskType !== "社内/その他";
 
-    if (!entry.date || !entry.staff || (requiresCustomer && !entry.customer) || !Number.isFinite(hours) || hours <= 0) {
+    if (!entry.date || !entry.staff || (!internal && !entry.customer) || (!internal && !taskCode) || !Number.isFinite(hours) || hours <= 0) {
       showToast("入力内容を確認してください");
       return;
     }
@@ -181,6 +202,45 @@
     );
     select.innerHTML = options.join("");
   }
+
+  // 案2: 業務区分セレクト（役務タスク＋社内）・工程セレクタ
+  function fillTaskSelect(select) {
+    const svc = serviceTasks();
+    let opts;
+    if (svc.length) {
+      opts = svc.slice().sort((a, b) => String(a.code).localeCompare(String(b.code), "ja"))
+        .map((t) => `<option value="${escapeHtml(t.code)}">${escapeHtml(t.name)}</option>`);
+    } else {
+      opts = (state.taskTypes || []).filter((n) => n !== "社内/その他").map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`);
+    }
+    opts.push(`<option value="${INTERNAL_VALUE}">社内 / その他</option>`);
+    select.innerHTML = opts.join("");
+  }
+
+  function fillPhaseSelect(code) {
+    if (!el.phase || !el.phaseField) return;
+    const phases = code ? phasesFor(code) : [];
+    if (phases.length >= 2) {
+      el.phase.innerHTML = phases.map((p) => `<option value="${escapeHtml(p.phaseCode)}">${escapeHtml(p.phaseName || p.phaseCode)}</option>`).join("");
+      el.phaseField.hidden = false;
+    } else {
+      el.phaseField.hidden = true;
+      el.phase.innerHTML = phases.length ? `<option value="${escapeHtml(phases[0].phaseCode)}">${escapeHtml(phases[0].phaseName || phases[0].phaseCode)}</option>` : "";
+    }
+  }
+
+  function syncTask() {
+    const v = el.taskType.value;
+    const internal = v === INTERNAL_VALUE || !v;
+    el.customer.disabled = internal;
+    if (internal) el.customer.value = "";
+    fillPhaseSelect(internal ? "" : v);
+  }
+
+  function serviceTasks() { return (state.tasks || []).filter((t) => t.allocationType === "service"); }
+  function phasesFor(code) { return (state.taskPhases || []).filter((p) => p.taskCode === String(code) && Number(p.ratio) > 0).sort((a, b) => a.sortOrder - b.sortOrder); }
+  function taskName(code) { const t = (state.tasks || []).find((x) => x.code === String(code)); return t ? t.name : code; }
+  function currentPhaseCode(code) { const ph = phasesFor(code); if (ph.length >= 2) return el.phase.value || ph[0].phaseCode; return ph.length ? ph[0].phaseCode : "PRE"; }
 
   function changeDuration(deltaMinutes) {
     const current = Math.round(Number(el.hours.value || 0) * 60);

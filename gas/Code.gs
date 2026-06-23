@@ -8,26 +8,68 @@ const CONFIG = {
     staff: "staff_master",
     customers: "customer_master",
     tasks: "task_master",
+    taskPhases: "task_phase_master",
+    customerStaff: "customer_staff_master",
     billing: "billing_data",
     targets: "staff_target_master",
-    items: "item_master"
+    items: "item_master",
+    settings: "app_settings"
   },
   headers: {
-    worklogs: ["id", "date", "staffCode", "staff", "customerCode", "customer", "taskType", "hours", "memo", "updatedAt"],
+    // 案2: worklogs に taskCode/phaseCode を追加（末尾に追加して既存列の位置を保つ）
+    worklogs: ["id", "date", "staffCode", "staff", "customerCode", "customer", "taskType", "hours", "memo", "updatedAt", "taskCode", "phaseCode"],
     staff: ["code", "name"],
     customers: ["code", "name"],
-    tasks: ["name"],
-    billing: ["invoiceId", "billingMonth", "customerCode", "customer", "invoiceItem", "paymentMethod", "netAmount", "taxAmount", "grossAmount", "issuedDate", "paymentDueDate", "paymentStatus", "memo"],
+    // 案2: 業務区分マスタ = 業務コード + 名称 + 配賦区分(service/excluded/tax)
+    tasks: ["code", "name", "allocationType"],
+    // 案2: 工程マスタ（業務コードごとの Prepare/Review 振分率。ratio は %・役務は合計100）
+    taskPhases: ["taskCode", "phaseCode", "phaseName", "ratio", "sortOrder"],
+    // 案2: 顧客担当者マスタ（1顧客に複数可。role=工程コード=役割対応フォールバックの寄せ先）
+    customerStaff: ["customerCode", "staffCode", "role", "sortOrder"],
+    // 案2: billing に invoiceItemCode(業務コード)/transferDate(振替日) を追加（末尾に追加）
+    billing: ["invoiceId", "billingMonth", "customerCode", "customer", "invoiceItem", "paymentMethod", "netAmount", "taxAmount", "grossAmount", "issuedDate", "paymentDueDate", "paymentStatus", "memo", "invoiceItemCode", "transferDate"],
     targets: ["targetMonth", "staffCode", "staff", "targetAmount"],
-    items: ["code", "name"]
+    items: ["code", "name"],
+    // 案2: 設定（作業→請求オフセット(イ) 等をキーバリューで保持）
+    settings: ["key", "value"]
   },
-  defaultTasks: ["顧問対応", "給与計算", "手続き", "労務相談", "助成金", "スポット", "社内/その他"]
+  defaultSettings: { billingOffset: "0" }
 };
+
+// 案2 工程コード（当面 Prepare/Review の2固定。N工程に拡張可）
+const PHASES = [
+  { code: "PRE", name: "Prepare" },
+  { code: "REV", name: "Review" }
+];
+
+// 案2 業務区分の初期カタログ（受領資料 【DM】請求品目一覧.xlsx より）
+// [code, name, allocationType(service/excluded/tax), prepare%, review%]
+// 000(¥0プレースホルダ)・057(正体不明)は seed 対象外＝マッチング漏れ扱い（所長回答待ち）。
+const TASK_CATALOG = [
+  ["001", "労務相談",         "service",  100, 0],
+  ["002", "事務長代行",       "service",  100, 0],
+  ["003", "有給休暇管理",     "service",  70, 30],
+  ["026", "給与計算",         "service",  70, 30],
+  ["027", "マイナンバー管理", "excluded", 0,  0],
+  ["028", "スポット手続",     "service",  100, 0],
+  ["036", "スポット手続",     "service",  100, 0],
+  ["037", "スポット手続",     "service",  70, 30],
+  ["046", "就業規則",         "service",  70, 30],
+  ["056", "賞与計算",         "service",  70, 30],
+  ["060", "諸費用",           "excluded", 0,  0],
+  ["061", "給与支払報告書",   "service",  70, 30],
+  ["062", "算定基礎届",       "service",  70, 30],
+  ["063", "労働保険年度更新", "service",  70, 30],
+  ["064", "住民税変更",       "service",  70, 30],
+  ["065", "年末調整",         "service",  70, 30],
+  ["080", "消費税",           "tax",      0,  0],
+  ["100", "LAI",              "service",  25, 75]
+];
 
 const MASTER_DEFS = {
   staff:     { sheet: CONFIG.sheets.staff,     fields: ["code", "name"], key: "code" },
   customers: { sheet: CONFIG.sheets.customers, fields: ["code", "name"], key: "code" },
-  tasks:     { sheet: CONFIG.sheets.tasks,     fields: ["name"],         key: "name" },
+  tasks:     { sheet: CONFIG.sheets.tasks,     fields: ["code", "name", "allocationType"], key: "code" },
   items:     { sheet: CONFIG.sheets.items,     fields: ["code", "name"], key: "code" }
 };
 
@@ -48,6 +90,23 @@ function setup() {
   ensureSheets_();
   seedDefaults_();
   invalidateDashboardCache_();
+}
+
+// 案2: 業務区分カタログ・工程・設定をシードし直す（マスタのみ作り直し）。
+// 既存のマスタ内容をクリアして TASK_CATALOG / PHASES から再構築する。
+function seedTaskCatalog_() {
+  const taskSheet = ensureSheet_(CONFIG.sheets.tasks, CONFIG.headers.tasks);
+  const phaseSheet = ensureSheet_(CONFIG.sheets.taskPhases, CONFIG.headers.taskPhases);
+  clearDataRows_(taskSheet);
+  clearDataRows_(phaseSheet);
+  TASK_CATALOG.forEach((row) => {
+    const [code, name, allocationType, prep, rev] = row;
+    taskSheet.appendRow([code, name, allocationType]);
+    if (allocationType === "service") {
+      phaseSheet.appendRow([code, "PRE", "Prepare", prep, 1]);
+      phaseSheet.appendRow([code, "REV", "Review", rev, 2]);
+    }
+  });
 }
 
 function route_(action, payload) {
@@ -92,6 +151,29 @@ function route_(action, payload) {
         deleteTarget_(payload.targetMonth, payload.staffCode);
         return { targetMonth: payload.targetMonth, staffCode: payload.staffCode };
       });
+    // 案2: 工程マスタ
+    case "saveTaskPhase":
+      return mutateDashboardData_(() => saveTaskPhase_(payload.row));
+    case "saveTaskPhases":
+      return mutateDashboardData_(() => (payload.rows || []).map(saveTaskPhase_));
+    case "deleteTaskPhase":
+      return mutateDashboardData_(() => {
+        deleteTaskPhase_(payload.taskCode, payload.phaseCode);
+        return { taskCode: payload.taskCode, phaseCode: payload.phaseCode };
+      });
+    // 案2: 顧客担当者マスタ
+    case "saveCustomerStaff":
+      return mutateDashboardData_(() => saveCustomerStaff_(payload.row));
+    case "saveCustomerStaffs":
+      return mutateDashboardData_(() => (payload.rows || []).map(saveCustomerStaff_));
+    case "deleteCustomerStaff":
+      return mutateDashboardData_(() => {
+        deleteCustomerStaff_(payload.customerCode, payload.staffCode);
+        return { customerCode: payload.customerCode, staffCode: payload.staffCode };
+      });
+    // 案2: 設定
+    case "saveSetting":
+      return mutateDashboardData_(() => saveSetting_(payload.key, payload.value));
     default:
       throw new Error("unknown action: " + action);
   }
@@ -110,6 +192,21 @@ function dashboard_(forceRefresh) {
       generatedAt: new Date().toISOString(),
       staff: readObjects_(CONFIG.sheets.staff),
       customers: readObjects_(CONFIG.sheets.customers),
+      tasks: readObjectsSafe_(CONFIG.sheets.tasks),
+      taskPhases: readObjectsSafe_(CONFIG.sheets.taskPhases).map((row) => ({
+        taskCode: String(row.taskCode),
+        phaseCode: row.phaseCode,
+        phaseName: row.phaseName,
+        ratio: Number(row.ratio || 0),
+        sortOrder: Number(row.sortOrder || 0)
+      })),
+      customerStaff: readObjectsSafe_(CONFIG.sheets.customerStaff).map((row) => ({
+        customerCode: String(row.customerCode),
+        staffCode: String(row.staffCode),
+        role: row.role,
+        sortOrder: Number(row.sortOrder || 0)
+      })),
+      settings: readSettings_(),
       entries: readObjects_(CONFIG.sheets.worklogs).map(normalizeWorklog_),
       billing: readObjects_(CONFIG.sheets.billing).map((row) => ({
         invoiceId: row.invoiceId,
@@ -117,10 +214,12 @@ function dashboard_(forceRefresh) {
         customerCode: row.customerCode,
         customer: row.customer,
         invoiceItem: row.invoiceItem,
+        invoiceItemCode: String(row.invoiceItemCode == null ? "" : row.invoiceItemCode),
         paymentMethod: row.paymentMethod,
         netAmount: Number(row.netAmount || 0),
         taxAmount: Number(row.taxAmount || 0),
         grossAmount: Number(row.grossAmount || 0),
+        transferDate: formatDate_(row.transferDate),
         issuedDate: formatDate_(row.issuedDate),
         paymentDueDate: formatDate_(row.paymentDueDate),
         paymentStatus: row.paymentStatus,
@@ -144,8 +243,12 @@ function bootstrap_() {
   return {
     staff: readObjects_(CONFIG.sheets.staff),
     customers: readObjects_(CONFIG.sheets.customers),
-    taskTypes: readObjects_(CONFIG.sheets.tasks).map((row) => row.name).filter(Boolean),
+    tasks: readObjectsSafe_(CONFIG.sheets.tasks),
+    taskTypes: readObjectsSafe_(CONFIG.sheets.tasks).map((row) => row.name).filter(Boolean),
+    taskPhases: readObjectsSafe_(CONFIG.sheets.taskPhases),
+    customerStaff: readObjectsSafe_(CONFIG.sheets.customerStaff),
     items: readObjectsSafe_(CONFIG.sheets.items),
+    settings: readSettings_(),
     entries: readObjects_(CONFIG.sheets.worklogs).map(normalizeWorklog_)
   };
 }
@@ -159,6 +262,8 @@ function normalizeWorklog_(row) {
     customerCode: row.customerCode,
     customer: row.customer,
     taskType: row.taskType,
+    taskCode: String(row.taskCode == null ? "" : row.taskCode),
+    phaseCode: row.phaseCode == null ? "" : row.phaseCode,
     hours: Number(row.hours || 0),
     memo: row.memo,
     updatedAt: row.updatedAt
@@ -220,6 +325,69 @@ function saveBilling_(row) {
   return row;
 }
 
+// 案2: 工程マスタ（複合キー taskCode + phaseCode）
+function saveTaskPhase_(row) {
+  if (!row || !row.taskCode || !row.phaseCode) throw new Error("taskPhase taskCode/phaseCode is required");
+  const sheet = ensureSheet_(CONFIG.sheets.taskPhases, CONFIG.headers.taskPhases);
+  const values = CONFIG.headers.taskPhases.map((key) => row[key] == null ? "" : row[key]);
+  const r = findRowByTwo_(sheet, 1, row.taskCode, 2, row.phaseCode);
+  if (r) {
+    sheet.getRange(r, 1, 1, values.length).setValues([values]);
+  } else {
+    sheet.appendRow(values);
+  }
+  return row;
+}
+
+function deleteTaskPhase_(taskCode, phaseCode) {
+  const sheet = getSheet_(CONFIG.sheets.taskPhases);
+  const r = findRowByTwo_(sheet, 1, taskCode, 2, phaseCode);
+  if (r) sheet.deleteRow(r);
+}
+
+// 案2: 顧客担当者マスタ（複合キー customerCode + staffCode）
+function saveCustomerStaff_(row) {
+  if (!row || !row.customerCode || !row.staffCode) throw new Error("customerStaff customerCode/staffCode is required");
+  const sheet = ensureSheet_(CONFIG.sheets.customerStaff, CONFIG.headers.customerStaff);
+  const values = CONFIG.headers.customerStaff.map((key) => row[key] == null ? "" : row[key]);
+  const r = findRowByTwo_(sheet, 1, row.customerCode, 2, row.staffCode);
+  if (r) {
+    sheet.getRange(r, 1, 1, values.length).setValues([values]);
+  } else {
+    sheet.appendRow(values);
+  }
+  return row;
+}
+
+function deleteCustomerStaff_(customerCode, staffCode) {
+  const sheet = getSheet_(CONFIG.sheets.customerStaff);
+  const r = findRowByTwo_(sheet, 1, customerCode, 2, staffCode);
+  if (r) sheet.deleteRow(r);
+}
+
+// 案2: 設定（キーバリュー・upsert）
+function saveSetting_(key, value) {
+  if (!key) throw new Error("setting key is required");
+  const sheet = ensureSheet_(CONFIG.sheets.settings, CONFIG.headers.settings);
+  const r = findRowByValue_(sheet, 1, key);
+  if (r) {
+    sheet.getRange(r, 1, 1, 2).setValues([[key, value]]);
+  } else {
+    sheet.appendRow([key, value]);
+  }
+  return { key: key, value: value };
+}
+
+function readSettings_() {
+  const rows = readObjectsSafe_(CONFIG.sheets.settings);
+  const out = {};
+  Object.keys(CONFIG.defaultSettings).forEach((k) => { out[k] = CONFIG.defaultSettings[k]; });
+  rows.forEach((row) => {
+    if (row.key != null && row.key !== "") out[String(row.key)] = String(row.value == null ? "" : row.value);
+  });
+  return out;
+}
+
 function upsertMaster_(type, item, oldCode) {
   const def = MASTER_DEFS[type];
   if (!def) throw new Error("unknown master type: " + type);
@@ -263,9 +431,12 @@ function ensureSheets_() {
   ensureSheet_(CONFIG.sheets.staff, CONFIG.headers.staff);
   ensureSheet_(CONFIG.sheets.customers, CONFIG.headers.customers);
   ensureSheet_(CONFIG.sheets.tasks, CONFIG.headers.tasks);
+  ensureSheet_(CONFIG.sheets.taskPhases, CONFIG.headers.taskPhases);
+  ensureSheet_(CONFIG.sheets.customerStaff, CONFIG.headers.customerStaff);
   ensureSheet_(CONFIG.sheets.billing, CONFIG.headers.billing);
   ensureSheet_(CONFIG.sheets.targets, CONFIG.headers.targets);
   ensureSheet_(CONFIG.sheets.items, CONFIG.headers.items);
+  ensureSheet_(CONFIG.sheets.settings, CONFIG.headers.settings);
 }
 
 function readDashboardCache_() {
@@ -314,9 +485,15 @@ function mutateDashboardData_(callback) {
 }
 
 function seedDefaults_() {
+  // 案2: 業務区分カタログ・工程をシード（空のときのみ）。
   const tasks = getSheet_(CONFIG.sheets.tasks);
-  if (tasks.getLastRow() === 1) {
-    CONFIG.defaultTasks.forEach((name) => tasks.appendRow([name]));
+  if (tasks.getLastRow() <= 1) {
+    seedTaskCatalog_();
+  }
+  // 設定の既定値（billingOffset 等）を初期投入。
+  const settings = ensureSheet_(CONFIG.sheets.settings, CONFIG.headers.settings);
+  if (settings.getLastRow() <= 1) {
+    Object.keys(CONFIG.defaultSettings).forEach((k) => settings.appendRow([k, CONFIG.defaultSettings[k]]));
   }
 }
 
@@ -330,6 +507,15 @@ function ensureSheet_(name, headers) {
     sheet.setFrozenRows(1);
   }
   return sheet;
+}
+
+// データ行（ヘッダー以外）をクリアする。
+function clearDataRows_(sheet) {
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow > 1 && lastCol > 0) {
+    sheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+  }
 }
 
 function getSheet_(name) {
@@ -366,6 +552,18 @@ function findRowByValue_(sheet, column, value) {
   const values = sheet.getRange(2, column, lastRow - 1, 1).getValues();
   for (let index = 0; index < values.length; index += 1) {
     if (String(values[index][0]) === String(value)) return index + 2;
+  }
+  return 0;
+}
+
+// 2列の複合キーで行を探す（工程マスタ・顧客担当者マスタ用）。
+function findRowByTwo_(sheet, col1, val1, col2, val2) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+  const width = Math.max(col1, col2);
+  const values = sheet.getRange(2, 1, lastRow - 1, width).getValues();
+  for (let i = 0; i < values.length; i += 1) {
+    if (String(values[i][col1 - 1]) === String(val1) && String(values[i][col2 - 1]) === String(val2)) return i + 2;
   }
   return 0;
 }

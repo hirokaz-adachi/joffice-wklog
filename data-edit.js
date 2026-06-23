@@ -125,6 +125,8 @@
       customerCode: e.customerCode || "",
       customer: e.customer || "",
       taskType: e.taskType || "",
+      taskCode: e.taskCode == null ? "" : String(e.taskCode),
+      phaseCode: e.phaseCode == null ? "" : String(e.phaseCode),
       hours: Number(e.hours || 0),
       memo: e.memo || "",
       updatedAt: e.updatedAt || ""
@@ -138,6 +140,8 @@
       customerCode: b.customerCode || "",
       customer: b.customer || "",
       invoiceItem: b.invoiceItem || "",
+      invoiceItemCode: b.invoiceItemCode == null ? "" : String(b.invoiceItemCode),
+      transferDate: String(b.transferDate || "").slice(0, 10),
       paymentMethod: b.paymentMethod || "",
       netAmount: Number(b.netAmount || 0),
       taxAmount: Number(b.taxAmount || 0),
@@ -170,7 +174,7 @@
     const rows = state.work.filter(matchWork).sort((a, b) => String(b.date).localeCompare(String(a.date)));
     if (!rows.length) {
       const msg = state.work.length ? "条件に一致する工数がありません。" : "工数データがありません。「＋ 行を追加」で追加できます。";
-      el.workBody.innerHTML = `<tr><td class="grid-empty" colspan="7">${msg}</td></tr>`;
+      el.workBody.innerHTML = `<tr><td class="grid-empty" colspan="9">${msg}</td></tr>`;
     } else {
       el.workBody.innerHTML = rows.map(workRowHtml).join("");
     }
@@ -181,7 +185,7 @@
     const rows = state.bill.filter(matchBill).sort((a, b) => String(b.billingMonth).localeCompare(String(a.billingMonth)));
     if (!rows.length) {
       const msg = state.bill.length ? "条件に一致する売上がありません。" : "売上データがありません。「＋ 行を追加」で追加できます。";
-      el.billBody.innerHTML = `<tr><td class="grid-empty" colspan="13">${msg}</td></tr>`;
+      el.billBody.innerHTML = `<tr><td class="grid-empty" colspan="15">${msg}</td></tr>`;
     } else {
       el.billBody.innerHTML = rows.map(billRowHtml).join("");
     }
@@ -243,6 +247,8 @@
       <td class="col-staff">${staffSelect(r.staffCode)}</td>
       <td class="col-customer">${customerSelect(r.customerCode)}</td>
       <td class="col-task">${taskSelect(r.taskType)}</td>
+      <td class="col-code"><input type="text" data-f="taskCode" value="${esc(r.taskCode)}" placeholder="業務コード"></td>
+      <td class="col-phase">${phaseSelect(r.phaseCode)}</td>
       <td class="col-hours num"><input class="cell-num" type="number" step="0.25" min="0" data-f="hours" value="${numAttr(r.hours)}"></td>
       <td class="col-memo"><input type="text" data-f="memo" value="${esc(r.memo)}"></td>
       <td class="col-ops"><button type="button" class="row-del" data-del>削除</button></td>
@@ -254,11 +260,13 @@
       <td class="col-invid"><span class="cell-id">${esc(r.invoiceId)}</span></td>
       <td class="col-month"><input type="month" data-f="billingMonth" value="${esc(r.billingMonth)}"></td>
       <td class="col-customer">${customerSelect(r.customerCode)}</td>
+      <td class="col-code"><input type="text" data-f="invoiceItemCode" value="${esc(r.invoiceItemCode)}" placeholder="業務コード"></td>
       <td class="col-item"><input type="text" data-f="invoiceItem" value="${esc(r.invoiceItem)}"></td>
       <td class="col-pay"><input type="text" data-f="paymentMethod" value="${esc(r.paymentMethod)}"></td>
       <td class="col-amt num"><input class="cell-num" type="number" step="1" data-f="netAmount" value="${numAttr(r.netAmount)}"></td>
       <td class="col-amt num"><input class="cell-num" type="number" step="1" data-f="taxAmount" value="${numAttr(r.taxAmount)}"></td>
       <td class="col-amt num"><input class="cell-num" type="number" step="1" data-f="grossAmount" value="${numAttr(r.grossAmount)}"></td>
+      <td class="col-date2"><input type="date" data-f="transferDate" value="${esc(r.transferDate)}"></td>
       <td class="col-date2"><input type="date" data-f="issuedDate" value="${esc(r.issuedDate)}"></td>
       <td class="col-date2"><input type="date" data-f="paymentDueDate" value="${esc(r.paymentDueDate)}"></td>
       <td class="col-status"><input type="text" data-f="paymentStatus" value="${esc(r.paymentStatus)}"></td>
@@ -287,6 +295,13 @@
     const list = state.taskTypes.slice();
     if (value && !list.includes(value)) list.push(value);
     return `<select data-f="taskType">${list.map((t) => opt(t, t, t === value)).join("")}</select>`;
+  }
+
+  // 案2: 工程（Prepare/Review）。空欄も可。
+  function phaseSelect(value) {
+    const opts = [opt("", "—", !value), opt("PRE", "Prepare", value === "PRE"), opt("REV", "Review", value === "REV")];
+    if (value && value !== "PRE" && value !== "REV") opts.push(opt(value, value, true));
+    return `<select data-f="phaseCode">${opts.join("")}</select>`;
   }
 
   function opt(value, label, selected) {
@@ -395,6 +410,8 @@
         customerCode: r.customerCode,
         customer: r.customerCode ? masterName("customers", r.customerCode) : "",
         taskType: r.taskType,
+        taskCode: r.taskCode || "",
+        phaseCode: r.phaseCode || "",
         hours: Number(r.hours),
         memo: r.memo || "",
         updatedAt: new Date().toISOString()
@@ -416,6 +433,8 @@
         customerCode: r.customerCode,
         customer: r.customerCode ? masterName("customers", r.customerCode) : "",
         invoiceItem: r.invoiceItem || "",
+        invoiceItemCode: r.invoiceItemCode || "",
+        transferDate: r.transferDate || "",
         paymentMethod: r.paymentMethod || "",
         netAmount: Number(r.netAmount || 0),
         taxAmount: Number(r.taxAmount || 0),
