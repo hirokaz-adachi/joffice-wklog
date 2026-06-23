@@ -206,3 +206,8 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+/* 案1相当: 担当役割と工程の不一致（二工程のみ）。ロックはせず警告表示のみ。 */
+.col-phase.is-mismatch { background: #fff5e6; }
+.col-phase.is-mismatch select { border-color: #d98324; box-shadow: 0 0 0 2px rgba(217, 131, 36, 0.18); }
+.col-phase.is-mismatch::after { content: "⚠"; margin-left: 4px; color: #b45309; font-weight: 700; }

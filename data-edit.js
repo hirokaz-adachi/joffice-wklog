@@ -5,7 +5,7 @@
   const TASK_INTERNAL = "社内/その他";
   const DEFAULT_TASKS = ["顧問対応", "給与計算", "手続き", "労務相談", "助成金", "スポット", TASK_INTERNAL];
 
-  const state = { staff: [], customers: [], taskTypes: DEFAULT_TASKS.slice(), customerStaff: [], work: [], bill: [] };
+  const state = { staff: [], customers: [], taskTypes: DEFAULT_TASKS.slice(), customerStaff: [], taskPhases: [], work: [], bill: [] };
   const dirtyWork = new Set();
   const dirtyBill = new Set();
   const newWork = new Set();
@@ -81,6 +81,8 @@
           state.taskTypes = Array.isArray(st.taskTypes) && st.taskTypes.length ? st.taskTypes : DEFAULT_TASKS.slice();
           state.customerStaff = (Array.isArray(st.customerStaff) ? st.customerStaff : [])
             .map((c) => ({ customerCode: String(c.customerCode), staffCode: String(c.staffCode), role: String(c.role || "") }));
+          state.taskPhases = (Array.isArray(st.taskPhases) ? st.taskPhases : [])
+            .map((p) => ({ taskCode: String(p.taskCode), phaseCode: String(p.phaseCode), ratio: Number(p.ratio || 0), sortOrder: Number(p.sortOrder || 0) }));
           state.work = (st.entries || []).map(normWork);
         }
         if (db) {
@@ -250,7 +252,7 @@
       <td class="col-customer">${customerSelect(r.customerCode, r.staffCode)}</td>
       <td class="col-task">${taskSelect(r.taskType)}</td>
       <td class="col-code"><input type="text" data-f="taskCode" value="${esc(r.taskCode)}" placeholder="業務コード"></td>
-      <td class="col-phase">${phaseSelect(r.phaseCode)}</td>
+      ${phaseTd(r)}
       <td class="col-hours num"><input class="cell-num" type="number" step="0.25" min="0" data-f="hours" value="${numAttr(r.hours)}"></td>
       <td class="col-memo"><input type="text" data-f="memo" value="${esc(r.memo)}"></td>
       <td class="col-ops"><button type="button" class="row-del" data-del>削除</button></td>
@@ -330,11 +332,68 @@
     return `<select data-f="taskType">${list.map((t) => opt(t, t, t === value)).join("")}</select>`;
   }
 
-  // 案2: 工程（Prepare/Review）。空欄も可。
-  function phaseSelect(value) {
-    const opts = [opt("", "—", !value), opt("PRE", "Prepare", value === "PRE"), opt("REV", "Review", value === "REV")];
-    if (value && value !== "PRE" && value !== "REV") opts.push(opt(value, value, true));
+  // コード正規化（数値は3桁ゼロ埋め）。マスタとの突合を安定させる。
+  function normCode(v) {
+    const s = String(v == null ? "" : v).trim();
+    return /^\d+$/.test(s) ? s.padStart(3, "0") : s;
+  }
+  // その業務区分の有効工程（ratio>0）。未マッピングは null。
+  function validPhases(taskCode) {
+    const key = normCode(taskCode);
+    if (!key) return null;
+    const ph = state.taskPhases.filter((p) => normCode(p.taskCode) === key && Number(p.ratio) > 0);
+    if (!ph.length) return null;
+    return ph.slice().sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)).map((p) => p.phaseCode);
+  }
+  function phaseName(code) { return code === "PRE" ? "Prepare" : code === "REV" ? "Review" : code; }
+
+  // 案2: 工程は「その業務区分の有効工程」のみ選択肢に（単一工程ならPreのみ＝実質固定）。
+  // 既存の不正値は「（不一致）」として残し、見えて直せるようにする（保存時の暗黙書換えを避ける）。
+  function phaseSelect(value, taskCode) {
+    const vp = validPhases(taskCode);
+    const opts = [opt("", "—", !value)];
+    if (vp) {
+      vp.forEach((code) => opts.push(opt(code, phaseName(code), value === code)));
+      if (value && !vp.includes(value)) opts.push(opt(value, phaseName(value) + "（不一致）", true));
+    } else {
+      opts.push(opt("PRE", "Prepare", value === "PRE"));
+      opts.push(opt("REV", "Review", value === "REV"));
+      if (value && value !== "PRE" && value !== "REV") opts.push(opt(value, value, true));
+    }
     return `<select data-f="phaseCode">${opts.join("")}</select>`;
+  }
+
+  // 案1相当: 担当役割と工程の不一致（二工程の業務区分のみ判定。単一工程/未マッピングは対象外）。
+  function phaseMismatch(r) {
+    const role = roleFor(r.staffCode, r.customerCode);
+    if (!role || !r.phaseCode) return false;
+    const vp = validPhases(r.taskCode);
+    if (!vp || vp.length < 2) return false;
+    return role !== r.phaseCode;
+  }
+  function phaseTd(r) {
+    if (phaseMismatch(r)) {
+      const role = roleFor(r.staffCode, r.customerCode);
+      const title = `担当役割（${phaseName(role)}）と工程（${phaseName(r.phaseCode)}）が一致しません`;
+      return `<td class="col-phase is-mismatch" title="${esc(title)}">${phaseSelect(r.phaseCode, r.taskCode)}</td>`;
+    }
+    return `<td class="col-phase">${phaseSelect(r.phaseCode, r.taskCode)}</td>`;
+  }
+  function applyPhaseMismatch(td, r) {
+    const bad = phaseMismatch(r);
+    td.classList.toggle("is-mismatch", bad);
+    if (bad) {
+      const role = roleFor(r.staffCode, r.customerCode);
+      td.setAttribute("title", `担当役割（${phaseName(role)}）と工程（${phaseName(r.phaseCode)}）が一致しません`);
+    } else {
+      td.removeAttribute("title");
+    }
+  }
+  function renderPhaseCell(tr, r) {
+    const td = tr.querySelector(".col-phase");
+    if (!td) return;
+    td.innerHTML = phaseSelect(r.phaseCode, r.taskCode);
+    applyPhaseMismatch(td, r);
   }
 
   function opt(value, label, selected) {
@@ -362,6 +421,13 @@
     if (kind === "work" && field === "staffCode") {
       const td = tr.querySelector(".col-customer");
       if (td) td.innerHTML = customerSelect(row.customerCode, row.staffCode);
+    }
+    // 工数: 工程の有効選択肢・不一致警告を関連項目の変更に追従させる
+    if (kind === "work" && (field === "staffCode" || field === "customerCode" || field === "taskCode")) {
+      renderPhaseCell(tr, row);
+    } else if (kind === "work" && field === "phaseCode") {
+      const td = tr.querySelector(".col-phase");
+      if (td) applyPhaseMismatch(td, row);
     }
 
     // 売上: 税抜・消費税の変更時に税込を自動計算（手動上書き前の補助）
