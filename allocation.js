@@ -27,6 +27,12 @@
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
   }
 
+  // 業務コードの正規化。数値化（先頭ゼロ落ち）とテキストの不一致を吸収し、数値コードは3桁ゼロ埋めに揃える。
+  function normCode(v) {
+    const s = String(v == null ? "" : v).trim();
+    return /^\d+$/.test(s) ? s.padStart(3, "0") : s;
+  }
+
   function bump(map, k1, k2, init) {
     if (!map.has(k1)) map.set(k1, new Map());
     const inner = map.get(k1);
@@ -37,11 +43,12 @@
   function buildIndex(data) {
     const taskByCode = new Map();
     (data.tasks || []).forEach((t) => {
-      taskByCode.set(String(t.code), { code: String(t.code), name: t.name, allocationType: t.allocationType || "service" });
+      const cc = normCode(t.code);
+      taskByCode.set(cc, { code: cc, name: t.name, allocationType: t.allocationType || "service" });
     });
     const phasesByCode = new Map();
     (data.taskPhases || []).forEach((p) => {
-      const code = String(p.taskCode);
+      const code = normCode(p.taskCode);
       if (!phasesByCode.has(code)) phasesByCode.set(code, []);
       phasesByCode.get(code).push({ phaseCode: p.phaseCode, ratio: num(p.ratio), sortOrder: num(p.sortOrder) });
     });
@@ -122,7 +129,7 @@
       if (e.customerCode) {
         st.directHours += hours;
         const cust = String(e.customerCode);
-        const code = String(e.taskCode || "");
+        const code = normCode(e.taskCode);
         const phase = String(e.phaseCode || "");
         ensureCustomer(e.customerCode, e.customer).hours += hours;
         if (!hoursIndex.has(cust)) hoursIndex.set(cust, new Map());
@@ -187,7 +194,7 @@
     (data.billing || []).forEach((b) => {
       if (String(b.billingMonth) !== billingMonth) return;
       const net = num(b.netAmount);
-      const code = String(b.invoiceItemCode || "");
+      const code = normCode(b.invoiceItemCode);
       const cust = ensureCustomer(b.customerCode, b.customer);
       const task = idx.taskByCode.get(code);
       const type = task ? task.allocationType : "service";

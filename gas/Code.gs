@@ -115,14 +115,21 @@ function seedTaskCatalog_() {
   const phaseSheet = ensureSheet_(CONFIG.sheets.taskPhases, CONFIG.headers.taskPhases);
   clearDataRows_(taskSheet);
   clearDataRows_(phaseSheet);
+  // コード列をテキスト書式に固定（setValues は書式を尊重し "026" を保持する。appendRow は数値化するため使わない）。
+  taskSheet.getRange(1, 1, taskSheet.getMaxRows(), 1).setNumberFormat("@");
+  phaseSheet.getRange(1, 1, phaseSheet.getMaxRows(), 1).setNumberFormat("@");
+  const taskRows = [];
+  const phaseRows = [];
   TASK_CATALOG.forEach((row) => {
-    const [code, name, allocationType, prep, rev] = row;
-    taskSheet.appendRow([code, name, allocationType]);
+    const code = row[0], name = row[1], allocationType = row[2], prep = row[3], rev = row[4];
+    taskRows.push([code, name, allocationType]);
     if (allocationType === "service") {
-      phaseSheet.appendRow([code, "PRE", "Prepare", prep, 1]);
-      phaseSheet.appendRow([code, "REV", "Review", rev, 2]);
+      phaseRows.push([code, "PRE", "Prepare", prep, 1]);
+      phaseRows.push([code, "REV", "Review", rev, 2]);
     }
   });
+  if (taskRows.length) taskSheet.getRange(2, 1, taskRows.length, 3).setValues(taskRows);
+  if (phaseRows.length) phaseSheet.getRange(2, 1, phaseRows.length, 5).setValues(phaseRows);
 }
 
 function route_(action, payload) {
