@@ -5,7 +5,7 @@
   const TASK_INTERNAL = "社内/その他";
   const DEFAULT_TASKS = ["顧問対応", "給与計算", "手続き", "労務相談", "助成金", "スポット", TASK_INTERNAL];
 
-  const state = { staff: [], customers: [], taskTypes: DEFAULT_TASKS.slice(), customerStaff: [], taskPhases: [], work: [], bill: [] };
+  const state = { staff: [], customers: [], taskTypes: DEFAULT_TASKS.slice(), customerStaff: [], taskPhases: [], tasks: [], work: [], bill: [] };
   const dirtyWork = new Set();
   const dirtyBill = new Set();
   const newWork = new Set();
@@ -83,11 +83,16 @@
             .map((c) => ({ customerCode: String(c.customerCode), staffCode: String(c.staffCode), role: String(c.role || "") }));
           state.taskPhases = (Array.isArray(st.taskPhases) ? st.taskPhases : [])
             .map((p) => ({ taskCode: String(p.taskCode), phaseCode: String(p.phaseCode), ratio: Number(p.ratio || 0), sortOrder: Number(p.sortOrder || 0) }));
+          state.tasks = (Array.isArray(st.tasks) ? st.tasks : [])
+            .map((t) => ({ code: normCode(t.code), name: String(t.name || "") })).filter((t) => t.code && t.name);
           state.work = (st.entries || []).map(normWork);
         }
         if (db) {
           if (!state.staff.length && db.staff) state.staff = normMaster(db.staff);
           if (!state.customers.length && db.customers) state.customers = normMaster(db.customers);
+          if (!state.tasks.length && Array.isArray(db.tasks)) {
+            state.tasks = db.tasks.map((t) => ({ code: normCode(t.code), name: String(t.name || "") })).filter((t) => t.code && t.name);
+          }
           state.bill = (db.billing || []).map(normBill);
         }
         loaded = true;
@@ -346,6 +351,9 @@
     return ph.slice().sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)).map((p) => p.phaseCode);
   }
   function phaseName(code) { return code === "PRE" ? "Prepare" : code === "REV" ? "Review" : code; }
+  // 業務区分マスタ（名↔コード）。名称変更時にコードを、コード変更時に名称を追従させる。
+  function nameToCode(name) { const t = state.tasks.find((x) => x.name === name); return t ? t.code : ""; }
+  function codeToName(code) { const t = state.tasks.find((x) => x.code === normCode(code)); return t ? t.name : ""; }
 
   // 案2: 工程は「その業務区分の有効工程」のみ選択肢に（単一工程ならPreのみ＝実質固定）。
   // 既存の不正値は「（不一致）」として残し、見えて直せるようにする（保存時の暗黙書換えを避ける）。
@@ -422,8 +430,26 @@
       const td = tr.querySelector(".col-customer");
       if (td) td.innerHTML = customerSelect(row.customerCode, row.staffCode);
     }
+    // 工数: 業務区分(名)変更 → 業務コードを同期（工程判定はコード基準のため）
+    if (kind === "work" && field === "taskType") {
+      const code = nameToCode(value);
+      if (code) {
+        row.taskCode = code;
+        const ci = tr.querySelector('[data-f="taskCode"]');
+        if (ci) ci.value = code;
+      }
+    }
+    // 工数: 業務コード変更 → 業務区分(名)を同期
+    if (kind === "work" && field === "taskCode") {
+      const nm = codeToName(value);
+      if (nm) {
+        row.taskType = nm;
+        const ts = tr.querySelector('[data-f="taskType"]');
+        if (ts) ts.value = nm;
+      }
+    }
     // 工数: 工程の有効選択肢・不一致警告を関連項目の変更に追従させる
-    if (kind === "work" && (field === "staffCode" || field === "customerCode" || field === "taskCode")) {
+    if (kind === "work" && (field === "staffCode" || field === "customerCode" || field === "taskCode" || field === "taskType")) {
       renderPhaseCell(tr, row);
     } else if (kind === "work" && field === "phaseCode") {
       const td = tr.querySelector(".col-phase");
