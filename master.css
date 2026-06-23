@@ -93,7 +93,10 @@
 /* 顧客担当（時系列）: 対象月バー（年/月セレクト＋前月/翌月）・有効状態のタグ */
 .assignee-month-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .amb-label { font-weight: 800; color: var(--ink); }
-.amb-select { min-height: 34px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; font-weight: 700; background: #fff; }
+/* ベースの select{width:100%} を打ち消し、内容幅で横並び固定 */
+.amb-select { flex: 0 0 auto; width: auto; min-height: 34px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; font-weight: 700; background: #fff; }
+#assigneeYear { min-width: 96px; }
+#assigneeMon { min-width: 76px; }
 .amb-nav { min-height: 34px; min-width: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; font-size: 18px; line-height: 1; color: var(--accent); }
 .amb-nav:hover { background: var(--accent-soft); }
 .amb-note { margin-left: 6px; color: var(--muted); font-size: 12px; }
