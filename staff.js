@@ -9,12 +9,14 @@
     taskTypes: ["顧問対応", "給与計算", "手続き", "労務相談", "助成金", "スポット", "社内/その他"],
     tasks: [],
     taskPhases: [],
+    customerStaff: [],
     entries: []
   };
 
   const state = loadState();
   if (!Array.isArray(state.tasks)) state.tasks = [];
   if (!Array.isArray(state.taskPhases)) state.taskPhases = [];
+  if (!Array.isArray(state.customerStaff)) state.customerStaff = [];
   const staffKey = "sharoshiWorklogMvp.selectedStaff";
   const el = {
     form: document.getElementById("entryForm"),
@@ -72,6 +74,9 @@
       state.taskPhases = Array.isArray(remoteState.taskPhases)
         ? remoteState.taskPhases.map((p) => ({ taskCode: String(p.taskCode), phaseCode: String(p.phaseCode), phaseName: p.phaseName, ratio: Number(p.ratio || 0), sortOrder: Number(p.sortOrder || 0) }))
         : [];
+      state.customerStaff = Array.isArray(remoteState.customerStaff)
+        ? remoteState.customerStaff.map((c) => ({ customerCode: String(c.customerCode), staffCode: String(c.staffCode), role: String(c.role || "") }))
+        : [];
       state.entries = normalizeEntries(remoteState.entries, staff, customers);
       fillMasterSelect(el.staff, state.staff);
       fillCustomerSelect(el.customer);
@@ -91,7 +96,9 @@
     el.staff.addEventListener("change", () => {
       localStorage.setItem(staffKey, el.staff.value);
       renderToday();
+      syncTask();
     });
+    el.customer.addEventListener("change", syncTask);
     el.taskType.addEventListener("change", syncTask);
     el.minusHour.addEventListener("click", () => changeDuration(-60));
     el.plusHour.addEventListener("click", () => changeDuration(60));
@@ -174,7 +181,7 @@
       <article class="today-item">
         <div class="today-main">
           <div class="today-customer">${escapeHtml(displayCustomer(entry))}</div>
-          <div class="today-sub">${escapeHtml(entry.taskType)}${entry.memo ? ` / ${escapeHtml(entry.memo)}` : ""}</div>
+          <div class="today-sub">${escapeHtml(entry.taskType)}${phaseBadge(entry.phaseCode)}${entry.memo ? ` / ${escapeHtml(entry.memo)}` : ""}</div>
         </div>
         <div class="today-side">
           <span class="today-hours">${formatDuration(entry.hours)}</span>
@@ -208,7 +215,8 @@
     const svc = serviceTasks();
     let opts;
     if (svc.length) {
-      opts = svc.slice().sort((a, b) => String(a.code).localeCompare(String(b.code), "ja"))
+      opts = svc.map((t) => ({ code: normCode(t.code), name: t.name }))
+        .sort((a, b) => a.code.localeCompare(b.code, "ja"))
         .map((t) => `<option value="${escapeHtml(t.code)}">${escapeHtml(t.name)}</option>`);
     } else {
       opts = (state.taskTypes || []).filter((n) => n !== "社内/その他").map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`);
@@ -235,12 +243,35 @@
     el.customer.disabled = internal;
     if (internal) el.customer.value = "";
     fillPhaseSelect(internal ? "" : v);
+    // 担当者の役割で工程を自動補完＋ロック（担当外は手動）
+    if (el.phase) el.phase.disabled = false;
+    if (!internal && el.phase) {
+      const phases = phasesFor(v);
+      if (phases.length >= 2) {
+        const role = roleFor(el.staff.value, el.customer.value);
+        if (role && phases.some((p) => p.phaseCode === role)) {
+          el.phase.value = role;
+          el.phase.disabled = true;
+        }
+      }
+    }
   }
 
+  function normCode(v) { const s = String(v == null ? "" : v).trim(); return /^\d+$/.test(s) ? s.padStart(3, "0") : s; }
   function serviceTasks() { return (state.tasks || []).filter((t) => t.allocationType === "service"); }
-  function phasesFor(code) { return (state.taskPhases || []).filter((p) => p.taskCode === String(code) && Number(p.ratio) > 0).sort((a, b) => a.sortOrder - b.sortOrder); }
-  function taskName(code) { const t = (state.tasks || []).find((x) => x.code === String(code)); return t ? t.name : code; }
+  function phasesFor(code) { const c = normCode(code); return (state.taskPhases || []).filter((p) => normCode(p.taskCode) === c && Number(p.ratio) > 0).sort((a, b) => a.sortOrder - b.sortOrder); }
+  function taskName(code) { const c = normCode(code); const t = (state.tasks || []).find((x) => normCode(x.code) === c); return t ? t.name : code; }
   function currentPhaseCode(code) { const ph = phasesFor(code); if (ph.length >= 2) return el.phase.value || ph[0].phaseCode; return ph.length ? ph[0].phaseCode : "PRE"; }
+  function roleFor(staffCode, custCode) {
+    if (!staffCode || !custCode) return "";
+    const cs = (state.customerStaff || []).find((x) => String(x.customerCode) === String(custCode) && String(x.staffCode) === String(staffCode));
+    return cs ? String(cs.role || "") : "";
+  }
+  function phaseBadge(code) {
+    if (code === "PRE") return ' <span class="phase-badge phase-pre">Prepare</span>';
+    if (code === "REV") return ' <span class="phase-badge phase-rev">Review</span>';
+    return "";
+  }
 
   function changeDuration(deltaMinutes) {
     const current = Math.round(Number(el.hours.value || 0) * 60);

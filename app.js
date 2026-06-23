@@ -9,12 +9,14 @@
     taskTypes: ["顧問対応", "給与計算", "手続き", "労務相談", "助成金", "スポット", "社内/その他"],
     tasks: [],
     taskPhases: [],
+    customerStaff: [],
     entries: []
   };
 
   const state = loadState();
   if (!Array.isArray(state.tasks)) state.tasks = [];
   if (!Array.isArray(state.taskPhases)) state.taskPhases = [];
+  if (!Array.isArray(state.customerStaff)) state.customerStaff = [];
   let calendarCursor = new Date();
   const el = {
     form: document.getElementById("entryForm"),
@@ -83,6 +85,9 @@
       state.taskPhases = Array.isArray(remoteState.taskPhases)
         ? remoteState.taskPhases.map((p) => ({ taskCode: String(p.taskCode), phaseCode: String(p.phaseCode), phaseName: p.phaseName, ratio: Number(p.ratio || 0), sortOrder: Number(p.sortOrder || 0) }))
         : [];
+      state.customerStaff = Array.isArray(remoteState.customerStaff)
+        ? remoteState.customerStaff.map((c) => ({ customerCode: String(c.customerCode), staffCode: String(c.staffCode), role: String(c.role || "") }))
+        : [];
       state.entries = normalizeEntries(remoteState.entries, staff, customers);
       persist();
       showToast("スプレッドシートから読み込みました");
@@ -107,7 +112,8 @@
     el.exportCsv.addEventListener("click", exportCsv);
     el.importCsv.addEventListener("change", importCsv);
 
-    el.staff.addEventListener("change", renderCardDayList);
+    el.staff.addEventListener("change", () => { renderCardDayList(); syncCustomerForTask(); });
+    el.customer.addEventListener("change", syncCustomerForTask);
     el.taskType.addEventListener("change", syncCustomerForTask);
 
     [el.filterFrom, el.filterTo, el.filterStaff, el.filterCustomer].forEach((input) => {
@@ -171,7 +177,7 @@
     el.editingId.value = entry.id;
     el.workDate.value = entry.date;
     el.staff.value = entry.staffCode || findMasterCodeByName("staff", entry.staff);
-    el.taskType.value = isInternal ? INTERNAL_VALUE : (entry.taskCode || INTERNAL_VALUE);
+    el.taskType.value = isInternal ? INTERNAL_VALUE : (normCode(entry.taskCode) || INTERNAL_VALUE);
     el.customer.value = entry.customerCode || findMasterCodeByName("customers", entry.customer);
     syncCustomerForTask();
     if (el.phase && entry.phaseCode) el.phase.value = entry.phaseCode;
@@ -328,7 +334,8 @@
     const svc = serviceTasks();
     let opts;
     if (svc.length) {
-      opts = svc.slice().sort((a, b) => String(a.code).localeCompare(String(b.code), "ja"))
+      opts = svc.map((t) => ({ code: normCode(t.code), name: t.name }))
+        .sort((a, b) => a.code.localeCompare(b.code, "ja"))
         .map((t) => `<option value="${escapeHtml(t.code)}">${escapeHtml(t.code)} ${escapeHtml(t.name)}</option>`);
     } else {
       // 未接続フォールバック（コードなし・名称のみ）
@@ -353,10 +360,24 @@
     }
   }
 
+  // 業務コードの正規化（数値化/テキストの不一致を吸収・数値は3桁ゼロ埋め）。allocation.js と同一規則。
+  function normCode(v) { const s = String(v == null ? "" : v).trim(); return /^\d+$/.test(s) ? s.padStart(3, "0") : s; }
   function serviceTasks() { return (state.tasks || []).filter((t) => t.allocationType === "service"); }
-  function phasesFor(code) { return (state.taskPhases || []).filter((p) => p.taskCode === String(code) && Number(p.ratio) > 0).sort((a, b) => a.sortOrder - b.sortOrder); }
-  function taskName(code) { const t = (state.tasks || []).find((x) => x.code === String(code)); return t ? t.name : code; }
+  function phasesFor(code) { const c = normCode(code); return (state.taskPhases || []).filter((p) => normCode(p.taskCode) === c && Number(p.ratio) > 0).sort((a, b) => a.sortOrder - b.sortOrder); }
+  function taskName(code) { const c = normCode(code); const t = (state.tasks || []).find((x) => normCode(x.code) === c); return t ? t.name : code; }
   function currentPhaseCode(code) { const ph = phasesFor(code); if (ph.length >= 2) return el.phase.value || ph[0].phaseCode; return ph.length ? ph[0].phaseCode : "PRE"; }
+  // 選択スタッフが選択顧客の担当(PRE/REV)として登録されている場合の役割
+  function roleFor(staffCode, custCode) {
+    if (!staffCode || !custCode) return "";
+    const cs = (state.customerStaff || []).find((x) => String(x.customerCode) === String(custCode) && String(x.staffCode) === String(staffCode));
+    return cs ? String(cs.role || "") : "";
+  }
+  // 工程バッジ（Prepare/Review）。空欄や工程なしは非表示。
+  function phaseBadge(code) {
+    if (code === "PRE") return ' <span class="phase-badge phase-pre">Prepare</span>';
+    if (code === "REV") return ' <span class="phase-badge phase-rev">Review</span>';
+    return "";
+  }
 
   function renderDailySummary() {
     const date = el.workDate.value;
@@ -378,6 +399,18 @@
     el.customer.disabled = internal;
     if (internal) el.customer.value = "";
     fillPhaseSelect(internal ? "" : taskValue);
+    // 担当者の役割で工程を自動補完＋ロック（担当外・該当役割が無効な工程は手動のまま）
+    if (el.phase) el.phase.disabled = false;
+    if (!internal && el.phase) {
+      const phases = phasesFor(taskValue);
+      if (phases.length >= 2) {
+        const role = roleFor(el.staff.value, el.customer.value);
+        if (role && phases.some((p) => p.phaseCode === role)) {
+          el.phase.value = role;
+          el.phase.disabled = true;
+        }
+      }
+    }
   }
 
   function renderCardDayList() {
@@ -402,7 +435,7 @@
     el.cardDayList.innerHTML = entries.map((entry) => `
       <div class="card-day-row${entry.id === editingId ? " is-editing" : ""}" data-id="${escapeHtml(entry.id)}">
         <div class="cd-main">
-          <span class="cd-task">${escapeHtml(entry.taskType)}</span>
+          <span class="cd-task">${escapeHtml(entry.taskType)}${phaseBadge(entry.phaseCode)}</span>
           <span class="cd-customer">${escapeHtml(displayCustomer(entry))}</span>
           ${entry.memo ? `<span class="cd-memo">${escapeHtml(entry.memo)}</span>` : ""}
         </div>
@@ -440,7 +473,7 @@
         <td>${escapeHtml(formatDate(entry.date))}</td>
         <td>${escapeHtml(entry.staff)}</td>
         <td>${escapeHtml(displayCustomer(entry))}</td>
-        <td>${escapeHtml(entry.taskType)}</td>
+        <td>${escapeHtml(entry.taskType)}${phaseBadge(entry.phaseCode)}</td>
         <td class="num">${Number(entry.hours).toFixed(2)}</td>
         <td>${escapeHtml(entry.memo || "")}</td>
         <td>

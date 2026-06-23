@@ -592,3 +592,17 @@ select:disabled {
     width: 100%;
   }
 }
+
+/* 案2: 工程バッジ（Prepare/Review）。工程ロック時の入力欄も明示。 */
+.phase-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.phase-badge.phase-pre { background: #dff3ef; color: #0b5d57; }
+.phase-badge.phase-rev { background: #eef2ff; color: #3730a3; }
+.entry-form select:disabled { background: #f1f5f4; color: var(--muted); cursor: not-allowed; }
