@@ -24,6 +24,9 @@
     workDate: document.getElementById("workDate"),
     staff: document.getElementById("staff"),
     customer: document.getElementById("customer"),
+    customerCombo: document.getElementById("customerCombo"),
+    customerSearch: document.getElementById("customerSearch"),
+    customerList: document.getElementById("customerList"),
     taskType: document.getElementById("taskType"),
     phase: document.getElementById("phase"),
     phaseField: document.getElementById("phaseField"),
@@ -112,9 +115,9 @@
     el.exportCsv.addEventListener("click", exportCsv);
     el.importCsv.addEventListener("change", importCsv);
 
-    el.staff.addEventListener("change", () => { renderCardDayList(); syncCustomerForTask(); });
-    el.customer.addEventListener("change", syncCustomerForTask);
+    el.staff.addEventListener("change", () => { renderCardDayList(); refreshCustomerCombo(); syncCustomerForTask(); });
     el.taskType.addEventListener("change", syncCustomerForTask);
+    bindCustomerCombo();
 
     [el.filterFrom, el.filterTo, el.filterStaff, el.filterCustomer].forEach((input) => {
       input.addEventListener("input", renderEntries);
@@ -166,7 +169,7 @@
     persist();
     resetForm({ keepDate: true, keepStaff: true });
     render();
-    if (!el.customer.disabled) el.customer.focus();
+    if (!el.customer.disabled && el.customerSearch) el.customerSearch.focus();
   }
 
   function editEntry(id) {
@@ -325,7 +328,7 @@
     fillMasterSelect(el.staff, state.staff, true);
     fillTaskSelect(el.taskType, true);
     fillFilterStaffSelect(el.filterStaff, true);
-    fillCustomerSelect(el.customer, true);
+    refreshCustomerCombo();
   }
 
   // 案2: 業務区分セレクト（役務タスク＋社内/その他）。工程はマスタ未取得時は taskTypes 名称にフォールバック。
@@ -379,6 +382,80 @@
     return "";
   }
 
+  // ===== 顧客 検索コンボ（PC） =====
+  // 選択スタッフの役割でグループ化（①Prepare ②Review ③担当外、各コード昇順）
+  function groupedCustomers(staffCode) {
+    const pre = [], rev = [], other = [];
+    (state.customers || []).forEach((c) => {
+      const role = roleFor(staffCode, c.code);
+      if (role === "PRE") pre.push(c);
+      else if (role === "REV") rev.push(c);
+      else other.push(c);
+    });
+    const byCode = (a, b) => String(a.code).localeCompare(String(b.code), "ja");
+    return { pre: pre.sort(byCode), rev: rev.sort(byCode), other: other.sort(byCode) };
+  }
+  function comboCustomerLabel(code) {
+    if (!code) return "";
+    const c = (state.customers || []).find((x) => String(x.code) === String(code));
+    return c ? `${c.code} ${c.name}` : code;
+  }
+  // 隠しinput(el.customer)の値・disabled を検索ボックスへ反映
+  function comboSync() {
+    if (!el.customerSearch) return;
+    el.customerSearch.value = comboCustomerLabel(el.customer.value);
+    el.customerSearch.disabled = !!el.customer.disabled;
+    el.customerSearch.placeholder = el.customer.disabled ? "（社内：顧客なし）" : "顧客を検索…";
+  }
+  function refreshCustomerCombo() { renderComboList(""); comboSync(); }
+  function comboItemHtml(c, role) {
+    const badge = role ? `<span class="role-badge role-${role.toLowerCase()}">${role === "PRE" ? "Pre" : "Rev"}</span>` : "";
+    return `<div class="combo-item" data-code="${escapeHtml(c.code)}" role="option"><span class="combo-code">${escapeHtml(c.code)}</span><span class="combo-name">${escapeHtml(c.name)}</span>${badge}</div>`;
+  }
+  function renderComboList(filter) {
+    if (!el.customerList) return;
+    const f = String(filter || "").trim().toLowerCase();
+    const match = (c) => !f || `${c.code} ${c.name}`.toLowerCase().includes(f);
+    const g = groupedCustomers(el.staff.value);
+    const pre = g.pre.filter(match), rev = g.rev.filter(match), other = g.other.filter(match);
+    let html = `<div class="combo-item" data-code="" role="option"><span class="combo-name">顧客指定なし</span></div>`;
+    if (pre.length || rev.length) {
+      html += `<div class="combo-group">担当顧客</div>` + pre.map((c) => comboItemHtml(c, "PRE")).join("") + rev.map((c) => comboItemHtml(c, "REV")).join("");
+    }
+    if (other.length) {
+      html += `<div class="combo-group">その他</div>` + other.map((c) => comboItemHtml(c, "")).join("");
+    }
+    if (!pre.length && !rev.length && !other.length && f) html += `<div class="combo-empty">該当なし</div>`;
+    el.customerList.innerHTML = html;
+  }
+  function openCombo() {
+    if (el.customer.disabled) return;
+    renderComboList("");
+    el.customerList.hidden = false;
+    el.customerSearch.setAttribute("aria-expanded", "true");
+  }
+  function closeCombo() {
+    el.customerList.hidden = true;
+    el.customerSearch.setAttribute("aria-expanded", "false");
+  }
+  function selectCombo(code) {
+    el.customer.value = code || "";
+    closeCombo();
+    syncCustomerForTask(); // comboSync＋工程の自動補完を再評価
+  }
+  function bindCustomerCombo() {
+    if (!el.customerSearch) return;
+    el.customerSearch.addEventListener("focus", () => { openCombo(); el.customerSearch.select(); });
+    el.customerSearch.addEventListener("input", () => { renderComboList(el.customerSearch.value); el.customerList.hidden = false; });
+    el.customerSearch.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { closeCombo(); comboSync(); }
+      else if (e.key === "Enter") { e.preventDefault(); const first = el.customerList.querySelector(".combo-item"); if (first) selectCombo(first.dataset.code); }
+    });
+    el.customerSearch.addEventListener("blur", () => { window.setTimeout(() => { if (el.customerList && !el.customerList.hidden) { closeCombo(); comboSync(); } }, 150); });
+    el.customerList.addEventListener("mousedown", (e) => { const it = e.target.closest(".combo-item"); if (it) { e.preventDefault(); selectCombo(it.dataset.code); } });
+    document.addEventListener("click", (e) => { if (el.customerCombo && !el.customerCombo.contains(e.target)) closeCombo(); });
+  }
+
   function renderDailySummary() {
     const date = el.workDate.value;
     const entries = state.entries.filter((entry) => entry.date === date);
@@ -398,6 +475,7 @@
     const internal = taskValue === INTERNAL_VALUE || !taskValue;
     el.customer.disabled = internal;
     if (internal) el.customer.value = "";
+    comboSync();
     fillPhaseSelect(internal ? "" : taskValue);
     // 担当者の役割で工程を自動補完＋ロック（担当外・該当役割が無効な工程は手動のまま）
     if (el.phase) el.phase.disabled = false;

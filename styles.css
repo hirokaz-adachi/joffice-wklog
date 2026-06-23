@@ -596,6 +596,24 @@ select:disabled {
 /* hidden 属性を確実に効かせる（label の display 指定に勝たせる）。単一工程時の工程欄を隠す */
 label[hidden] { display: none !important; }
 
+/* 案2: 顧客 検索コンボ（PC） */
+.combo { position: relative; }
+.combo-list {
+  position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; right: 0;
+  max-height: 300px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+.combo-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-weight: 400; }
+.combo-item:hover { background: var(--accent-soft); }
+.combo-code { color: var(--muted); font-weight: 700; font-size: 12px; min-width: 46px; }
+.combo-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.combo-group { position: sticky; top: 0; padding: 6px 12px; font-size: 11px; font-weight: 800; color: var(--accent-dark); background: #eef5f3; }
+.combo-empty { padding: 12px; color: var(--muted); text-align: center; }
+.role-badge { padding: 1px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; flex: 0 0 auto; }
+.role-badge.role-pre { background: #dff3ef; color: #0b5d57; }
+.role-badge.role-rev { background: #eef2ff; color: #3730a3; }
+
 /* 案2: 工程バッジ（Prepare/Review）。工程ロック時の入力欄も明示。 */
 .phase-badge {
   display: inline-block;

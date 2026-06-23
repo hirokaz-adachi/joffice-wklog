@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>J-Office Insight ｜ 工数管理</title>
-  <link rel="stylesheet" href="styles.css?v=20260623-3">
+  <link rel="stylesheet" href="styles.css?v=20260623-4">
 </head>
 <body>
   <header class="topbar">
@@ -57,7 +57,11 @@
 
         <label>
           顧客
-          <select id="customer"></select>
+          <div class="combo" id="customerCombo">
+            <input id="customerSearch" type="text" autocomplete="off" placeholder="顧客を検索…" aria-label="顧客検索" role="combobox" aria-expanded="false">
+            <div id="customerList" class="combo-list" hidden role="listbox"></div>
+          </div>
+          <input type="hidden" id="customer">
         </label>
 
         <label>
@@ -160,6 +164,6 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="config.js"></script>
   <script src="backend.js?v=20260623-1"></script>
-  <script src="app.js?v=20260623-2"></script>
+  <script src="app.js?v=20260623-3"></script>
 </body>
 </html>
