@@ -295,8 +295,21 @@
     el.searchWrap.style.display = "";
     if (!state.assigneeMonth) state.assigneeMonth = currentMonth();
     const month = state.assigneeMonth;
-    el.hint.innerHTML = `対象月 <input type="month" id="assigneeMonth" value="${esc(month)}"> 時点の担当を表示・編集します。保存は<b>その月から有効</b>（未計上枠は担当へフォールバック配賦）。`
-      + `<span class="eff-tag eff-this">この月〜</span>=当月から指定 / <span class="eff-tag eff-inh">引継</span>=前月以前から継続。`;
+    const yy = month.slice(0, 4), mm = month.slice(5, 7);
+    const baseY = Number(yy) || new Date().getFullYear();
+    const years = [];
+    for (let y = baseY - 4; y <= baseY + 1; y += 1) years.push(y);
+    if (years.indexOf(Number(yy)) < 0) years.unshift(Number(yy));
+    const yearOpts = years.map((y) => `<option value="${y}"${String(y) === yy ? " selected" : ""}>${y}年</option>`).join("");
+    const monOpts = Array.from({ length: 12 }, (_, i) => { const m = String(i + 1).padStart(2, "0"); return `<option value="${m}"${m === mm ? " selected" : ""}>${i + 1}月</option>`; }).join("");
+    el.hint.innerHTML = `<div class="assignee-month-bar">
+        <span class="amb-label">対象月</span>
+        <button type="button" id="assigneePrev" class="amb-nav" aria-label="前月">‹</button>
+        <select id="assigneeYear" class="amb-select">${yearOpts}</select>
+        <select id="assigneeMon" class="amb-select">${monOpts}</select>
+        <button type="button" id="assigneeNext" class="amb-nav" aria-label="翌月">›</button>
+        <span class="amb-note">時点の担当を表示・編集（保存は<b>その月から有効</b>。未計上枠は担当へフォールバック配賦）。<span class="eff-tag eff-this">この月〜</span>当月から指定 <span class="eff-tag eff-inh">引継</span>前月以前から継続</span>
+      </div>`;
     el.head.innerHTML = `<tr><th class="col-key">顧客番号</th><th>顧客名</th><th>Prepare担当</th><th>Review担当</th><th class="ops">操作</th></tr>`;
     const q = el.search.value.trim().toLowerCase();
     const rows = state.customers.filter((c) => !q || (c.code + " " + c.name).toLowerCase().includes(q))
@@ -320,8 +333,14 @@
         <td class="ops"><button type="button" class="row-edit" data-save>保存</button>${hasTm ? `<button type="button" class="row-revert" data-revert>当月取消</button>` : ""}</td></tr>`;
     }).join("") : `<tr><td class="grid-empty" colspan="5">顧客がありません。</td></tr>`;
     el.count.textContent = `${rows.length} / ${state.customers.length} 件（${month} 時点）`;
-    const mi = document.getElementById("assigneeMonth");
-    if (mi) mi.onchange = () => { state.assigneeMonth = mi.value || currentMonth(); renderAssignees(); };
+    const setM = (m) => { state.assigneeMonth = m; renderAssignees(); };
+    const ys = document.getElementById("assigneeYear"), ms = document.getElementById("assigneeMon");
+    if (ys) ys.onchange = () => setM(ys.value + "-" + document.getElementById("assigneeMon").value);
+    if (ms) ms.onchange = () => setM(document.getElementById("assigneeYear").value + "-" + ms.value);
+    const shiftM = window.JOfficeAllocation ? window.JOfficeAllocation.shiftMonth : (m) => m;
+    const prev = document.getElementById("assigneePrev"), next = document.getElementById("assigneeNext");
+    if (prev) prev.onclick = () => setM(shiftM(month, -1));
+    if (next) next.onclick = () => setM(shiftM(month, 1));
   }
 
   async function saveAssignee(custCode, tr) {
