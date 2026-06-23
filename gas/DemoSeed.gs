@@ -28,6 +28,7 @@ const DEMO = {
 
 function rebuildDemo() {
   ensureSheets_();
+  applyCodeFormats_();
   seedTaskCatalog_();
   seedSettings_();
   seedStaffAndCustomers_();

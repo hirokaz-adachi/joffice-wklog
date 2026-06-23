@@ -88,8 +88,24 @@ function doGet(e) {
 
 function setup() {
   ensureSheets_();
+  applyCodeFormats_();
   seedDefaults_();
   invalidateDashboardCache_();
+}
+
+// 業務コード列をテキスト書式（@）に固定し、"026" 等の先頭ゼロが数値化で落ちるのを防ぐ。
+// setup()/rebuildDemo() の seed 前に呼ぶ。書き込み前に書式を当てることで以後の値はテキスト保持される。
+function applyCodeFormats_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const fmt = function (name, col) {
+    const sh = ss.getSheetByName(name);
+    if (sh && col > 0) sh.getRange(1, col, sh.getMaxRows(), 1).setNumberFormat("@");
+  };
+  fmt(CONFIG.sheets.tasks, 1);       // task_master.code
+  fmt(CONFIG.sheets.taskPhases, 1);  // task_phase_master.taskCode
+  fmt(CONFIG.sheets.items, 1);       // item_master.code
+  fmt(CONFIG.sheets.worklogs, CONFIG.headers.worklogs.indexOf("taskCode") + 1);
+  fmt(CONFIG.sheets.billing, CONFIG.headers.billing.indexOf("invoiceItemCode") + 1);
 }
 
 // 案2: 業務区分カタログ・工程・設定をシードし直す（マスタのみ作り直し）。
