@@ -92,5 +92,30 @@ check("C012 Review枠フォールバック 0<backed<service", c12 && c12.backedR
 const c1=may.customers.find(c=>c.code==="C001");
 check("C001 諸費用=対象外・役務に非混入", c1 && c1.excludedRevenue>0 && c1.grossRevenue===c1.serviceRevenue+c1.excludedRevenue);
 
+// --- 顧客担当の時系列（有効開始月）解決 ---
+const tsData = {
+  staff:[["S001","山田"],["S002","佐藤"],["S003","鈴木"]].map(s=>({code:s[0],name:s[1]})),
+  customers:[{code:"C001",name:"アルファ"}],
+  tasks:[{code:"026",name:"給与計算",allocationType:"service"}],
+  taskPhases:[{taskCode:"026",phaseCode:"PRE",ratio:70,sortOrder:1},{taskCode:"026",phaseCode:"REV",ratio:30,sortOrder:2}],
+  customerStaff:[
+    {customerCode:"C001",staffCode:"S001",role:"PRE",effectiveFrom:""},
+    {customerCode:"C001",staffCode:"S002",role:"PRE",effectiveFrom:"2026-05"},
+    {customerCode:"C001",staffCode:"S003",role:"REV",effectiveFrom:""},
+    {customerCode:"C001",staffCode:"",role:"PRE",effectiveFrom:"2026-06"}
+  ],
+  settings:{billingOffset:"0"}, entries:[], targets:[],
+  billing:["2026-04","2026-05","2026-06"].map(m=>({billingMonth:m,customerCode:"C001",invoiceItemCode:"026",netAmount:100000}))
+};
+const attrOf=(m,c)=>{const r=ENGINE.buildMonthModel(tsData,m);const s=r.staff.find(x=>x.code===c);return{v:s?Math.round(s.attributedRevenue):0,un:Math.round(r.firm.unallocated)};};
+check("[時系列] 4月 PRE枠→S001", attrOf("2026-04","S001").v===70000 && attrOf("2026-04","S002").v===0);
+check("[時系列] 5月 担当交代→S002", attrOf("2026-05","S002").v===70000 && attrOf("2026-05","S001").v===0);
+check("[時系列] 6月 PRE解除→未配賦", attrOf("2026-06","S001").v===0 && attrOf("2026-06","S002").v===0 && attrOf("2026-06","S001").un===70000);
+check("[時系列] REVは全月継続→S003", attrOf("2026-04","S003").v===30000 && attrOf("2026-06","S003").v===30000);
+check("[時系列] roleAsOf 4月 S001=PRE / 5月 S001=空 / 5月 S002=PRE",
+  ENGINE.roleAsOf(tsData.customerStaff,"C001","S001","2026-04")==="PRE" &&
+  ENGINE.roleAsOf(tsData.customerStaff,"C001","S001","2026-05")==="" &&
+  ENGINE.roleAsOf(tsData.customerStaff,"C001","S002","2026-05")==="PRE");
+
 console.log(`\nRESULT: ${pass} passed / ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -54,23 +54,44 @@
     });
     phasesByCode.forEach((list) => list.sort((a, b) => a.sortOrder - b.sortOrder));
 
-    const assigneesByCustomer = new Map(); // cust -> { role -> [staff] }
-    const roleByCustomerStaff = new Map(); // cust -> { staff -> role }
-    (data.customerStaff || []).forEach((cs) => {
-      const cust = String(cs.customerCode);
-      const role = String(cs.role || "");
-      const sc = String(cs.staffCode);
-      if (!assigneesByCustomer.has(cust)) assigneesByCustomer.set(cust, {});
-      const byRole = assigneesByCustomer.get(cust);
-      if (!byRole[role]) byRole[role] = [];
-      byRole[role].push(sc);
-      if (!roleByCustomerStaff.has(cust)) roleByCustomerStaff.set(cust, {});
-      roleByCustomerStaff.get(cust)[sc] = role;
-    });
+    // 顧客担当は時系列マスタ（有効開始月 effectiveFrom）。生データを保持し、対象月で都度解決する。
+    const customerStaff = (data.customerStaff || []).map((cs) => ({
+      customerCode: String(cs.customerCode), staffCode: String(cs.staffCode || ""),
+      role: String(cs.role || ""), effectiveFrom: String(cs.effectiveFrom || "")
+    }));
 
     const staffName = new Map((data.staff || []).map((s) => [String(s.code), s.name]));
     const customerName = new Map((data.customers || []).map((c) => [String(c.code), c.name]));
-    return { taskByCode, phasesByCode, assigneesByCustomer, roleByCustomerStaff, staffName, customerName };
+    return { taskByCode, phasesByCode, customerStaff, staffName, customerName };
+  }
+
+  // 顧客担当を対象月時点で解決。各(顧客,役割)について effectiveFrom<=対象月 のうち最新の effectiveFrom の行を採用。
+  // effectiveFrom 空="初期から有効"（YYYY-MM 文字列比較で空が最小になる性質を利用）。staffCode 空=担当なし（解除）。
+  function resolveAssignees(rows, month) {
+    const assigneesByCustomer = new Map(); // cust -> { role -> [staff] }
+    const roleByCustomerStaff = new Map(); // cust -> { staff -> role }
+    const m = String(month || "");
+    const latest = new Map(); // "cust|role" -> max effectiveFrom (<=month)
+    rows.forEach((r) => {
+      if (String(r.effectiveFrom) > m) return; // 未来の設定は無視（"" は常に <= 対象月）
+      const key = r.customerCode + "|" + r.role;
+      const cur = latest.get(key);
+      if (cur === undefined || String(r.effectiveFrom) > cur) latest.set(key, String(r.effectiveFrom));
+    });
+    rows.forEach((r) => {
+      if (String(r.effectiveFrom) > m) return;
+      const key = r.customerCode + "|" + r.role;
+      if (String(r.effectiveFrom) !== latest.get(key)) return;
+      if (!r.staffCode) return; // 担当なし（解除）
+      const cust = r.customerCode, role = r.role, sc = r.staffCode;
+      if (!assigneesByCustomer.has(cust)) assigneesByCustomer.set(cust, {});
+      const byRole = assigneesByCustomer.get(cust);
+      if (!byRole[role]) byRole[role] = [];
+      if (byRole[role].indexOf(sc) < 0) byRole[role].push(sc);
+      if (!roleByCustomerStaff.has(cust)) roleByCustomerStaff.set(cust, {});
+      roleByCustomerStaff.get(cust)[sc] = role;
+    });
+    return { assigneesByCustomer, roleByCustomerStaff };
   }
 
   function listBillingMonths(data) {
@@ -88,6 +109,10 @@
     const idx = buildIndex(data);
     const offset = billingOffset(data);
     const workMonth = shiftMonth(billingMonth, -offset);
+    // 顧客担当は作業月時点で解決（時系列マスタ）。
+    const resolved = resolveAssignees(idx.customerStaff, workMonth);
+    const assigneesByCustomer = resolved.assigneesByCustomer;
+    const roleByCustomerStaff = resolved.roleByCustomerStaff;
     const warnings = [];
 
     const staff = new Map();
@@ -173,7 +198,7 @@
     }
 
     function allocFallback(pool, custCode, roleCodes, cust, label) {
-      const byRole = idx.assigneesByCustomer.get(String(custCode)) || {};
+      const byRole = assigneesByCustomer.get(String(custCode)) || {};
       let targets = [];
       roleCodes.forEach((rc) => { targets = targets.concat(byRole[rc] || []); });
       targets = [...new Set(targets)];
@@ -275,7 +300,7 @@
       .filter((c) => c.gross > 0 || c.tax > 0 || c.hours > 0)
       .map((c) => {
         const items = [...(custItems.get(c.code) || new Map()).values()].sort((a, b) => b.amount - a.amount);
-        const roleMap = idx.roleByCustomerStaff.get(c.code) || {};
+        const roleMap = roleByCustomerStaff.get(c.code) || {};
         const sbMap = custStaff.get(c.code) || new Map();
         const staffBreakdown = [...sbMap.entries()].map(([sc, v]) => ({
           staffCode: sc, name: idx.staffName.get(sc) || sc, role: roleMap[sc] || "",
@@ -287,7 +312,7 @@
           grossRevenue: c.gross, serviceRevenue: c.service, excludedRevenue: c.excluded, tax: c.tax,
           backedRevenue: c.backed, unrecordedRevenue: c.service - c.backed, hours: c.hours,
           rate: c.hours ? c.backed / c.hours : null,
-          primaryStaff: primaryStaffOf(idx, c.code),
+          primaryStaff: primaryStaffOf(assigneesByCustomer, idx.staffName, c.code),
           invoiceItems: items, staffBreakdown: staffBreakdown
         };
       });
@@ -308,18 +333,29 @@
     return { firm: firmModel, staff: staffList, customers: customerList, warnings: warnings };
   }
 
-  function primaryStaffOf(idx, custCode) {
-    const byRole = idx.assigneesByCustomer.get(String(custCode)) || {};
+  function primaryStaffOf(assigneesByCustomer, staffName, custCode) {
+    const byRole = assigneesByCustomer.get(String(custCode)) || {};
     const order = ["PRE", "REV"];
     const names = [];
-    order.forEach((rc) => (byRole[rc] || []).forEach((sc) => names.push((idx.staffName.get(sc) || sc) + "(" + rc + ")")));
+    order.forEach((rc) => (byRole[rc] || []).forEach((sc) => names.push((staffName.get(sc) || sc) + "(" + rc + ")")));
     Object.keys(byRole).forEach((rc) => {
-      if (order.indexOf(rc) < 0) (byRole[rc] || []).forEach((sc) => names.push((idx.staffName.get(sc) || sc) + "(" + rc + ")"));
+      if (order.indexOf(rc) < 0) (byRole[rc] || []).forEach((sc) => names.push((staffName.get(sc) || sc) + "(" + rc + ")"));
     });
     return names.join(" / ") || "—";
   }
 
-  const api = { buildMonthModel, listBillingMonths, shiftMonth, billingOffset };
+  // 画面側（入力/訂正/マスタ）から再利用する月時点の担当解決ヘルパ。
+  function roleAsOf(rows, custCode, staffCode, month) {
+    const r = resolveAssignees(rows || [], month);
+    const map = r.roleByCustomerStaff.get(String(custCode)) || {};
+    return map[String(staffCode)] || "";
+  }
+  function assigneesAsOf(rows, custCode, month) {
+    const r = resolveAssignees(rows || [], month);
+    return r.assigneesByCustomer.get(String(custCode)) || {};
+  }
+
+  const api = { buildMonthModel, listBillingMonths, shiftMonth, billingOffset, resolveAssignees, roleAsOf, assigneesAsOf };
   global.JOfficeAllocation = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);
