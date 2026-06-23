@@ -45,12 +45,12 @@
   async function init() {
     el.workDate.value = toDateInput(new Date());
     fillMasterSelect(el.staff, state.staff);
-    fillCustomerSelect(el.customer);
     fillTaskSelect(el.taskType);
-    syncTask();
 
     const savedStaff = localStorage.getItem(staffKey);
     if (savedStaff && state.staff.some((item) => item.code === savedStaff)) el.staff.value = savedStaff;
+    fillCustomerSelect(el.customer); // 選択スタッフの担当を上位に
+    syncTask();
 
     bindEvents();
     await hydrateRemoteState();
@@ -79,11 +79,11 @@
         : [];
       state.entries = normalizeEntries(remoteState.entries, staff, customers);
       fillMasterSelect(el.staff, state.staff);
-      fillCustomerSelect(el.customer);
       fillTaskSelect(el.taskType);
-      syncTask();
       const savedStaff = localStorage.getItem(staffKey);
       if (savedStaff && state.staff.some((item) => item.code === savedStaff)) el.staff.value = savedStaff;
+      fillCustomerSelect(el.customer);
+      syncTask();
       persist();
     } catch (error) {
       showToast(error.message);
@@ -95,6 +95,7 @@
     el.workDate.addEventListener("change", renderToday);
     el.staff.addEventListener("change", () => {
       localStorage.setItem(staffKey, el.staff.value);
+      fillCustomerSelect(el.customer); // 担当の並びを選択スタッフに合わせて更新
       renderToday();
       syncTask();
     });
@@ -203,11 +204,35 @@
     select.innerHTML = values.map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.code)} ${escapeHtml(item.name)}</option>`).join("");
   }
 
+  // 顧客を選択スタッフの役割でグループ化（①Prepare担当 ②Review担当 ③担当外、各コード昇順）。
+  function groupedCustomers(staffCode) {
+    const pre = [], rev = [], other = [];
+    (state.customers || []).forEach((c) => {
+      const role = roleFor(staffCode, c.code);
+      if (role === "PRE") pre.push(c);
+      else if (role === "REV") rev.push(c);
+      else other.push(c);
+    });
+    const byCode = (a, b) => String(a.code).localeCompare(String(b.code), "ja");
+    return { pre: pre.sort(byCode), rev: rev.sort(byCode), other: other.sort(byCode) };
+  }
+
   function fillCustomerSelect(select) {
-    const options = [`<option value="">顧客指定なし</option>`].concat(
-      state.customers.map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.code)} ${escapeHtml(item.name)}</option>`)
-    );
-    select.innerHTML = options.join("");
+    const cur = select.value;
+    const g = groupedCustomers(el.staff.value);
+    const opt = (c, role) => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.code)} ${escapeHtml(c.name)}${role ? ` (${role === "PRE" ? "Pre" : "Rev"})` : ""}</option>`;
+    let html = `<option value="">顧客指定なし</option>`;
+    if (g.pre.length || g.rev.length) {
+      html += `<optgroup label="担当顧客">`
+        + g.pre.map((c) => opt(c, "PRE")).join("")
+        + g.rev.map((c) => opt(c, "REV")).join("")
+        + `</optgroup>`;
+    }
+    if (g.other.length) {
+      html += `<optgroup label="その他">` + g.other.map((c) => opt(c, "")).join("") + `</optgroup>`;
+    }
+    select.innerHTML = html;
+    if (cur) select.value = cur;
   }
 
   // 案2: 業務区分セレクト（役務タスク＋社内）・工程セレクタ
