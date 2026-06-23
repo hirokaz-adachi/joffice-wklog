@@ -56,13 +56,30 @@ function seedStaffAndCustomers_() {
 function preStaffOf_(i) { return DEMO.staff[i % DEMO.staff.length][0]; }
 function revStaffOf_(i) { return DEMO.staff[(i + 2) % DEMO.staff.length][0]; }
 
+// 時系列デモ: C001(i=0) の Prepare 担当を 2026-05 から交代させる（マスタと工数を整合させる）。
+function preChangeMonthOf_(i) { return i === 0 ? "2026-05" : ""; }
+function preChangeStaffOf_(i) { return i === 0 ? DEMO.staff[1 % DEMO.staff.length][0] : ""; } // S002
+function demoPreStaffOf_(i, month) {
+  const cm = preChangeMonthOf_(i);
+  return (cm && month >= cm) ? preChangeStaffOf_(i) : preStaffOf_(i);
+}
+function demoRevStaffOf_(i, month) { return revStaffOf_(i); }
+
+// 顧客担当（時系列）。baseline は effectiveFrom 空、担当交代は有効開始月つきの追加行で表現。
 function seedCustomerStaff_() {
   const sheet = ensureSheet_(CONFIG.sheets.customerStaff, CONFIG.headers.customerStaff);
   clearDataRows_(sheet);
+  const eCol = CONFIG.headers.customerStaff.indexOf("effectiveFrom") + 1;
+  sheet.getRange(1, eCol, sheet.getMaxRows(), 1).setNumberFormat("@"); // 有効開始月をテキスト保持
+  const rows = [];
   DEMO.customers.forEach((c, i) => {
-    sheet.appendRow([c[0], preStaffOf_(i), "PRE", 1]);
-    sheet.appendRow([c[0], revStaffOf_(i), "REV", 2]);
+    rows.push([c[0], preStaffOf_(i), "PRE", 1, ""]); // baseline Prepare
+    rows.push([c[0], revStaffOf_(i), "REV", 2, ""]); // baseline Review
+    if (preChangeMonthOf_(i)) {
+      rows.push([c[0], preChangeStaffOf_(i), "PRE", 1, preChangeMonthOf_(i)]); // 担当交代（その月から有効）
+    }
   });
+  sheet.getRange(2, 1, rows.length, CONFIG.headers.customerStaff.length).setValues(rows);
 }
 
 // 顧客ごとの当月サービス品目を返す（[code, netAmount] の配列）。
@@ -124,8 +141,8 @@ function generateBillingAndWorklogs_() {
     DEMO.customers.forEach((c, ci) => {
       const custCode = c[0];
       const custName = c[1];
-      const preStaff = preStaffOf_(ci);
-      const revStaff = revStaffOf_(ci);
+      const preStaff = demoPreStaffOf_(ci, month); // 月次変動を反映（工数を担当と整合）
+      const revStaff = demoRevStaffOf_(ci, month);
       // フォールバック演出: C011 は 2026-04 に工数ゼロ（全額フォールバック）
       const skipAllWork = (custCode === "C011" && month === "2026-04");
       // フォールバック演出: C012 は Review 工数を常に計上しない（Review枠フォールバック）

@@ -25,7 +25,7 @@ const CONFIG = {
     // 案2: 工程マスタ（業務コードごとの Prepare/Review 振分率。ratio は %・役務は合計100）
     taskPhases: ["taskCode", "phaseCode", "phaseName", "ratio", "sortOrder"],
     // 案2: 顧客担当者マスタ（1顧客に複数可。role=工程コード=役割対応フォールバックの寄せ先）
-    customerStaff: ["customerCode", "staffCode", "role", "sortOrder"],
+    customerStaff: ["customerCode", "staffCode", "role", "sortOrder", "effectiveFrom"],
     // 案2: billing に invoiceItemCode(業務コード)/transferDate(振替日) を追加（末尾に追加）
     billing: ["invoiceId", "billingMonth", "customerCode", "customer", "invoiceItem", "paymentMethod", "netAmount", "taxAmount", "grossAmount", "issuedDate", "paymentDueDate", "paymentStatus", "memo", "invoiceItemCode", "transferDate"],
     targets: ["targetMonth", "staffCode", "staff", "targetAmount"],
@@ -106,6 +106,7 @@ function applyCodeFormats_() {
   fmt(CONFIG.sheets.items, 1);       // item_master.code
   fmt(CONFIG.sheets.worklogs, CONFIG.headers.worklogs.indexOf("taskCode") + 1);
   fmt(CONFIG.sheets.billing, CONFIG.headers.billing.indexOf("invoiceItemCode") + 1);
+  fmt(CONFIG.sheets.customerStaff, CONFIG.headers.customerStaff.indexOf("effectiveFrom") + 1); // 有効開始月 "YYYY-MM" をテキスト保持
 }
 
 // 案2: 業務区分カタログ・工程・設定をシードし直す（マスタのみ作り直し）。
@@ -191,8 +192,8 @@ function route_(action, payload) {
       return mutateDashboardData_(() => (payload.rows || []).map(saveCustomerStaff_));
     case "deleteCustomerStaff":
       return mutateDashboardData_(() => {
-        deleteCustomerStaff_(payload.customerCode, payload.staffCode);
-        return { customerCode: payload.customerCode, staffCode: payload.staffCode };
+        deleteCustomerStaff_(payload.customerCode, payload.role, payload.effectiveFrom);
+        return { customerCode: payload.customerCode, role: payload.role, effectiveFrom: payload.effectiveFrom };
       });
     // 案2: 設定
     case "saveSetting":
@@ -225,8 +226,9 @@ function dashboard_(forceRefresh) {
       })),
       customerStaff: readObjectsSafe_(CONFIG.sheets.customerStaff).map((row) => ({
         customerCode: String(row.customerCode),
-        staffCode: String(row.staffCode),
+        staffCode: String(row.staffCode || ""),
         role: row.role,
+        effectiveFrom: formatMonth_(row.effectiveFrom),
         sortOrder: Number(row.sortOrder || 0)
       })),
       settings: readSettings_(),
@@ -269,7 +271,13 @@ function bootstrap_() {
     tasks: readObjectsSafe_(CONFIG.sheets.tasks),
     taskTypes: readObjectsSafe_(CONFIG.sheets.tasks).map((row) => row.name).filter(Boolean),
     taskPhases: readObjectsSafe_(CONFIG.sheets.taskPhases),
-    customerStaff: readObjectsSafe_(CONFIG.sheets.customerStaff),
+    customerStaff: readObjectsSafe_(CONFIG.sheets.customerStaff).map((row) => ({
+      customerCode: String(row.customerCode),
+      staffCode: String(row.staffCode || ""),
+      role: row.role,
+      effectiveFrom: formatMonth_(row.effectiveFrom),
+      sortOrder: Number(row.sortOrder || 0)
+    })),
     items: readObjectsSafe_(CONFIG.sheets.items),
     settings: readSettings_(),
     entries: readObjects_(CONFIG.sheets.worklogs).map(normalizeWorklog_)
@@ -369,22 +377,29 @@ function deleteTaskPhase_(taskCode, phaseCode) {
 }
 
 // 案2: 顧客担当者マスタ（複合キー customerCode + staffCode）
+// 顧客担当（時系列）。同一(顧客,役割,有効開始月)を upsert。staffCode 空=担当解除（tombstone）も許容。
 function saveCustomerStaff_(row) {
-  if (!row || !row.customerCode || !row.staffCode) throw new Error("customerStaff customerCode/staffCode is required");
+  if (!row || !row.customerCode || !row.role) throw new Error("customerStaff customerCode/role is required");
   const sheet = ensureSheet_(CONFIG.sheets.customerStaff, CONFIG.headers.customerStaff);
-  const values = CONFIG.headers.customerStaff.map((key) => row[key] == null ? "" : row[key]);
-  const r = findRowByTwo_(sheet, 1, row.customerCode, 2, row.staffCode);
-  if (r) {
-    sheet.getRange(r, 1, 1, values.length).setValues([values]);
-  } else {
-    sheet.appendRow(values);
-  }
+  const cCol = CONFIG.headers.customerStaff.indexOf("customerCode") + 1;
+  const rCol = CONFIG.headers.customerStaff.indexOf("role") + 1;
+  const eCol = CONFIG.headers.customerStaff.indexOf("effectiveFrom") + 1;
+  // 有効開始月 "YYYY-MM" を日付に化けさせないようテキスト書式で固定（setValues は書式を尊重）。
+  sheet.getRange(1, eCol, sheet.getMaxRows(), 1).setNumberFormat("@");
+  const eff = row.effectiveFrom == null ? "" : String(row.effectiveFrom);
+  const values = CONFIG.headers.customerStaff.map((key) => (key === "effectiveFrom" ? eff : (row[key] == null ? "" : row[key])));
+  const r = findRowByThree_(sheet, cCol, row.customerCode, rCol, row.role, eCol, eff) || (sheet.getLastRow() + 1);
+  sheet.getRange(r, 1, 1, values.length).setValues([values]);
   return row;
 }
 
-function deleteCustomerStaff_(customerCode, staffCode) {
-  const sheet = getSheet_(CONFIG.sheets.customerStaff);
-  const r = findRowByTwo_(sheet, 1, customerCode, 2, staffCode);
+function deleteCustomerStaff_(customerCode, role, effectiveFrom) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheets.customerStaff);
+  if (!sheet) return;
+  const cCol = CONFIG.headers.customerStaff.indexOf("customerCode") + 1;
+  const rCol = CONFIG.headers.customerStaff.indexOf("role") + 1;
+  const eCol = CONFIG.headers.customerStaff.indexOf("effectiveFrom") + 1;
+  const r = findRowByThree_(sheet, cCol, customerCode, rCol, role, eCol, effectiveFrom == null ? "" : String(effectiveFrom));
   if (r) sheet.deleteRow(r);
 }
 
@@ -579,7 +594,7 @@ function findRowByValue_(sheet, column, value) {
   return 0;
 }
 
-// 2列の複合キーで行を探す（工程マスタ・顧客担当者マスタ用）。
+// 2列の複合キーで行を探す（工程マスタ用）。
 function findRowByTwo_(sheet, col1, val1, col2, val2) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return 0;
@@ -587,6 +602,20 @@ function findRowByTwo_(sheet, col1, val1, col2, val2) {
   const values = sheet.getRange(2, 1, lastRow - 1, width).getValues();
   for (let i = 0; i < values.length; i += 1) {
     if (String(values[i][col1 - 1]) === String(val1) && String(values[i][col2 - 1]) === String(val2)) return i + 2;
+  }
+  return 0;
+}
+
+// 3列の複合キーで行を探す（顧客担当: 顧客・役割・有効開始月）。有効開始月は formatMonth_ 相当に揃えて比較。
+function findRowByThree_(sheet, c1, v1, c2, v2, c3, v3) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+  const width = Math.max(c1, c2, c3);
+  const values = sheet.getRange(2, 1, lastRow - 1, width).getValues();
+  for (let i = 0; i < values.length; i += 1) {
+    if (String(values[i][c1 - 1]) === String(v1)
+      && String(values[i][c2 - 1]) === String(v2)
+      && formatMonth_(values[i][c3 - 1]) === String(v3)) return i + 2;
   }
   return 0;
 }
