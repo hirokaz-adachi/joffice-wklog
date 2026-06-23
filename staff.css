@@ -312,6 +312,9 @@ button {
   }
 }
 
+/* hidden 属性を確実に効かせる（label/fieldset の display 指定に勝たせる）。単一工程時の工程欄を隠す */
+label[hidden], fieldset[hidden] { display: none !important; }
+
 /* 案2: 工程バッジ（Prepare/Review） */
 .phase-badge {
   display: inline-block;
