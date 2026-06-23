@@ -114,8 +114,10 @@ function generateBillingAndWorklogs_() {
 
   const billingRows = [];
   const worklogRows = [];
+  const QHOFF = [0, 0.25, 0.5, 0.75]; // 端数（0.25時間刻み）を持たせるための決定的オフセット
+  const qh = function (x) { return Math.max(0.25, Math.round(x * 4) / 4); };
 
-  DEMO.months.forEach((month) => {
+  DEMO.months.forEach((month, mi) => {
     const date = month + "-15";
     const transferDate = transferDateOf_(month);
 
@@ -140,12 +142,12 @@ function generateBillingAndWorklogs_() {
         if (skipAllWork) return; // 工数なし→全額フォールバック
         // Prepare 工数（preRatio>0 のとき）
         if (ratioOf_(code, "PRE") > 0) {
-          const h = Math.max(1, Math.round(net / 15000));
+          const h = qh(net / 15000 + QHOFF[(ci + mi) % 4]);
           worklogRows.push(worklogObj_(date, preStaff, custCode, custName, code, "PRE", h));
         }
         // Review 工数（revRatio>0 かつ skipReviewWork でない）
         if (ratioOf_(code, "REV") > 0 && !skipReviewWork) {
-          const h = Math.max(1, Math.round(net / 40000));
+          const h = qh(net / 40000 + QHOFF[(ci + mi + 2) % 4]);
           worklogRows.push(worklogObj_(date, revStaff, custCode, custName, code, "REV", h));
         }
       });
@@ -166,8 +168,8 @@ function generateBillingAndWorklogs_() {
     });
 
     // --- 社内/非生産工数（各スタッフ・各月） ---
-    DEMO.staff.forEach((s) => {
-      worklogRows.push(internalWorklogObj_(date, s[0]));
+    DEMO.staff.forEach((s, si) => {
+      worklogRows.push(internalWorklogObj_(date, s[0], qh(3.5 + QHOFF[(si + mi) % 4])));
     });
 
     // --- 売上目標（各スタッフ・各月） ---
@@ -217,7 +219,7 @@ function worklogObj_(date, staffCode, custCode, custName, code, phaseCode, hours
   };
 }
 
-function internalWorklogObj_(date, staffCode) {
+function internalWorklogObj_(date, staffCode, hours) {
   return {
     id: "w_" + date + "_INT_" + staffCode,
     date: date,
@@ -228,7 +230,7 @@ function internalWorklogObj_(date, staffCode) {
     taskType: "社内/その他",
     taskCode: "",
     phaseCode: "",
-    hours: 5,
+    hours: hours == null ? 5 : hours,
     memo: "社内業務",
     updatedAt: date + "T09:00:00Z"
   };
