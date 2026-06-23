@@ -101,9 +101,9 @@
     return mutate("saveCustomerStaffs", { rows });
   }
 
-  async function deleteCustomerStaff(customerCode, staffCode) {
+  async function deleteCustomerStaff(customerCode, role, effectiveFrom) {
     if (!isRemote()) return null;
-    return mutate("deleteCustomerStaff", { customerCode, staffCode });
+    return mutate("deleteCustomerStaff", { customerCode, role, effectiveFrom });
   }
 
   // 案2: 設定

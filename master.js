@@ -62,7 +62,8 @@
           ratio: Number(p.ratio || 0), sortOrder: Number(p.sortOrder || 0)
         }));
         state.customerStaff = (Array.isArray(st.customerStaff) ? st.customerStaff : []).map((c) => ({
-          customerCode: String(c.customerCode), staffCode: String(c.staffCode), role: String(c.role || ""), sortOrder: Number(c.sortOrder || 0)
+          customerCode: String(c.customerCode), staffCode: String(c.staffCode || ""), role: String(c.role || ""),
+          effectiveFrom: String(c.effectiveFrom || ""), sortOrder: Number(c.sortOrder || 0)
         }));
         state.settings = (st.settings && typeof st.settings === "object") ? st.settings : {};
         setStatus("スプレッドシートから読み込みました");
@@ -272,59 +273,96 @@
     showToast(wasEditing ? "更新しました" : "追加しました");
   }
 
-  // ---------------- 顧客担当（assignees） ----------------
+  // ---------------- 顧客担当（assignees・時系列） ----------------
+  // 対象月を選び、その月時点の担当を表示・編集する。保存は「その月から有効」。差分のみ保持。
+  function currentMonth() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
+  function resolvedStaff(custCode, role, month, rows) {
+    const src = rows || state.customerStaff;
+    const a = window.JOfficeAllocation ? window.JOfficeAllocation.assigneesAsOf(src, custCode, month) : {};
+    return (a[role] || [])[0] || "";
+  }
+  // この月の指定を除いた継承値（前月以前から有効なもの）。
+  function inheritedStaff(custCode, role, month) {
+    const subset = state.customerStaff.filter((x) => String(x.effectiveFrom || "") !== month);
+    return resolvedStaff(custCode, role, month, subset);
+  }
+  function thisMonthRow(custCode, role, month) {
+    return state.customerStaff.find((x) => x.customerCode === String(custCode) && x.role === role && String(x.effectiveFrom || "") === month);
+  }
+
   function renderAssignees() {
     el.form.style.display = "none";
     el.searchWrap.style.display = "";
-    el.hint.textContent = "1顧客に Prepare担当・Review担当 を割り当てます（工数未計上の枠は役割対応で担当者へフォールバック配賦されます）。";
+    if (!state.assigneeMonth) state.assigneeMonth = currentMonth();
+    const month = state.assigneeMonth;
+    el.hint.innerHTML = `対象月 <input type="month" id="assigneeMonth" value="${esc(month)}"> 時点の担当を表示・編集します。保存は<b>その月から有効</b>（未計上枠は担当へフォールバック配賦）。`
+      + `<span class="eff-tag eff-this">この月〜</span>=当月から指定 / <span class="eff-tag eff-inh">引継</span>=前月以前から継続。`;
     el.head.innerHTML = `<tr><th class="col-key">顧客番号</th><th>顧客名</th><th>Prepare担当</th><th>Review担当</th><th class="ops">操作</th></tr>`;
     const q = el.search.value.trim().toLowerCase();
     const rows = state.customers.filter((c) => !q || (c.code + " " + c.name).toLowerCase().includes(q))
       .slice().sort((a, b) => a.code.localeCompare(b.code, "ja"));
-    const opts = (sel) => `<option value="">—（未設定）</option>` + state.staff.slice()
+    const opts = (sel) => `<option value="">—（担当なし）</option>` + state.staff.slice()
       .sort((a, b) => a.code.localeCompare(b.code, "ja"))
       .map((s) => `<option value="${esc(s.code)}"${s.code === sel ? " selected" : ""}>${esc(s.code)} ${esc(s.name)}</option>`).join("");
+    const cell = (c, role) => {
+      const val = resolvedStaff(c.code, role, month);
+      const tag = thisMonthRow(c.code, role, month) ? `<span class="eff-tag eff-this">この月〜</span>`
+        : (val ? `<span class="eff-tag eff-inh">引継</span>` : "");
+      return `<td><select data-role="${role}">${opts(val)}</select>${tag}</td>`;
+    };
     el.body.innerHTML = rows.length ? rows.map((c) => {
-      const pre = assignee(c.code, "PRE"), rev = assignee(c.code, "REV");
+      const hasTm = thisMonthRow(c.code, "PRE", month) || thisMonthRow(c.code, "REV", month);
       return `<tr data-key="${esc(c.code)}">
         <td class="col-key">${esc(c.code)}</td>
         <td>${esc(c.name)}</td>
-        <td><select data-role="PRE">${opts(pre)}</select></td>
-        <td><select data-role="REV">${opts(rev)}</select></td>
-        <td class="ops"><button type="button" class="row-edit" data-save>保存</button></td></tr>`;
+        ${cell(c, "PRE")}
+        ${cell(c, "REV")}
+        <td class="ops"><button type="button" class="row-edit" data-save>保存</button>${hasTm ? `<button type="button" class="row-revert" data-revert>当月取消</button>` : ""}</td></tr>`;
     }).join("") : `<tr><td class="grid-empty" colspan="5">顧客がありません。</td></tr>`;
-    el.count.textContent = `${rows.length} / ${state.customers.length} 件`;
-  }
-
-  function assignee(custCode, role) {
-    const c = state.customerStaff.find((x) => x.customerCode === String(custCode) && x.role === role);
-    return c ? c.staffCode : "";
+    el.count.textContent = `${rows.length} / ${state.customers.length} 件（${month} 時点）`;
+    const mi = document.getElementById("assigneeMonth");
+    if (mi) mi.onchange = () => { state.assigneeMonth = mi.value || currentMonth(); renderAssignees(); };
   }
 
   async function saveAssignee(custCode, tr) {
-    const preSel = tr.querySelector('select[data-role="PRE"]').value;
-    const revSel = tr.querySelector('select[data-role="REV"]').value;
+    const month = state.assigneeMonth;
     try {
-      await setRole(custCode, "PRE", preSel, 1);
-      await setRole(custCode, "REV", revSel, 2);
+      await applyRoleChange(custCode, "PRE", tr.querySelector('select[data-role="PRE"]').value, 1, month);
+      await applyRoleChange(custCode, "REV", tr.querySelector('select[data-role="REV"]').value, 2, month);
     } catch (error) { showToast(error.message); return; }
-    showToast("保存しました");
+    showToast(`${month} 以降の担当を保存しました`);
+    renderAssignees();
   }
 
-  async function setRole(custCode, role, newStaff, sortOrder) {
-    const cur = state.customerStaff.find((x) => x.customerCode === String(custCode) && x.role === role);
-    if (cur && cur.staffCode !== newStaff) {
-      await window.WorklogBackend.deleteCustomerStaff(custCode, cur.staffCode);
-      state.customerStaff = state.customerStaff.filter((x) => !(x.customerCode === String(custCode) && x.role === role));
+  // 選択値が継承値と同じなら当月行は作らず（既存があれば削除）、異なれば当月から有効の指定を upsert。
+  async function applyRoleChange(custCode, role, chosen, sortOrder, month) {
+    const dropLocal = () => { state.customerStaff = state.customerStaff.filter((x) => !(x.customerCode === String(custCode) && x.role === role && String(x.effectiveFrom || "") === month)); };
+    if (chosen === inheritedStaff(custCode, role, month)) {
+      if (thisMonthRow(custCode, role, month)) {
+        await window.WorklogBackend.deleteCustomerStaff(custCode, role, month);
+        dropLocal();
+      }
+      return;
     }
-    if (newStaff && (!cur || cur.staffCode !== newStaff)) {
-      await window.WorklogBackend.saveCustomerStaff({ customerCode: custCode, staffCode: newStaff, role, sortOrder });
-      state.customerStaff = state.customerStaff.filter((x) => !(x.customerCode === String(custCode) && x.role === role));
-      state.customerStaff.push({ customerCode: String(custCode), staffCode: newStaff, role, sortOrder });
-    }
-    if (!newStaff && cur) {
-      state.customerStaff = state.customerStaff.filter((x) => !(x.customerCode === String(custCode) && x.role === role));
-    }
+    await window.WorklogBackend.saveCustomerStaff({ customerCode: String(custCode), staffCode: chosen, role, effectiveFrom: month, sortOrder });
+    dropLocal();
+    state.customerStaff.push({ customerCode: String(custCode), staffCode: chosen, role, effectiveFrom: month, sortOrder });
+  }
+
+  // 当月の指定（PRE/REV）を取り消し、前月以前の担当に戻す。
+  async function revertMonth(custCode) {
+    const month = state.assigneeMonth;
+    try {
+      for (let i = 0; i < 2; i += 1) {
+        const role = i === 0 ? "PRE" : "REV";
+        if (thisMonthRow(custCode, role, month)) {
+          await window.WorklogBackend.deleteCustomerStaff(custCode, role, month);
+          state.customerStaff = state.customerStaff.filter((x) => !(x.customerCode === String(custCode) && x.role === role && String(x.effectiveFrom || "") === month));
+        }
+      }
+    } catch (error) { showToast(error.message); return; }
+    showToast(`${month} の指定を取り消しました`);
+    renderAssignees();
   }
 
   // ---------------- 共通イベント ----------------
@@ -332,7 +370,11 @@
     const tr = event.target.closest("tr[data-key]");
     if (!tr) return;
     const key = tr.dataset.key;
-    if (active === "assignees") { if (event.target.closest("[data-save]")) saveAssignee(key, tr); return; }
+    if (active === "assignees") {
+      if (event.target.closest("[data-revert]")) revertMonth(key);
+      else if (event.target.closest("[data-save]")) saveAssignee(key, tr);
+      return;
+    }
     if (event.target.closest("[data-edit]")) startEdit(key);
     else if (event.target.closest("[data-del]")) removeItem(key);
   }

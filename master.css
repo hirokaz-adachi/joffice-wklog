@@ -89,3 +89,10 @@
 #masterTable .num { text-align: right; font-variant-numeric: tabular-nums; }
 #masterBody select { width: 100%; min-height: 34px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; }
 #masterTable .row-edit[data-save] { color: #fff; background: var(--accent); border-color: var(--accent); }
+
+/* 顧客担当（時系列）: 有効状態のタグ・当月取消ボタン・月セレクタ */
+#assigneeMonth { margin: 0 4px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 6px; }
+.eff-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; vertical-align: middle; }
+.eff-tag.eff-this { background: #dff3ef; color: #0b5d57; }
+.eff-tag.eff-inh { background: #eef2ff; color: #3730a3; }
+.row-revert { margin-left: 6px; border-color: #efc7b8; color: #9a3412; }
