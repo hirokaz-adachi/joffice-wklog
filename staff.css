@@ -135,6 +135,18 @@ textarea {
   line-height: 1.5;
 }
 
+/* 担当工程に固定された工程セレクト等、非活性の入力欄をはっきりグレーアウト */
+select:disabled,
+input:disabled,
+textarea:disabled {
+  background: #d7dee0;
+  color: #5a6a72;
+  border-color: #c2cccf;
+  opacity: 1;
+  cursor: not-allowed;
+  -webkit-text-fill-color: #5a6a72;
+}
+
 button {
   min-height: 44px;
   border: 1px solid var(--line);
