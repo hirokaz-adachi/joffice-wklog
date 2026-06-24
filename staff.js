@@ -54,8 +54,43 @@
 
     bindEvents();
     await hydrateRemoteState();
+    applyEntryParams(); // 工数入力（月間）からの誘導時: 日付・スタッフ・顧客/業務/工程をプリセット＋戻る導線
     renderToday();
     updateDurationDisplay();
+  }
+
+  // URLパラメータ（from=worklog-month）による初期化。通常の起動では何もしない。
+  function applyEntryParams() {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("from") !== "worklog-month") return;
+
+    const back = document.getElementById("backToMonth");
+    if (back) {
+      const bp = new URLSearchParams();
+      if (q.get("staff")) bp.set("staff", q.get("staff"));
+      if (q.get("month")) bp.set("month", q.get("month"));
+      back.setAttribute("href", "worklog-month.html" + (bp.toString() ? "?" + bp.toString() : ""));
+      back.hidden = false;
+    }
+
+    const date = q.get("date");
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) el.workDate.value = date;
+
+    const staff = q.get("staff");
+    if (staff && state.staff.some((s) => s.code === staff)) {
+      el.staff.value = staff;
+      try { localStorage.setItem(staffKey, staff); } catch (e) {}
+    }
+
+    // 選択スタッフ・作業月で顧客並びを再構築してからプリセット
+    fillCustomerSelect(el.customer);
+    const customer = q.get("customer");
+    if (customer && [...el.customer.options].some((o) => o.value === customer)) el.customer.value = customer;
+    const task = q.get("task");
+    if (task && [...el.taskType.options].some((o) => o.value === task)) el.taskType.value = task;
+    syncTask(); // 顧客・業務に応じて工程セレクタ更新＋担当役割で自動補完
+    const phase = q.get("phase");
+    if (phase && el.phase && [...el.phase.options].some((o) => o.value === phase)) el.phase.value = phase;
   }
 
   async function hydrateRemoteState() {

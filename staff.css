@@ -69,6 +69,22 @@ header input {
   width: 142px;
 }
 
+/* 工数入力（月間）からの誘導時のみ表示する戻る導線 */
+.back-month {
+  display: block;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+  text-align: center;
+}
+.back-month:hover { background: var(--accent); color: #fff; }
+.back-month[hidden] { display: none; }
+
 .identity,
 .entry-card,
 .today {

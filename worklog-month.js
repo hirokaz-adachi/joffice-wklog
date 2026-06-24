@@ -21,13 +21,18 @@
   let displayRows = [];            // 描画順の行メタ
   let days = [];                   // [{ day, date, dow, weekend }]
   let memoTarget = null;           // メモ編集ポップオーバーの対象 { key, date, id }
+  let paramStaff = "";             // URL誘導（スマホ画面から戻る等）で指定されたスタッフ
 
   const el = {};
   init();
 
   function init() {
     cache();
-    month = defaultMonth();
+    // スマホ画面からの復帰など、URLパラメータで対象月・スタッフを復元
+    const q = new URLSearchParams(location.search);
+    paramStaff = q.get("staff") || "";
+    const mp = q.get("month");
+    month = (mp && /^\d{4}-\d{2}$/.test(mp)) ? mp : defaultMonth();
     el.monthInput.value = month;
     bind();
     hydrate();
@@ -38,7 +43,7 @@
       "staffSelect", "monthInput", "prevMonth", "nextMonth", "saveAll", "copyPrev",
       "grandTotal", "pendingInfo", "gridWrap", "addCustomer", "addTask",
       "addPhaseField", "addPhase", "addRowBtn", "toast", "statusNote",
-      "memoPopover", "memoHeader", "memoHours", "memoText", "memoApply", "memoClear", "memoClose"
+      "memoPopover", "memoHeader", "memoHours", "memoText", "memoHint", "memoMulti", "memoApply", "memoClear", "memoMobile", "memoClose"
     ];
     ids.forEach((id) => { el[id] = document.getElementById(id); });
   }
@@ -65,16 +70,24 @@
     el.addRowBtn.addEventListener("click", addRowFromPicker);
     el.addCustomer.addEventListener("change", syncAddPicker);
     el.addTask.addEventListener("change", syncAddPicker);
-    // グリッドのセル入力（イベント委譲）
-    el.gridWrap.addEventListener("input", onCellInput);
-    // メモ編集ポップオーバー: ダブルクリック / Enter で開く、スクロールで閉じる
-    el.gridWrap.addEventListener("dblclick", onCellActivate);
+    // セルは表示専用。単一クリック（または Enter/Space）で編集ウィンドウを開く。スクロールで閉じる。
+    el.gridWrap.addEventListener("click", onCellActivate);
     el.gridWrap.addEventListener("keydown", onGridKeydown);
     el.gridWrap.addEventListener("scroll", closeMemo);
     el.memoApply.addEventListener("click", applyMemo);
     el.memoClear.addEventListener("click", clearMemo);
+    el.memoMobile.addEventListener("click", openMobileEdit);
     el.memoClose.addEventListener("click", closeMemo);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMemo(); });
+    document.addEventListener("mousedown", onDocMouseDown);
+  }
+
+  // ポップオーバー外（かつセル以外）をクリックしたら閉じる
+  function onDocMouseDown(event) {
+    if (el.memoPopover.hidden) return;
+    if (el.memoPopover.contains(event.target)) return;
+    if (event.target.closest && event.target.closest("td.cell-disp")) return;
+    closeMemo();
   }
 
   function stepMonth(delta) {
@@ -108,7 +121,8 @@
     }
     fillStaffSelect();
     const saved = (() => { try { return localStorage.getItem("sharoshiWorklogMvp.selectedStaff"); } catch (e) { return ""; } })();
-    if (saved && state.staff.some((s) => s.code === saved)) staffCode = saved;
+    if (paramStaff && state.staff.some((s) => s.code === paramStaff)) staffCode = paramStaff;
+    else if (saved && state.staff.some((s) => s.code === saved)) staffCode = saved;
     else if (!staffCode && state.staff.length) staffCode = state.staff[0].code;
     el.staffSelect.value = staffCode;
     fillAddCustomer();
@@ -336,14 +350,15 @@
       const cells = days.map((d) => {
         const id = cellId(r.key, d.date);
         const cm = cellModel.get(id);
-        const cls = "col-day" + (d.weekend ? " weekend" : "");
+        const cls = "col-day cell-disp" + (d.weekend ? " weekend" : "");
+        const aria = `${esc(r.customerName)} ${esc(r.taskName)} ${d.date}`;
         if (cm && cm.multi) {
-          const mt = "複数明細（data-edit で編集してください）" + (cm.memo ? " / " + cm.memo : "");
-          return `<td class="${cls} cell-multi" title="${esc(mt)}">${fmt(cm.hours)}<span class="multi-dot">複</span></td>`;
+          const mt = "複数明細（クリックで詳細・スマホ用画面で編集）" + (cm.memo ? " / " + cm.memo : "");
+          return `<td class="${cls} cell-multi" data-row="${esc(r.key)}" data-date="${d.date}" tabindex="0" role="button" aria-label="${aria}（複数明細）" title="${esc(mt)}">${fmt(cm.hours)}<span class="multi-dot">複</span></td>`;
         }
-        const v = cm && cm.hours ? String(cm.hours) : "";
+        const v = cm && cm.hours ? fmt(cm.hours) : "";
         const hasMemo = !!(cm && cm.memo);
-        return `<td class="${cls}${hasMemo ? " has-memo" : ""}"${hasMemo ? ` title="${esc(cm.memo)}"` : ""}><input class="cell" type="number" inputmode="decimal" step="0.25" min="0" max="24" data-row="${esc(r.key)}" data-date="${d.date}" value="${v}" aria-label="${esc(r.customerName)} ${esc(r.taskName)} ${d.date}">${hasMemo ? `<span class="cell-memo-dot" aria-hidden="true"></span>` : ""}</td>`;
+        return `<td class="${cls}${hasMemo ? " has-memo" : ""}" data-row="${esc(r.key)}" data-date="${d.date}" tabindex="0" role="button" aria-label="${aria}"${hasMemo ? ` title="${esc(cm.memo)}"` : ""}><span class="cell-val">${v}</span>${hasMemo ? `<span class="cell-memo-dot" aria-hidden="true"></span>` : ""}</td>`;
       }).join("");
       body += `<tr data-row="${esc(r.key)}"${rowCls ? ` class="${rowCls}"` : ""}>`
         + `<td class="col-cust" title="${esc(r.customerName)}">${custLabel}</td>`
@@ -367,24 +382,7 @@
     </table>`;
   }
 
-  // ---- 入力・集計 ----
-  function onCellInput(event) {
-    const input = event.target;
-    if (!input.classList || !input.classList.contains("cell")) return;
-    const key = input.dataset.row;
-    const date = input.dataset.date;
-    const id = cellId(key, date);
-    let v = Number(input.value);
-    if (!Number.isFinite(v) || v < 0) v = 0;
-    if (v > 24) { v = 24; input.value = "24"; }
-    const cm = cellModel.get(id) || { hours: 0, memo: "", editable: true, ids: [], multi: false };
-    cm.hours = v;
-    cellModel.set(id, cm);
-    computePending(key, date, id, cm);
-    refreshTotals();
-    refreshPendingInfo();
-  }
-
+  // ---- 集計・保留 ----
   function computePending(key, date, id, cm) {
     const original = originalCell(id);
     const sameHours = round2(cm.hours) === round2(original.hours);
@@ -505,27 +503,25 @@
     };
   }
 
-  // ---- メモ編集ポップオーバー ----
+  // ---- 工数・メモ編集ポップオーバー ----
+  // セルは表示専用。クリック／Enter・Space で編集ウィンドウを開く（単一=編集／複数明細=読取専用＋スマホ誘導）。
   function onCellActivate(event) {
-    const td = event.target.closest("td");
-    if (!td) return;
-    const input = td.querySelector(".cell");
-    if (input) openMemo(input.dataset.row, input.dataset.date);
-    else if (td.classList.contains("cell-multi")) showToast("複数明細のセルは data-edit で編集してください");
+    const td = event.target.closest("td.cell-disp");
+    if (!td || !td.dataset.row) return;
+    openMemo(td.dataset.row, td.dataset.date);
   }
 
   function onGridKeydown(event) {
-    if (event.key !== "Enter") return;
-    const input = event.target;
-    if (!input.classList || !input.classList.contains("cell")) return;
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const td = event.target.closest ? event.target.closest("td.cell-disp") : null;
+    if (!td || !td.dataset.row) return;
     event.preventDefault();
-    openMemo(input.dataset.row, input.dataset.date);
+    openMemo(td.dataset.row, td.dataset.date);
   }
 
   function openMemo(key, date) {
     const id = cellId(key, date);
     const cm = cellModel.get(id) || { hours: 0, memo: "", editable: true, ids: [], multi: false };
-    if (cm.multi) { showToast("複数明細のセルは data-edit で編集してください"); return; }
     const row = displayRows.find((r) => r.key === key);
     if (!row) return;
     memoTarget = { key, date, id };
@@ -533,10 +529,37 @@
     el.memoHeader.textContent = `${mmdd(date)}　${row.customerName} / ${row.taskName}${phase}`;
     el.memoHours.value = cm.hours ? String(cm.hours) : "";
     el.memoText.value = cm.memo || "";
+    // 複数明細セルは読取専用＋「スマホ用画面で編集」、単一/空セルは通常編集
+    const multi = !!cm.multi;
+    el.memoHours.disabled = multi;
+    el.memoText.readOnly = multi;
+    el.memoApply.hidden = multi;
+    el.memoClear.hidden = multi;
+    el.memoHint.hidden = multi;
+    el.memoMobile.hidden = !multi;
+    el.memoMulti.hidden = !multi;
+    el.memoPopover.classList.toggle("is-readonly", multi);
     const td = cellTd(key, date);
     el.memoPopover.hidden = false;
     positionPopover(td);
-    el.memoText.focus();
+    if (multi) el.memoMobile.focus(); else el.memoText.focus();
+  }
+
+  // 複数明細セル → スマホ用作業登録画面を当該日付・スタッフ・顧客/業務/工程プリセットで開く（戻る導線つき）
+  function openMobileEdit() {
+    if (!memoTarget) return;
+    if (!guardPending()) return; // 未保存の編集がある場合は確認（移動で破棄されるため）
+    const row = displayRows.find((r) => r.key === memoTarget.key);
+    if (!row) return;
+    const p = new URLSearchParams();
+    p.set("from", "worklog-month");
+    p.set("date", memoTarget.date);
+    p.set("month", month);
+    if (staffCode) p.set("staff", staffCode);
+    if (row.customerCode) p.set("customer", row.customerCode);
+    if (row.taskCode) p.set("task", row.taskCode);
+    if (row.phaseCode) p.set("phase", row.phaseCode);
+    window.location.href = "staff.html?" + p.toString();
   }
 
   function positionPopover(td) {
@@ -584,10 +607,11 @@
   }
 
   function updateCellDom(key, date, cm) {
-    const input = cellInput(key, date);
-    if (!input) return;
-    input.value = cm.hours ? String(cm.hours) : "";
-    const td = input.closest("td");
+    const td = cellTd(key, date);
+    if (!td) return;
+    let val = td.querySelector(".cell-val");
+    if (!val) { val = document.createElement("span"); val.className = "cell-val"; td.insertBefore(val, td.firstChild); }
+    val.textContent = cm.hours ? fmt(cm.hours) : "";
     const hasMemo = !!cm.memo;
     td.classList.toggle("has-memo", hasMemo);
     if (hasMemo) td.setAttribute("title", cm.memo); else td.removeAttribute("title");
@@ -596,8 +620,7 @@
     if (!hasMemo && dot) dot.remove();
   }
 
-  function cellInput(key, date) { return el.gridWrap.querySelector(`.cell[data-row="${cssEsc(key)}"][data-date="${date}"]`); }
-  function cellTd(key, date) { const i = cellInput(key, date); return i ? i.closest("td") : null; }
+  function cellTd(key, date) { return el.gridWrap.querySelector(`td.cell-disp[data-row="${cssEsc(key)}"][data-date="${date}"]`); }
   function mmdd(date) { const p = String(date).split("-"); return p.length === 3 ? `${Number(p[1])}/${Number(p[2])}` : date; }
 
   // ---- 配賦エンジン委譲（顧客担当の時系列解決） ----

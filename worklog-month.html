@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>J-Office Insight ｜ 工数入力（月間）</title>
-  <link rel="stylesheet" href="worklog-month.css?v=20260624-4">
+  <link rel="stylesheet" href="worklog-month.css?v=20260624-5">
 </head>
 <body>
   <header class="topbar">
@@ -64,18 +64,20 @@
     <span><span class="multi-dot">複</span> 同一セルに複数明細あり（data-edit で編集）</span>
   </section>
 
-  <div id="memoPopover" class="memo-pop" hidden role="dialog" aria-label="メモ編集">
+  <div id="memoPopover" class="memo-pop" hidden role="dialog" aria-label="工数・メモ編集">
     <h3 id="memoHeader"></h3>
     <div class="mp-row">
       <label for="memoHours">時間</label>
       <input id="memoHours" type="number" inputmode="decimal" step="0.25" min="0" max="24">
-      <span class="mp-hint">時間を0にすると削除</span>
+      <span id="memoHint" class="mp-hint">時間を0にすると削除</span>
     </div>
     <textarea id="memoText" rows="3" maxlength="200" placeholder="メモ（改行可）"></textarea>
+    <p id="memoMulti" class="mp-multi" hidden>このセルは複数明細（同一日・顧客・業務・工程に2件以上）です。修正はスマホ用画面で行ってください。</p>
     <div class="mp-actions">
       <div class="mp-left">
         <button id="memoApply" type="button" class="mp-apply">適用</button>
         <button id="memoClear" type="button" class="mp-clear">クリア</button>
+        <button id="memoMobile" type="button" class="mp-mobile" hidden>スマホ用画面で編集</button>
       </div>
       <button id="memoClose" type="button" class="mp-close">閉じる</button>
     </div>
@@ -85,6 +87,6 @@
   <script src="config.js"></script>
   <script src="backend.js?v=20260623-2"></script>
   <script src="allocation.js?v=20260623-3"></script>
-  <script src="worklog-month.js?v=20260624-4"></script>
+  <script src="worklog-month.js?v=20260624-5"></script>
 </body>
 </html>

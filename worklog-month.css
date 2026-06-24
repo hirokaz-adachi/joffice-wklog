@@ -142,19 +142,14 @@ button.secondary:hover { border-color: var(--accent); background: var(--accent-s
 .group-row .group-cell { position: sticky; left: 0; z-index: 2; background: #eef3f2;
   color: var(--accent-dark); font-size: 11.5px; font-weight: 800; padding: 2px 8px; }
 
-/* セル入力 */
-.cell {
-  width: 100%; height: 34px; border: 1px solid transparent; border-radius: 4px;
-  background: transparent; text-align: center; color: var(--ink);
-  font-variant-numeric: tabular-nums; padding: 0 2px;
-  -moz-appearance: textfield;
-}
-.cell::-webkit-outer-spin-button, .cell::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.cell:hover { border-color: var(--line); }
-.cell:focus { border-color: var(--accent); outline: 2px solid rgba(15,118,110,.14); background: #fff; }
+/* 表示専用セル: クリックで編集ウィンドウを開く */
+.cell-disp { cursor: pointer; font-variant-numeric: tabular-nums; color: var(--ink); }
+.cell-disp .cell-val { display: inline-block; min-width: 1em; }
+.cell-disp:focus { outline: 2px solid rgba(15,118,110,.45); outline-offset: -2px; }
+.cell-disp:focus-visible { outline: 2px solid rgba(15,118,110,.55); outline-offset: -2px; }
 
-/* メモあり: 右上にドット。セルにカーソルでメモ編集できることを示す */
-.has-memo { cursor: help; }
+/* メモあり: 右上にドット */
+.has-memo { cursor: pointer; }
 .cell-memo-dot {
   position: absolute; top: 3px; right: 3px; width: 6px; height: 6px;
   border-radius: 50%; background: var(--accent); pointer-events: none;
@@ -206,6 +201,12 @@ button.secondary:hover { border-color: var(--accent); background: var(--accent-s
 .memo-pop .mp-clear:hover { border-color: #b91c1c; }
 .memo-pop .mp-close { background: #fff; color: var(--muted); border: 1px solid var(--line); }
 .memo-pop .mp-close:hover { border-color: var(--accent); }
+.memo-pop .mp-mobile { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
+.memo-pop .mp-mobile:hover { background: var(--accent-dark); }
+.memo-pop .mp-multi { margin: 6px 0 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.memo-pop.is-readonly input[disabled], .memo-pop.is-readonly textarea[readonly] {
+  background: #f1f5f4; color: var(--muted); -webkit-text-fill-color: var(--muted); cursor: default;
+}
 
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(12px);
