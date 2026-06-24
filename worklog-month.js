@@ -315,6 +315,8 @@
 
     let body = "";
     let lastGroup = null;
+    let lastCustomer = null;
+    let band = 0;
     const groupLabel = { assigned: "担当顧客", spot: "スポット・その他", internal: "社内・非生産" };
     displayRows.forEach((r) => {
       if (r.group !== lastGroup) {
@@ -322,7 +324,14 @@
           + days.map((d) => `<td class="col-day${d.weekend ? " weekend" : ""}"></td>`).join("")
           + `<td class="col-total"></td></tr>`;
         lastGroup = r.group;
+        lastCustomer = null;
       }
+      // 顧客ブロックの可読性: 名称は先頭行のみ表示／境界に区切り線（cust-start）／顧客単位で淡い交互バンド（band）
+      const custKey = r.group + "|" + r.customerCode;
+      const isCustStart = custKey !== lastCustomer;
+      if (isCustStart) { band ^= 1; lastCustomer = custKey; }
+      const rowCls = ((isCustStart ? "cust-start" : "") + (band ? " band" : "")).trim();
+      const custLabel = isCustStart ? esc(r.customerName) : "";
       const badge = r.phaseName ? ` <span class="phase-badge phase-${(r.phaseCode || "").toLowerCase()}">${esc(r.phaseName)}</span>` : "";
       const cells = days.map((d) => {
         const id = cellId(r.key, d.date);
@@ -336,8 +345,8 @@
         const hasMemo = !!(cm && cm.memo);
         return `<td class="${cls}${hasMemo ? " has-memo" : ""}"${hasMemo ? ` title="${esc(cm.memo)}"` : ""}><input class="cell" type="number" inputmode="decimal" step="0.25" min="0" max="24" data-row="${esc(r.key)}" data-date="${d.date}" value="${v}" aria-label="${esc(r.customerName)} ${esc(r.taskName)} ${d.date}">${hasMemo ? `<span class="cell-memo-dot" aria-hidden="true"></span>` : ""}</td>`;
       }).join("");
-      body += `<tr data-row="${esc(r.key)}">`
-        + `<td class="col-cust" title="${esc(r.customerName)}">${esc(r.customerName)}</td>`
+      body += `<tr data-row="${esc(r.key)}"${rowCls ? ` class="${rowCls}"` : ""}>`
+        + `<td class="col-cust" title="${esc(r.customerName)}">${custLabel}</td>`
         + `<td class="col-task" title="${esc(r.taskName)}">${esc(r.taskName)}${badge}</td>`
         + cells
         + `<td class="col-total" data-rowtotal="${esc(r.key)}">0</td></tr>`;
