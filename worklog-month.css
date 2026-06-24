@@ -10,6 +10,7 @@
   --accent-soft: #e0f3ef;
   --weekend: #eef3f2;
   --band: #f3f6f5;
+  --hover: #cfe9e1;
   --zero: #fff1cf;
   --zero-ink: #8a5a00;
   --head: #eef3f2;
@@ -117,7 +118,13 @@ button.secondary:hover { border-color: var(--accent); background: var(--accent-s
 .month-grid tbody tr.band > .col-day { background: var(--band); }
 .month-grid tbody tr.band > .col-day.weekend { background: var(--weekend); }
 .month-grid tbody tr.band > .col-total { background: var(--band); }
-.month-grid tbody tr:hover .col-cust, .month-grid tbody tr:hover .col-task { background: #f6faf9; }
+/* ホバー: 行全体（顧客・業務・全日付セル・月計）をはっきりした色でハイライト。バンド・週末より優先 */
+.month-grid tbody tr:hover > .col-cust,
+.month-grid tbody tr:hover > .col-task,
+.month-grid tbody tr:hover > .col-day,
+.month-grid tbody tr:hover > .col-total { background: var(--hover); }
+.month-grid tbody tr:hover > .col-day.weekend { background: var(--hover); }
+.month-grid tbody tr.group-row:hover > .group-cell { background: #eef3f2; }
 
 /* 日付列 */
 .col-day { width: 40px; min-width: 40px; max-width: 40px; text-align: center; vertical-align: middle; position: relative; }
