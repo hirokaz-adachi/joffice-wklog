@@ -20,6 +20,7 @@
   let cellModel = new Map();       // cellId -> { hours, editable, ids:[], multi }
   let displayRows = [];            // 描画順の行メタ
   let days = [];                   // [{ day, date, dow, weekend }]
+  let memoTarget = null;           // メモ編集ポップオーバーの対象 { key, date, id }
 
   const el = {};
   init();
@@ -36,7 +37,8 @@
     const ids = [
       "staffSelect", "monthInput", "prevMonth", "nextMonth", "saveAll", "copyPrev",
       "grandTotal", "pendingInfo", "gridWrap", "addCustomer", "addTask",
-      "addPhaseField", "addPhase", "addRowBtn", "toast", "statusNote"
+      "addPhaseField", "addPhase", "addRowBtn", "toast", "statusNote",
+      "memoPopover", "memoHeader", "memoHours", "memoText", "memoApply", "memoClear", "memoClose"
     ];
     ids.forEach((id) => { el[id] = document.getElementById(id); });
   }
@@ -65,6 +67,14 @@
     el.addTask.addEventListener("change", syncAddPicker);
     // グリッドのセル入力（イベント委譲）
     el.gridWrap.addEventListener("input", onCellInput);
+    // メモ編集ポップオーバー: ダブルクリック / Enter で開く、スクロールで閉じる
+    el.gridWrap.addEventListener("dblclick", onCellActivate);
+    el.gridWrap.addEventListener("keydown", onGridKeydown);
+    el.gridWrap.addEventListener("scroll", closeMemo);
+    el.memoApply.addEventListener("click", applyMemo);
+    el.memoClear.addEventListener("click", clearMemo);
+    el.memoClose.addEventListener("click", closeMemo);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMemo(); });
   }
 
   function stepMonth(delta) {
@@ -231,6 +241,7 @@
 
   // ---- 描画 ----
   function render() {
+    closeMemo();
     days = buildDays(month);
     displayRows = buildRows();
     cellModel = buildCellModel();
@@ -289,7 +300,8 @@
     });
     byCell.forEach((list, id) => {
       const hours = list.reduce((s, e) => s + num(e.hours), 0);
-      model.set(id, { hours: round2(hours), editable: list.length <= 1, ids: list.map((e) => e.id), multi: list.length > 1 });
+      const memo = list.length === 1 ? (list[0].memo || "") : list.map((e) => e.memo).filter(Boolean).join(" / ");
+      model.set(id, { hours: round2(hours), memo: memo, editable: list.length <= 1, ids: list.map((e) => e.id), multi: list.length > 1 });
     });
     return model;
   }
@@ -316,10 +328,12 @@
         const cm = cellModel.get(id);
         const cls = "col-day" + (d.weekend ? " weekend" : "");
         if (cm && cm.multi) {
-          return `<td class="${cls} cell-multi" title="複数明細（data-edit で編集してください）">${fmt(cm.hours)}<span class="multi-dot">複</span></td>`;
+          const mt = "複数明細（data-edit で編集してください）" + (cm.memo ? " / " + cm.memo : "");
+          return `<td class="${cls} cell-multi" title="${esc(mt)}">${fmt(cm.hours)}<span class="multi-dot">複</span></td>`;
         }
         const v = cm && cm.hours ? String(cm.hours) : "";
-        return `<td class="${cls}"><input class="cell" type="number" inputmode="decimal" step="0.25" min="0" max="24" data-row="${esc(r.key)}" data-date="${d.date}" value="${v}" aria-label="${esc(r.customerName)} ${esc(r.taskName)} ${d.date}"></td>`;
+        const hasMemo = !!(cm && cm.memo);
+        return `<td class="${cls}${hasMemo ? " has-memo" : ""}"${hasMemo ? ` title="${esc(cm.memo)}"` : ""}><input class="cell" type="number" inputmode="decimal" step="0.25" min="0" max="24" data-row="${esc(r.key)}" data-date="${d.date}" value="${v}" aria-label="${esc(r.customerName)} ${esc(r.taskName)} ${d.date}">${hasMemo ? `<span class="cell-memo-dot" aria-hidden="true"></span>` : ""}</td>`;
       }).join("");
       body += `<tr data-row="${esc(r.key)}">`
         + `<td class="col-cust" title="${esc(r.customerName)}">${esc(r.customerName)}</td>`
@@ -353,7 +367,7 @@
     let v = Number(input.value);
     if (!Number.isFinite(v) || v < 0) v = 0;
     if (v > 24) { v = 24; input.value = "24"; }
-    const cm = cellModel.get(id) || { hours: 0, editable: true, ids: [], multi: false };
+    const cm = cellModel.get(id) || { hours: 0, memo: "", editable: true, ids: [], multi: false };
     cm.hours = v;
     cellModel.set(id, cm);
     computePending(key, date, id, cm);
@@ -362,16 +376,18 @@
   }
 
   function computePending(key, date, id, cm) {
-    const original = originalCellHours(id);
-    if (round2(cm.hours) === round2(original.hours)) { pending.delete(id); return; }
+    const original = originalCell(id);
+    const sameHours = round2(cm.hours) === round2(original.hours);
+    const sameMemo = (cm.memo || "") === (original.memo || "");
+    if (sameHours && sameMemo) { pending.delete(id); return; }
     const row = displayRows.find((r) => r.key === key);
     if (cm.hours > 0) {
       if (original.ids.length === 1) {
         const base = state.entries.find((e) => e.id === original.ids[0]);
-        const entry = Object.assign({}, base, { hours: round2(cm.hours), updatedAt: new Date().toISOString() });
+        const entry = Object.assign({}, base, { hours: round2(cm.hours), memo: cm.memo || "", updatedAt: new Date().toISOString() });
         pending.set(id, { action: "upsert", entry });
       } else {
-        pending.set(id, { action: "upsert", entry: newEntry(row, date, round2(cm.hours)) });
+        pending.set(id, { action: "upsert", entry: newEntry(row, date, round2(cm.hours), cm.memo || "") });
       }
     } else {
       if (original.ids.length === 1) pending.set(id, { action: "delete", entry: { id: original.ids[0] } });
@@ -379,15 +395,18 @@
     }
   }
 
-  function originalCellHours(id) {
-    const list = [];
+  function originalCell(id) {
     let hours = 0;
+    let memo = "";
     const ids = [];
     state.entries.forEach((e) => {
       const eid = cellId(rowKey(e.customerCode || "", e.taskCode || "", e.phaseCode || ""), e.date);
-      if (eid === id && (e.staffCode || "") === staffCode) { hours += num(e.hours); ids.push(e.id); list.push(e); }
+      if (eid === id && (e.staffCode || "") === staffCode) {
+        hours += num(e.hours); ids.push(e.id);
+        if (ids.length === 1) memo = e.memo || "";
+      }
     });
-    return { hours: round2(hours), ids };
+    return { hours: round2(hours), ids, memo };
   }
 
   function refreshTotals() {
@@ -458,7 +477,7 @@
     showToast(`保存しました（更新${upserts.length}・削除${deletes.length}）`);
   }
 
-  function newEntry(row, date, hours) {
+  function newEntry(row, date, hours, memo) {
     const internal = !row.customerCode && !row.taskCode;
     return {
       id: makeId(),
@@ -471,10 +490,105 @@
       taskCode: internal ? "" : row.taskCode,
       phaseCode: internal ? "" : (row.phaseCode || ""),
       hours: hours,
-      memo: "",
+      memo: memo || "",
       updatedAt: new Date().toISOString()
     };
   }
+
+  // ---- メモ編集ポップオーバー ----
+  function onCellActivate(event) {
+    const td = event.target.closest("td");
+    if (!td) return;
+    const input = td.querySelector(".cell");
+    if (input) openMemo(input.dataset.row, input.dataset.date);
+    else if (td.classList.contains("cell-multi")) showToast("複数明細のセルは data-edit で編集してください");
+  }
+
+  function onGridKeydown(event) {
+    if (event.key !== "Enter") return;
+    const input = event.target;
+    if (!input.classList || !input.classList.contains("cell")) return;
+    event.preventDefault();
+    openMemo(input.dataset.row, input.dataset.date);
+  }
+
+  function openMemo(key, date) {
+    const id = cellId(key, date);
+    const cm = cellModel.get(id) || { hours: 0, memo: "", editable: true, ids: [], multi: false };
+    if (cm.multi) { showToast("複数明細のセルは data-edit で編集してください"); return; }
+    const row = displayRows.find((r) => r.key === key);
+    if (!row) return;
+    memoTarget = { key, date, id };
+    const phase = row.phaseName ? `　${row.phaseName}` : "";
+    el.memoHeader.textContent = `${mmdd(date)}　${row.customerName} / ${row.taskName}${phase}`;
+    el.memoHours.value = cm.hours ? String(cm.hours) : "";
+    el.memoText.value = cm.memo || "";
+    const td = cellTd(key, date);
+    el.memoPopover.hidden = false;
+    positionPopover(td);
+    el.memoText.focus();
+  }
+
+  function positionPopover(td) {
+    const pop = el.memoPopover;
+    const pw = pop.offsetWidth || 300;
+    const ph = pop.offsetHeight || 200;
+    const r = td ? td.getBoundingClientRect() : { left: 120, right: 160, top: 140, bottom: 170 };
+    let left = r.left;
+    if (left + pw > window.innerWidth - 12) left = window.innerWidth - 12 - pw;
+    if (left < 12) left = 12;
+    let top = r.bottom + 6;
+    if (top + ph > window.innerHeight - 12) top = Math.max(12, r.top - ph - 6);
+    pop.style.left = `${Math.round(left)}px`;
+    pop.style.top = `${Math.round(top)}px`;
+  }
+
+  function applyMemo() {
+    if (!memoTarget) return;
+    let h = Number(el.memoHours.value);
+    if (!Number.isFinite(h) || h < 0) h = 0;
+    if (h > 24) h = 24;
+    const memo = el.memoText.value.trim(); // 前後の空白・改行のみ除去、内部の改行は保持
+    const { key, date, id } = memoTarget;
+    const cm = cellModel.get(id) || { hours: 0, memo: "", editable: true, ids: [], multi: false };
+    cm.hours = round2(h);
+    cm.memo = memo;
+    cellModel.set(id, cm);
+    computePending(key, date, id, cm);
+    updateCellDom(key, date, cm);
+    refreshTotals();
+    refreshPendingInfo();
+    closeMemo();
+    showToast("反映しました（保存で確定）");
+  }
+
+  function clearMemo() {
+    el.memoHours.value = "";
+    el.memoText.value = "";
+    applyMemo();
+  }
+
+  function closeMemo() {
+    if (el.memoPopover) el.memoPopover.hidden = true;
+    memoTarget = null;
+  }
+
+  function updateCellDom(key, date, cm) {
+    const input = cellInput(key, date);
+    if (!input) return;
+    input.value = cm.hours ? String(cm.hours) : "";
+    const td = input.closest("td");
+    const hasMemo = !!cm.memo;
+    td.classList.toggle("has-memo", hasMemo);
+    if (hasMemo) td.setAttribute("title", cm.memo); else td.removeAttribute("title");
+    let dot = td.querySelector(".cell-memo-dot");
+    if (hasMemo && !dot) { dot = document.createElement("span"); dot.className = "cell-memo-dot"; dot.setAttribute("aria-hidden", "true"); td.appendChild(dot); }
+    if (!hasMemo && dot) dot.remove();
+  }
+
+  function cellInput(key, date) { return el.gridWrap.querySelector(`.cell[data-row="${cssEsc(key)}"][data-date="${date}"]`); }
+  function cellTd(key, date) { const i = cellInput(key, date); return i ? i.closest("td") : null; }
+  function mmdd(date) { const p = String(date).split("-"); return p.length === 3 ? `${Number(p[1])}/${Number(p[2])}` : date; }
 
   // ---- 配賦エンジン委譲（顧客担当の時系列解決） ----
   function roleAsOf(customerCode, sCode, m) {

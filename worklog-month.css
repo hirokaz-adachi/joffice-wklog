@@ -112,7 +112,7 @@ button.secondary:hover { border-color: var(--accent); background: var(--accent-s
 .month-grid tbody tr:hover .col-cust, .month-grid tbody tr:hover .col-task { background: #f6faf9; }
 
 /* 日付列 */
-.col-day { width: 40px; min-width: 40px; max-width: 40px; text-align: center; vertical-align: middle; }
+.col-day { width: 40px; min-width: 40px; max-width: 40px; text-align: center; vertical-align: middle; position: relative; }
 .col-day.weekend { background: var(--weekend); }
 .month-grid thead th.col-day.weekend { background: #e4ecea; }
 .d-num { display: block; font-size: 12px; font-weight: 700; color: var(--ink); line-height: 1.1; }
@@ -138,6 +138,14 @@ button.secondary:hover { border-color: var(--accent); background: var(--accent-s
 .cell:hover { border-color: var(--line); }
 .cell:focus { border-color: var(--accent); outline: 2px solid rgba(15,118,110,.14); background: #fff; }
 
+/* メモあり: 右上にドット。セルにカーソルでメモ編集できることを示す */
+.has-memo { cursor: help; }
+.cell-memo-dot {
+  position: absolute; top: 3px; right: 3px; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--accent); pointer-events: none;
+}
+.col-day.weekend .cell-memo-dot { background: var(--accent-dark); }
+
 .cell-multi { text-align: center; font-variant-numeric: tabular-nums; color: var(--muted); position: relative; }
 .multi-dot {
   display: inline-block; margin-left: 3px; padding: 0 4px; border-radius: 4px;
@@ -159,6 +167,30 @@ button.secondary:hover { border-color: var(--accent); background: var(--accent-s
 .lg-box { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
 .lg-weekend { background: var(--weekend); border: 1px solid var(--line); }
 .lg-zero { background: var(--zero); border: 1px solid #f0d48a; }
+
+/* メモ編集ポップオーバー */
+.memo-pop {
+  position: fixed; z-index: 80; width: 300px;
+  background: #fff; border: 1px solid var(--line-strong); border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(20, 32, 37, .18); padding: 12px;
+}
+.memo-pop[hidden] { display: none; }
+.memo-pop h3 { margin: 0 0 8px; font-size: 12.5px; color: var(--accent-dark); font-weight: 800; line-height: 1.4; }
+.memo-pop .mp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.memo-pop label { font-size: 12px; color: var(--muted); font-weight: 700; }
+.memo-pop .mp-hint { font-size: 11px; color: var(--muted); }
+.memo-pop input[type="number"] { width: 92px; min-height: 34px; border: 1px solid var(--line); border-radius: 7px; padding: 0 8px; color: var(--ink); background: #fff; }
+.memo-pop textarea { width: 100%; min-height: 70px; border: 1px solid var(--line); border-radius: 7px; padding: 8px; resize: vertical; line-height: 1.5; color: var(--ink); background: #fff; }
+.memo-pop textarea:focus, .memo-pop input:focus { border-color: var(--accent); outline: 2px solid rgba(15, 118, 110, .14); }
+.memo-pop .mp-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; }
+.memo-pop .mp-left { display: flex; gap: 8px; }
+.memo-pop button { min-height: 32px; border-radius: 7px; padding: 0 12px; font-weight: 700; font-size: 13px; cursor: pointer; }
+.memo-pop .mp-apply { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
+.memo-pop .mp-apply:hover { background: var(--accent-dark); }
+.memo-pop .mp-clear { background: #fff; color: #b91c1c; border: 1px solid var(--line); }
+.memo-pop .mp-clear:hover { border-color: #b91c1c; }
+.memo-pop .mp-close { background: #fff; color: var(--muted); border: 1px solid var(--line); }
+.memo-pop .mp-close:hover { border-color: var(--accent); }
 
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(12px);
