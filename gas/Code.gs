@@ -12,7 +12,6 @@ const CONFIG = {
     customerStaff: "customer_staff_master",
     billing: "billing_data",
     targets: "staff_target_master",
-    items: "item_master",
     settings: "app_settings"
   },
   headers: {
@@ -29,7 +28,6 @@ const CONFIG = {
     // 案2: billing に invoiceItemCode(業務コード)/transferDate(振替日) を追加（末尾に追加）
     billing: ["invoiceId", "billingMonth", "customerCode", "customer", "invoiceItem", "paymentMethod", "netAmount", "taxAmount", "grossAmount", "issuedDate", "paymentDueDate", "paymentStatus", "memo", "invoiceItemCode", "transferDate"],
     targets: ["targetMonth", "staffCode", "staff", "targetAmount"],
-    items: ["code", "name"],
     // 案2: 設定（作業→請求オフセット(イ) 等をキーバリューで保持）
     settings: ["key", "value"]
   },
@@ -42,35 +40,32 @@ const PHASES = [
   { code: "REV", name: "Review" }
 ];
 
-// 案2 業務区分の初期カタログ（受領資料 【DM】請求品目一覧.xlsx より）
+// 案2 業務区分の確定カタログ（受領資料 【DM】請求品目一覧.xlsx・2026-06-23 櫻井所長回答で確定）
 // [code, name, allocationType(service/excluded/tax), prepare%, review%]
-// 000(¥0プレースホルダ)・057(正体不明)は seed 対象外＝マッチング漏れ扱い（所長回答待ち）。
+// 0/0 の 027/028/060 は配賦対象外（工程比なし＝スタッフ配賦せず・総売上にのみ計上）、080 は税。
+// 旧 037/046/100 は廃止。スポット手続は 036 に一本化。
 const TASK_CATALOG = [
-  ["001", "労務相談",         "service",  100, 0],
-  ["002", "事務長代行",       "service",  100, 0],
-  ["003", "有給休暇管理",     "service",  70, 30],
-  ["026", "給与計算",         "service",  70, 30],
-  ["027", "マイナンバー管理", "excluded", 0,  0],
-  ["028", "スポット手続",     "service",  100, 0],
-  ["036", "スポット手続",     "service",  100, 0],
-  ["037", "スポット手続",     "service",  70, 30],
-  ["046", "就業規則",         "service",  70, 30],
-  ["056", "賞与計算",         "service",  70, 30],
-  ["060", "諸費用",           "excluded", 0,  0],
-  ["061", "給与支払報告書",   "service",  70, 30],
-  ["062", "算定基礎届",       "service",  70, 30],
-  ["063", "労働保険年度更新", "service",  70, 30],
-  ["064", "住民税変更",       "service",  70, 30],
-  ["065", "年末調整",         "service",  70, 30],
-  ["080", "消費税",           "tax",      0,  0],
-  ["100", "LAI",              "service",  25, 75]
+  ["001", "労務相談",            "service",  100, 0],
+  ["002", "事務長代行費用",      "service",  100, 0],
+  ["003", "有給休暇管理費用",    "service",  70, 30],
+  ["026", "給与計算",            "service",  70, 30],
+  ["027", "FBデータ作成費用",    "excluded", 0,  0],
+  ["028", "マイナンバー管理料金", "excluded", 0,  0],
+  ["036", "スポット手続",        "service",  100, 0],
+  ["056", "賞与計算",            "service",  70, 30],
+  ["060", "諸費用",              "excluded", 0,  0],
+  ["061", "給与支払報告書",      "service",  70, 30],
+  ["062", "算定基礎届",          "service",  70, 30],
+  ["063", "労働保険年度更新",    "service",  70, 30],
+  ["064", "住民税変更",          "service",  70, 30],
+  ["065", "年末調整",            "service",  70, 30],
+  ["080", "消費税",              "tax",      0,  0]
 ];
 
 const MASTER_DEFS = {
   staff:     { sheet: CONFIG.sheets.staff,     fields: ["code", "name"], key: "code" },
   customers: { sheet: CONFIG.sheets.customers, fields: ["code", "name"], key: "code" },
-  tasks:     { sheet: CONFIG.sheets.tasks,     fields: ["code", "name", "allocationType"], key: "code" },
-  items:     { sheet: CONFIG.sheets.items,     fields: ["code", "name"], key: "code" }
+  tasks:     { sheet: CONFIG.sheets.tasks,     fields: ["code", "name", "allocationType"], key: "code" }
 };
 
 function doGet(e) {
@@ -103,7 +98,6 @@ function applyCodeFormats_() {
   };
   fmt(CONFIG.sheets.tasks, 1);       // task_master.code
   fmt(CONFIG.sheets.taskPhases, 1);  // task_phase_master.taskCode
-  fmt(CONFIG.sheets.items, 1);       // item_master.code
   fmt(CONFIG.sheets.worklogs, CONFIG.headers.worklogs.indexOf("taskCode") + 1);
   fmt(CONFIG.sheets.billing, CONFIG.headers.billing.indexOf("invoiceItemCode") + 1);
   fmt(CONFIG.sheets.customerStaff, CONFIG.headers.customerStaff.indexOf("effectiveFrom") + 1); // 有効開始月 "YYYY-MM" をテキスト保持
@@ -278,7 +272,6 @@ function bootstrap_() {
       effectiveFrom: formatMonth_(row.effectiveFrom),
       sortOrder: Number(row.sortOrder || 0)
     })),
-    items: readObjectsSafe_(CONFIG.sheets.items),
     settings: readSettings_(),
     entries: readObjects_(CONFIG.sheets.worklogs).map(normalizeWorklog_)
   };
@@ -473,7 +466,6 @@ function ensureSheets_() {
   ensureSheet_(CONFIG.sheets.customerStaff, CONFIG.headers.customerStaff);
   ensureSheet_(CONFIG.sheets.billing, CONFIG.headers.billing);
   ensureSheet_(CONFIG.sheets.targets, CONFIG.headers.targets);
-  ensureSheet_(CONFIG.sheets.items, CONFIG.headers.items);
   ensureSheet_(CONFIG.sheets.settings, CONFIG.headers.settings);
 }
 
