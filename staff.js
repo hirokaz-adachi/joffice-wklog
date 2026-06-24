@@ -92,6 +92,13 @@
 
   function bindEvents() {
     el.form.addEventListener("submit", saveEntry);
+    // メモは textarea（Enter＝改行）。Ctrl/Cmd+Enter で追加できるよう補助。
+    el.memo.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        el.form.requestSubmit();
+      }
+    });
     el.workDate.addEventListener("change", () => {
       fillCustomerSelect(el.customer); // 作業月が変わると担当の並びが変わる
       syncTask();                      // 工程の自動補完も作業月の担当で再評価

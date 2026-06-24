@@ -101,6 +101,13 @@
 
   function bindEvents() {
     el.form.addEventListener("submit", saveEntry);
+    // メモは textarea（Enter＝改行）。Ctrl/Cmd+Enter で登録できるよう補助。
+    el.memo.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        el.form.requestSubmit();
+      }
+    });
     el.cancelEdit.addEventListener("click", () => {
       resetForm({ keepDate: true, keepStaff: true });
       renderCardDayList();
@@ -560,7 +567,7 @@
         <td>${escapeHtml(displayCustomer(entry))}</td>
         <td>${escapeHtml(entry.taskType)}${phaseBadge(entry.phaseCode)}</td>
         <td class="num">${Number(entry.hours).toFixed(2)}</td>
-        <td>${escapeHtml(entry.memo || "")}</td>
+        <td><span class="memo-cell">${escapeHtml(entry.memo || "")}</span></td>
         <td>
           <div class="row-actions">
             <button type="button" class="secondary" data-edit="${entry.id}">編集</button>

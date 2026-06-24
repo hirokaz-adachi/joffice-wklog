@@ -23,7 +23,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -116,9 +117,22 @@ select {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: var(--accent);
   outline: 3px solid rgba(15, 118, 110, 0.14);
+}
+
+textarea {
+  width: 100%;
+  min-height: 60px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: #fff;
+  resize: vertical;
+  line-height: 1.5;
 }
 
 button {
@@ -252,6 +266,7 @@ button {
   margin-top: 4px;
   color: var(--muted);
   font-size: 13px;
+  white-space: pre-wrap;
 }
 
 .today-side {

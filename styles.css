@@ -25,7 +25,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -280,9 +281,22 @@ select {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: var(--accent);
   outline: 3px solid rgba(15, 118, 110, 0.13);
+}
+
+textarea {
+  width: 100%;
+  min-height: 56px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 11px;
+  color: var(--ink);
+  background: #fff;
+  resize: vertical;
+  line-height: 1.5;
 }
 
 .wide {
@@ -504,7 +518,8 @@ tr:last-child td {
 .cd-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .cd-task { font-size: 12px; color: var(--accent-dark); font-weight: 700; }
 .cd-customer { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cd-memo { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-memo { font-size: 12px; color: var(--muted); overflow: hidden; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.memo-cell { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; max-width: 280px; }
 .cd-side { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
 .cd-hours { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 

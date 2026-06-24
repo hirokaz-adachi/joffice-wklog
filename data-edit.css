@@ -100,7 +100,8 @@
 }
 
 .edit-grid input,
-.edit-grid select {
+.edit-grid select,
+.edit-grid textarea {
   min-height: 34px;
   padding: 0 8px;
   border: 1px solid transparent;
@@ -109,15 +110,25 @@
 }
 
 .edit-grid input:hover,
-.edit-grid select:hover {
+.edit-grid select:hover,
+.edit-grid textarea:hover {
   border-color: var(--line);
 }
 
 .edit-grid input:focus,
-.edit-grid select:focus {
+.edit-grid select:focus,
+.edit-grid textarea:focus {
   border-color: var(--accent);
   background: #fff;
   outline: 3px solid rgba(15, 118, 110, 0.13);
+}
+
+.edit-grid textarea {
+  padding: 6px 8px;
+  resize: vertical;
+  line-height: 1.4;
+  vertical-align: middle;
+  white-space: pre-wrap;
 }
 
 .edit-grid input.cell-num {
@@ -139,7 +150,8 @@
 .col-customer select { width: 200px; }
 .col-task select { width: 140px; }
 .col-hours input { width: 84px; }
-.col-memo input { width: 220px; }
+.col-memo input,
+.col-memo textarea { width: 220px; }
 .col-month input { width: 130px; }
 .col-item input { width: 150px; }
 .col-pay input { width: 110px; }

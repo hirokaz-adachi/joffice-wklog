@@ -259,7 +259,7 @@
       <td class="col-code"><input type="text" data-f="taskCode" value="${esc(r.taskCode)}" placeholder="業務コード"></td>
       ${phaseTd(r)}
       <td class="col-hours num"><input class="cell-num" type="number" step="0.25" min="0" data-f="hours" value="${numAttr(r.hours)}"></td>
-      <td class="col-memo"><input type="text" data-f="memo" value="${esc(r.memo)}"></td>
+      <td class="col-memo"><textarea data-f="memo" rows="1">${esc(r.memo)}</textarea></td>
       <td class="col-ops"><button type="button" class="row-del" data-del>削除</button></td>
     </tr>`;
   }
@@ -279,7 +279,7 @@
       <td class="col-date2"><input type="date" data-f="issuedDate" value="${esc(r.issuedDate)}"></td>
       <td class="col-date2"><input type="date" data-f="paymentDueDate" value="${esc(r.paymentDueDate)}"></td>
       <td class="col-status"><input type="text" data-f="paymentStatus" value="${esc(r.paymentStatus)}"></td>
-      <td class="col-memo"><input type="text" data-f="memo" value="${esc(r.memo)}"></td>
+      <td class="col-memo"><textarea data-f="memo" rows="1">${esc(r.memo)}</textarea></td>
       <td class="col-ops"><button type="button" class="row-del" data-del>削除</button></td>
     </tr>`;
   }
