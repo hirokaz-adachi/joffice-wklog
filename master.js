@@ -3,16 +3,15 @@
 
   // 案2: 業務区分は code+name+配賦区分(allocationType)＋工程比(Prepare/Review)。
   //       顧客担当タブ(assignees)は顧客×Prepare/Review担当を編集する。
-  //       staff/customers/items は従来どおりの汎用エディタ。
+  //       staff/customers は従来どおりの汎用エディタ。
 
   const ALLOC_LABELS = { service: "役務", excluded: "対象外", tax: "消費税" };
   const GENERIC = {
     staff: { label: "スタッフ", key: "code", fields: [{ k: "code", label: "社員番号" }, { k: "name", label: "氏名" }], hint: "工数入力で使うスタッフ（社員番号・氏名）を管理します。" },
-    customers: { label: "顧客", key: "code", fields: [{ k: "code", label: "顧客番号" }, { k: "name", label: "顧客名" }], hint: "顧問先（顧客番号・顧客名）を管理します。" },
-    items: { label: "品目（請求項目）", key: "code", fields: [{ k: "code", label: "品目コード" }, { k: "name", label: "品目名" }], hint: "請求データの品目（請求項目）コード表を管理します。" }
+    customers: { label: "顧客", key: "code", fields: [{ k: "code", label: "顧客番号" }, { k: "name", label: "顧客名" }], hint: "顧問先（顧客番号・顧客名）を管理します。" }
   };
 
-  const state = { staff: [], customers: [], items: [], tasks: [], taskPhases: [], customerStaff: [], settings: {} };
+  const state = { staff: [], customers: [], tasks: [], taskPhases: [], customerStaff: [], settings: {} };
   const OFFSET_LABELS = { "0": "当月請求（オフセット0）", "1": "翌月請求（+1）", "2": "翌々月請求（+2）" };
   let active = "staff";
   let editingKey = "";
@@ -52,7 +51,6 @@
       if (st) {
         state.staff = normPair(st.staff);
         state.customers = normPair(st.customers);
-        state.items = normPair(st.items);
         state.tasks = (Array.isArray(st.tasks) ? st.tasks : []).map((t) => ({
           code: String(t.code || "").trim(), name: String(t.name || "").trim(),
           allocationType: t.allocationType || "service"
@@ -127,7 +125,7 @@
     showToast("設定を保存しました");
   }
 
-  // ---------------- 汎用（staff/customers/items） ----------------
+  // ---------------- 汎用（staff/customers） ----------------
   function renderGeneric() {
     const def = GENERIC[active];
     el.form.style.display = "";
