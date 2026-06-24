@@ -9,7 +9,7 @@
  * 売上2系統:
  *   配賦売上(allocated)   = 工数按分 ＋ フォールバック … 金額系（帰属売上・達成率）
  *   工数対応売上(backed)  = 工数按分のみ              … per-hour 系（時間単価・生産性）
- * 売上区分(allocationType): service(役務) / excluded(対象外・立替) / tax(消費税)
+ * 売上区分(allocationType): service(役務) / excluded(配賦対象外・立替や手数料等) / tax(消費税)
  *   税抜売上(総) = service + excluded（tax は含めない）。税込 = 税抜売上 + tax。
  */
 (function (global) {

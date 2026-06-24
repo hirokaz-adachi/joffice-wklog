@@ -181,7 +181,7 @@
 
   function renderKpis(firm) {
     el.netRevenue.textContent = formatCurrency(firm.grossRevenue);
-    el.revenueBreakdown.textContent = `役務 ${formatCurrency(firm.serviceRevenue)}・対象外 ${formatCurrency(firm.excludedRevenue)}`;
+    el.revenueBreakdown.textContent = `役務 ${formatCurrency(firm.serviceRevenue)}・配賦対象外 ${formatCurrency(firm.excludedRevenue)}`;
     el.taxValue.textContent = formatCurrency(firm.tax);
     el.taxIncluded.textContent = `税込 ${formatCurrency(firm.taxIncluded)}`;
     el.totalHours.textContent = `${formatNumber(firm.totalHours, 2)}h`;
@@ -252,7 +252,7 @@
 
   function typeTag(type) {
     if (type === "tax") return ` <span class="rev-tag tag-tax">税</span>`;
-    if (type === "excluded") return ` <span class="rev-tag tag-excluded">対象外</span>`;
+    if (type === "excluded") return ` <span class="rev-tag tag-excluded">配賦対象外</span>`;
     return "";
   }
 
@@ -402,7 +402,7 @@
       <div class="staff-detail-kpis">
         ${kpiBox("税抜売上(総)", formatCurrency(c.grossRevenue))}
         ${kpiBox("役務売上", formatCurrency(c.serviceRevenue))}
-        ${kpiBox("対象外(立替)", formatCurrency(c.excludedRevenue))}
+        ${kpiBox("配賦対象外", formatCurrency(c.excludedRevenue))}
         ${kpiBox("消費税", formatCurrency(c.tax))}
         ${kpiBox("顧客工数", `${formatNumber(c.hours, 2)}h`)}
         ${kpiBox("時間単価", c.rate != null ? formatCurrency(c.rate) : "—（工数未記録）", c.rate != null ? customerRateClass(c.rate) : "")}

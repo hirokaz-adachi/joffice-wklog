@@ -5,7 +5,7 @@
   //       顧客担当タブ(assignees)は顧客×Prepare/Review担当を編集する。
   //       staff/customers は従来どおりの汎用エディタ。
 
-  const ALLOC_LABELS = { service: "役務", excluded: "対象外", tax: "消費税" };
+  const ALLOC_LABELS = { service: "役務", excluded: "配賦対象外", tax: "消費税" };
   const GENERIC = {
     staff: { label: "スタッフ", key: "code", fields: [{ k: "code", label: "社員番号" }, { k: "name", label: "氏名" }], hint: "工数入力で使うスタッフ（社員番号・氏名）を管理します。" },
     customers: { label: "顧客", key: "code", fields: [{ k: "code", label: "顧客番号" }, { k: "name", label: "顧客名" }], hint: "顧問先（顧客番号・顧客名）を管理します。" }
@@ -172,7 +172,7 @@
   function renderTasks() {
     el.form.style.display = "";
     el.searchWrap.style.display = "";
-    el.hint.textContent = "業務コード＝請求の業務コード（恒等）。配賦区分（役務／対象外／消費税）と、役務の工程比（Prepare/Review・合計100）を管理します。";
+    el.hint.textContent = "業務コード＝請求の業務コード（恒等）。配賦区分（役務／配賦対象外／消費税）と、役務の工程比（Prepare/Review・合計100）を管理します。";
     const editing = Boolean(editingKey);
     el.form.className = "master-edit-form is-tasks" + (editing ? " is-editing" : "");
     el.form.innerHTML = `
@@ -180,7 +180,7 @@
       <label>名称<input type="text" id="mf_name"></label>
       <label>配賦区分<select id="mf_alloc">
         <option value="service">役務</option>
-        <option value="excluded">対象外（立替）</option>
+        <option value="excluded">配賦対象外</option>
         <option value="tax">消費税</option>
       </select></label>
       <label class="phase-input">Prepare%<input type="number" id="mf_pre" min="0" max="100" step="1" value="100"></label>
