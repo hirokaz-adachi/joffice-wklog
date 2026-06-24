@@ -29,9 +29,9 @@ if (-not $FtpHost -or -not $FtpUser -or -not $FtpPass -or -not $RemoteDir) {
 
 # 2) 配信対象（Webファイルのみ。gas/ docs/ scripts/ DEPLOY.md などは配信しない）
 $webFiles = @(
-  'index.html','worklog.html','staff.html','dashboard.html','data-edit.html','master.html','targets.html','analysis.html',
-  'styles.css','staff.css','dashboard.css','data-edit.css','master.css','targets.css','analysis.css',
-  'app.js','staff.js','dashboard.js','backend.js','config.js','data-edit.js','master.js','targets.js','analysis.js','allocation.js'
+  'index.html','worklog.html','worklog-month.html','staff.html','dashboard.html','data-edit.html','master.html','targets.html','analysis.html',
+  'styles.css','worklog-month.css','staff.css','dashboard.css','data-edit.css','master.css','targets.css','analysis.css',
+  'app.js','worklog-month.js','staff.js','dashboard.js','backend.js','config.js','data-edit.js','master.js','targets.js','analysis.js','allocation.js'
 )
 if ($Only) {
   # -File 経由だと "a,b" が1要素で渡るためカンマでも分割できるよう正規化

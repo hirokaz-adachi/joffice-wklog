@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>J-Office Insight ｜ 工数入力（月間）</title>
+  <link rel="stylesheet" href="worklog-month.css?v=20260624-1">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">J-Office Insight</p>
+      <h1>工数入力（月間）</h1>
+    </div>
+    <div class="top-actions">
+      <a class="nav-button" href="index.html">メニュー</a>
+      <a class="nav-button" href="staff.html">作業内容登録（スマホ）</a>
+      <a class="nav-button" href="data-edit.html">データ訂正・編集</a>
+    </div>
+  </header>
+
+  <section class="toolbar">
+    <div class="tool-group">
+      <label class="tool-field">
+        スタッフ
+        <select id="staffSelect"></select>
+      </label>
+      <label class="tool-field">
+        対象月
+        <span class="month-control">
+          <button id="prevMonth" type="button" class="icon-button" aria-label="前月">‹</button>
+          <input id="monthInput" type="month">
+          <button id="nextMonth" type="button" class="icon-button" aria-label="翌月">›</button>
+        </span>
+      </label>
+    </div>
+    <div class="tool-group tool-right">
+      <span class="grand">月合計 <strong id="grandTotal">0h</strong></span>
+      <span id="pendingInfo" class="pending"></span>
+      <button id="copyPrev" type="button" class="secondary">前月構成コピー</button>
+      <button id="saveAll" type="button" class="primary" disabled>保存</button>
+    </div>
+  </section>
+
+  <section class="addbar">
+    <span class="addbar-label">行を追加</span>
+    <select id="addCustomer" aria-label="追加する顧客"></select>
+    <select id="addTask" aria-label="追加する業務"></select>
+    <span id="addPhaseField" class="add-phase" hidden>
+      <select id="addPhase" aria-label="追加する工程"></select>
+    </span>
+    <button id="addRowBtn" type="button" class="secondary">＋ 追加</button>
+    <span class="addbar-hint">担当顧客はリスト上位・工程は担当役割で既定。スポットや担当外もここから追加できます。</span>
+  </section>
+
+  <p id="statusNote" class="status-note" role="status" aria-live="polite"></p>
+
+  <main class="grid-wrap" id="gridWrap"></main>
+
+  <section class="legend">
+    <span><span class="lg-box lg-weekend"></span> 土日</span>
+    <span><span class="lg-box lg-zero"></span> 平日で入力ゼロ（漏れの目安）</span>
+    <span><span class="phase-badge phase-pre">Prepare</span><span class="phase-badge phase-rev">Review</span> 担当役割から工程を自動補完</span>
+    <span><span class="multi-dot">複</span> 同一セルに複数明細あり（data-edit で編集）</span>
+  </section>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="config.js"></script>
+  <script src="backend.js?v=20260623-2"></script>
+  <script src="allocation.js?v=20260623-3"></script>
+  <script src="worklog-month.js?v=20260624-1"></script>
+</body>
+</html>
