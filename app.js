@@ -505,7 +505,7 @@
     el.dailyCount.textContent = String(entries.length);
     el.dailyCustomers.textContent = String(customerCount);
     el.staffSummary.innerHTML = summaryMarkup(groupHours(entries, "staff"), { kind: "staff" });
-    el.customerSummary.innerHTML = summaryMarkup(groupHours(entries, "customer"), { demote: "顧客指定なし", kind: "customer" });
+    el.customerSummary.innerHTML = summaryMarkup(groupHours(entries, "customer"), { kind: "customer" });
   }
 
   function syncCustomerForTask() {
@@ -575,7 +575,8 @@
       if (from && entry.date < from) return false;
       if (to && entry.date > to) return false;
       if (staff && staff !== "すべて" && (entry.staffCode || entry.staff) !== staff) return false;
-      if (customer && !entry.customer.toLowerCase().includes(customer)) return false;
+      // 顧客フィルタ: 名称は部分一致／顧客コードは完全一致（サマリークリックはコードを渡す）
+      if (customer && !((entry.customer || "").toLowerCase().includes(customer) || (entry.customerCode || "").toLowerCase() === customer)) return false;
       return true;
     });
   }
@@ -748,29 +749,24 @@
   }
 
   function summaryMarkup(groups, options = {}) {
-    const demote = options.demote;
-    const items = Object.entries(groups).sort((a, b) => {
-      if (demote) {
-        if (a[0] === demote && b[0] !== demote) return 1;
-        if (b[0] === demote && a[0] !== demote) return -1;
-      }
-      return b[1] - a[1];
+    const kind = options.kind;
+    const items = Object.values(groups).sort((a, b) => {
+      if (!a.code && b.code) return 1;   // 顧客指定なし/未割当 は末尾へ
+      if (!b.code && a.code) return -1;
+      return b.hours - a.hours;
     });
     if (items.length === 0) return `<div class="empty">入力はありません</div>`;
-    const kind = options.kind;
-    return items.map(([name, hours]) => {
+    return items.map((it) => {
       let attrs = "";
       let cls = "summary-item";
-      if (kind === "staff") {
-        const code = findMasterCodeByName("staff", name);
-        if (code) { attrs = ` data-filter-kind="staff" data-filter-value="${escapeHtml(code)}" role="button" tabindex="0" title="このスタッフで入力一覧を絞り込み"`; cls += " is-clickable"; }
-      } else if (kind === "customer" && name !== "顧客指定なし") {
-        attrs = ` data-filter-kind="customer" data-filter-value="${escapeHtml(name)}" role="button" tabindex="0" title="この顧客で入力一覧を絞り込み"`;
+      if (it.code && (kind === "staff" || kind === "customer")) {
+        const t = kind === "staff" ? "このスタッフで入力一覧を絞り込み" : "この顧客で入力一覧を絞り込み";
+        attrs = ` data-filter-kind="${kind}" data-filter-value="${escapeHtml(it.code)}" data-filter-name="${escapeHtml(it.name)}" role="button" tabindex="0" title="${t}"`;
         cls += " is-clickable";
       }
       return `<div class="${cls}"${attrs}>
-        <span class="summary-name">${escapeHtml(name)}</span>
-        <span class="summary-hours">${hours.toFixed(2)}h</span>
+        <span class="summary-name">${escapeHtml(it.name)}</span>
+        <span class="summary-hours">${it.hours.toFixed(2)}h</span>
       </div>`;
     }).join("");
   }
@@ -782,23 +778,35 @@
     if (!item) return;
     event.preventDefault();
     const kind = item.dataset.filterKind;
-    const value = item.dataset.filterValue;
+    const value = item.dataset.filterValue;        // コード（スタッフ=社員番号 / 顧客=顧客コード）
+    const label = item.dataset.filterName || value;
     if (kind === "staff") {
       if (Array.from(el.filterStaff.options).some((o) => o.value === value)) el.filterStaff.value = value;
-      showToast(`スタッフ「${item.querySelector(".summary-name").textContent}」で絞り込みました`);
+      showToast(`スタッフ「${label}」で絞り込みました`);
     } else if (kind === "customer") {
-      el.filterCustomer.value = value;
-      showToast(`顧客「${value}」で絞り込みました`);
+      el.filterCustomer.value = value;             // 顧客コードで絞り込み（名称ではなくコード基準）
+      showToast(`顧客「${label}」で絞り込みました`);
     }
     renderEntries();
   }
 
+  // 集計は必ずコード基準（同名・改名でもブレない）。表示名は現行マスタ優先。
   function groupHours(entries, key) {
-    return entries.reduce((acc, entry) => {
-      const groupKey = key === "customer" ? displayCustomer(entry) : entry[key];
-      acc[groupKey] = (acc[groupKey] || 0) + Number(entry.hours);
-      return acc;
-    }, {});
+    const map = {};
+    entries.forEach((entry) => {
+      let code;
+      let name;
+      if (key === "customer") {
+        code = entry.customerCode || "";
+        name = code ? (getMasterName("customers", code) || entry.customer || code) : "顧客指定なし";
+      } else {
+        code = entry.staffCode || "";
+        name = code ? (getMasterName("staff", code) || entry.staff || code) : (entry.staff || "—");
+      }
+      if (!map[code]) map[code] = { code: code, name: name, hours: 0 };
+      map[code].hours += Number(entry.hours || 0);
+    });
+    return map;
   }
 
   function sum(entries, key) {
