@@ -137,6 +137,10 @@
     });
 
     el.summaryToggle.addEventListener("click", toggleSummary);
+    [el.staffSummary, el.customerSummary].forEach((box) => {
+      box.addEventListener("click", onSummaryActivate);
+      box.addEventListener("keydown", onSummaryActivate);
+    });
     el.confirmCancel.addEventListener("click", closeConfirm);
     el.confirmDelete.addEventListener("click", performDelete);
     el.confirmModal.addEventListener("mousedown", (e) => { if (e.target === el.confirmModal) closeConfirm(); });
@@ -500,8 +504,8 @@
     el.dailyHours.textContent = totalHours.toFixed(2);
     el.dailyCount.textContent = String(entries.length);
     el.dailyCustomers.textContent = String(customerCount);
-    el.staffSummary.innerHTML = summaryMarkup(groupHours(entries, "staff"));
-    el.customerSummary.innerHTML = summaryMarkup(groupHours(entries, "customer"), { demote: "顧客指定なし" });
+    el.staffSummary.innerHTML = summaryMarkup(groupHours(entries, "staff"), { kind: "staff" });
+    el.customerSummary.innerHTML = summaryMarkup(groupHours(entries, "customer"), { demote: "顧客指定なし", kind: "customer" });
   }
 
   function syncCustomerForTask() {
@@ -753,12 +757,40 @@
       return b[1] - a[1];
     });
     if (items.length === 0) return `<div class="empty">入力はありません</div>`;
-    return items.map(([name, hours]) => `
-      <div class="summary-item">
+    const kind = options.kind;
+    return items.map(([name, hours]) => {
+      let attrs = "";
+      let cls = "summary-item";
+      if (kind === "staff") {
+        const code = findMasterCodeByName("staff", name);
+        if (code) { attrs = ` data-filter-kind="staff" data-filter-value="${escapeHtml(code)}" role="button" tabindex="0" title="このスタッフで入力一覧を絞り込み"`; cls += " is-clickable"; }
+      } else if (kind === "customer" && name !== "顧客指定なし") {
+        attrs = ` data-filter-kind="customer" data-filter-value="${escapeHtml(name)}" role="button" tabindex="0" title="この顧客で入力一覧を絞り込み"`;
+        cls += " is-clickable";
+      }
+      return `<div class="${cls}"${attrs}>
         <span class="summary-name">${escapeHtml(name)}</span>
         <span class="summary-hours">${hours.toFixed(2)}h</span>
-      </div>
-    `).join("");
+      </div>`;
+    }).join("");
+  }
+
+  // 日次サマリーの行クリック → 入力一覧フィルタへ反映
+  function onSummaryActivate(event) {
+    if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+    const item = event.target.closest("[data-filter-kind]");
+    if (!item) return;
+    event.preventDefault();
+    const kind = item.dataset.filterKind;
+    const value = item.dataset.filterValue;
+    if (kind === "staff") {
+      if (Array.from(el.filterStaff.options).some((o) => o.value === value)) el.filterStaff.value = value;
+      showToast(`スタッフ「${item.querySelector(".summary-name").textContent}」で絞り込みました`);
+    } else if (kind === "customer") {
+      el.filterCustomer.value = value;
+      showToast(`顧客「${value}」で絞り込みました`);
+    }
+    renderEntries();
   }
 
   function groupHours(entries, key) {

@@ -663,6 +663,10 @@ label[hidden] { display: none !important; }
 .summary-panel.is-collapsed .summary-body { display: none; }
 /* 顧客別は固定高さ＋スクロール（60社以上対応） */
 .summary-list-scroll { max-height: 240px; overflow-y: auto; }
+/* サマリー行クリックで入力一覧を絞り込み */
+.summary-item.is-clickable { cursor: pointer; padding-left: 8px; padding-right: 8px; margin: 0 -8px; border-radius: 6px; }
+.summary-item.is-clickable:hover { background: var(--accent-soft); }
+.summary-item.is-clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* 入力一覧ツールバー（新規登録＋フィルタ） */
 .list-panel .section-heading { flex-wrap: wrap; gap: 10px; }
