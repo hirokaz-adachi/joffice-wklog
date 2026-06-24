@@ -663,6 +663,8 @@ label[hidden] { display: none !important; }
 .summary-panel.is-collapsed .summary-body { display: none; }
 /* 顧客別は固定高さ＋スクロール（60社以上対応） */
 .summary-list-scroll { max-height: 240px; overflow-y: auto; }
+/* 社員番号・顧客コードの併記（日次サマリー・入力一覧） */
+.code-tag { color: var(--muted); font-weight: 700; font-size: 12px; font-variant-numeric: tabular-nums; margin-right: 2px; }
 /* サマリー行クリックで入力一覧を絞り込み */
 .summary-item.is-clickable { cursor: pointer; padding-left: 8px; padding-right: 8px; margin: 0 -8px; border-radius: 6px; }
 .summary-item.is-clickable:hover { background: var(--accent-soft); }

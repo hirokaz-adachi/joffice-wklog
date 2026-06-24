@@ -543,8 +543,8 @@
     el.entryRows.innerHTML = entries.map((entry) => `
       <tr>
         <td>${escapeHtml(formatDate(entry.date))}</td>
-        <td>${escapeHtml(entry.staff)}</td>
-        <td>${escapeHtml(displayCustomer(entry))}</td>
+        <td>${entry.staffCode ? `<span class="code-tag">${escapeHtml(entry.staffCode)}</span> ` : ""}${escapeHtml(entry.staff)}</td>
+        <td>${entry.customerCode ? `<span class="code-tag">${escapeHtml(entry.customerCode)}</span> ` : ""}${escapeHtml(displayCustomer(entry))}</td>
         <td>${escapeHtml(entry.taskType)}${phaseBadge(entry.phaseCode)}</td>
         <td class="num">${Number(entry.hours).toFixed(2)}</td>
         <td><span class="memo-cell">${escapeHtml(entry.memo || "")}</span></td>
@@ -765,7 +765,7 @@
         cls += " is-clickable";
       }
       return `<div class="${cls}"${attrs}>
-        <span class="summary-name">${escapeHtml(it.name)}</span>
+        <span class="summary-name">${it.code ? `<span class="code-tag">${escapeHtml(it.code)}</span> ` : ""}${escapeHtml(it.name)}</span>
         <span class="summary-hours">${it.hours.toFixed(2)}h</span>
       </div>`;
     }).join("");
