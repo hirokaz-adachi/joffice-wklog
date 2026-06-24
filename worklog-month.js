@@ -248,6 +248,7 @@
     el.gridWrap.innerHTML = buildGridHtml();
     refreshTotals();
     refreshPendingInfo();
+    fillAddCustomer(); // スタッフ/対象月の変更に追従して「行を追加」の顧客候補（担当グルーピング）を再構築
   }
 
   function buildRows() {
