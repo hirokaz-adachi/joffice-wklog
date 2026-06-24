@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>J-Office Insight ｜ 工数管理</title>
-  <link rel="stylesheet" href="styles.css?v=20260624-1">
+  <link rel="stylesheet" href="styles.css?v=20260624-2">
 </head>
 <body>
   <header class="topbar">
     <div>
       <p class="eyebrow">J-Office Insight</p>
-      <h1>顧客別工数入力管理画面</h1>
+      <h1>工数 照会・訂正</h1>
     </div>
     <div class="top-actions">
       <a class="nav-button" href="index.html">メニュー</a>
@@ -36,12 +36,65 @@
   </section>
 
   <main class="layout">
-    <section class="entry-panel" aria-labelledby="entryTitle">
+    <section class="summary-panel is-collapsed" id="summaryPanel" aria-labelledby="summaryTitle">
+      <button type="button" class="summary-toggle" id="summaryToggle" aria-expanded="false" aria-controls="summaryBody">
+        <span class="summary-toggle-title"><span class="chevron" aria-hidden="true">▸</span> <span id="summaryTitle">日次サマリー</span> <span id="selectedDateLabel" class="summary-date"></span></span>
+        <span class="summary-toggle-total">合計 <strong id="dailyHours">0.00</strong>h ・ <span id="dailyCount">0</span>件 ・ <span id="dailyCustomers">0</span>社</span>
+      </button>
+      <div class="summary-body" id="summaryBody">
+        <div class="split">
+          <div>
+            <h3>スタッフ別</h3>
+            <div id="staffSummary" class="summary-list"></div>
+          </div>
+          <div>
+            <h3>顧客別</h3>
+            <div id="customerSummary" class="summary-list summary-list-scroll"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="list-panel" aria-labelledby="listTitle">
       <div class="section-heading">
-        <h2 id="entryTitle">入力</h2>
-        <button id="copyPrevious" type="button" class="secondary">前日コピー</button>
+        <h2 id="listTitle">入力一覧</h2>
+        <div class="list-tools">
+          <button id="newEntry" type="button">＋ 新規登録</button>
+          <div class="filters">
+            <input id="filterFrom" type="date" aria-label="開始日">
+            <input id="filterTo" type="date" aria-label="終了日">
+            <select id="filterStaff" aria-label="スタッフで絞り込み"></select>
+            <input id="filterCustomer" type="search" placeholder="顧客検索" aria-label="顧客検索">
+          </div>
+        </div>
       </div>
 
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>日付</th>
+              <th>スタッフ</th>
+              <th>顧客</th>
+              <th>業務区分</th>
+              <th class="num">時間</th>
+              <th>メモ</th>
+              <th class="actions-col">操作</th>
+            </tr>
+          </thead>
+          <tbody id="entryRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- 工数 編集/新規 モーダル -->
+  <div class="modal-overlay" id="entryModal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="entryModalTitle">
+      <div class="modal-head">
+        <h2 id="entryModalTitle">工数の登録</h2>
+        <button type="button" class="modal-x" id="entryModalClose" aria-label="閉じる">×</button>
+      </div>
       <form id="entryForm" class="entry-form">
         <input id="editingId" type="hidden">
 
@@ -86,85 +139,28 @@
 
         <div class="form-actions wide">
           <button id="saveEntry" type="submit">登録</button>
-          <button id="cancelEdit" type="button" class="secondary" hidden>編集取消</button>
+          <button id="cancelEdit" type="button" class="secondary">キャンセル</button>
         </div>
       </form>
+    </div>
+  </div>
 
-      <div class="card-day">
-        <div class="card-day-head">
-          <h3>選択スタッフの当日入力</h3>
-          <span id="cardDayMeta" class="card-day-meta"></span>
-        </div>
-        <div id="cardDayList" class="card-day-list"></div>
+  <!-- 削除確認 モーダル -->
+  <div class="modal-overlay" id="confirmModal" hidden>
+    <div class="modal-card modal-confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <h2 id="confirmTitle">入力を削除しますか？</h2>
+      <p id="confirmText" class="confirm-text"></p>
+      <div class="form-actions">
+        <button type="button" class="danger-solid" id="confirmDelete">削除する</button>
+        <button type="button" class="secondary" id="confirmCancel">キャンセル</button>
       </div>
-    </section>
-
-    <section class="summary-panel" aria-labelledby="summaryTitle">
-      <div class="section-heading">
-        <h2 id="summaryTitle">日次サマリー <span id="selectedDateLabel" class="summary-date"></span></h2>
-      </div>
-
-      <div class="metrics">
-        <div class="metric">
-          <span>合計時間</span>
-          <strong id="dailyHours">0.00</strong>
-        </div>
-        <div class="metric">
-          <span>入力件数</span>
-          <strong id="dailyCount">0</strong>
-        </div>
-        <div class="metric">
-          <span>顧客数</span>
-          <strong id="dailyCustomers">0</strong>
-        </div>
-      </div>
-
-      <div class="split">
-        <div>
-          <h3>スタッフ別</h3>
-          <div id="staffSummary" class="summary-list"></div>
-        </div>
-        <div>
-          <h3>顧客別</h3>
-          <div id="customerSummary" class="summary-list"></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="list-panel" aria-labelledby="listTitle">
-      <div class="section-heading">
-        <h2 id="listTitle">入力一覧</h2>
-        <div class="filters">
-          <input id="filterFrom" type="date" aria-label="開始日">
-          <input id="filterTo" type="date" aria-label="終了日">
-          <select id="filterStaff" aria-label="スタッフで絞り込み"></select>
-          <input id="filterCustomer" type="search" placeholder="顧客検索" aria-label="顧客検索">
-        </div>
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>日付</th>
-              <th>スタッフ</th>
-              <th>顧客</th>
-              <th>業務区分</th>
-              <th class="num">時間</th>
-              <th>メモ</th>
-              <th class="actions-col">操作</th>
-            </tr>
-          </thead>
-          <tbody id="entryRows"></tbody>
-        </table>
-      </div>
-    </section>
-  </main>
+    </div>
+  </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="config.js"></script>
   <script src="backend.js?v=20260623-2"></script>
   <script src="allocation.js?v=20260623-3"></script>
-  <script src="app.js?v=20260624-1"></script>
+  <script src="app.js?v=20260624-2"></script>
 </body>
 </html>

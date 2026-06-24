@@ -34,7 +34,16 @@
     memo: document.getElementById("memo"),
     saveEntry: document.getElementById("saveEntry"),
     cancelEdit: document.getElementById("cancelEdit"),
-    copyPrevious: document.getElementById("copyPrevious"),
+    newEntry: document.getElementById("newEntry"),
+    entryModal: document.getElementById("entryModal"),
+    entryModalTitle: document.getElementById("entryModalTitle"),
+    entryModalClose: document.getElementById("entryModalClose"),
+    confirmModal: document.getElementById("confirmModal"),
+    confirmText: document.getElementById("confirmText"),
+    confirmDelete: document.getElementById("confirmDelete"),
+    confirmCancel: document.getElementById("confirmCancel"),
+    summaryPanel: document.getElementById("summaryPanel"),
+    summaryToggle: document.getElementById("summaryToggle"),
     exportCsv: document.getElementById("exportCsv"),
     importCsv: document.getElementById("importCsv"),
     prevMonth: document.getElementById("prevMonth"),
@@ -52,17 +61,17 @@
     filterTo: document.getElementById("filterTo"),
     filterStaff: document.getElementById("filterStaff"),
     filterCustomer: document.getElementById("filterCustomer"),
-    cardDayList: document.getElementById("cardDayList"),
-    cardDayMeta: document.getElementById("cardDayMeta"),
     toast: document.getElementById("toast")
   };
+  let selectedDate = "";   // カレンダー/日次サマリー/新規既定日付（モーダルの日付欄とは別管理）
+  let pendingDeleteId = ""; // 削除確認モーダルの対象
 
   init();
 
   async function init() {
     const today = new Date();
     const todayValue = toDateInput(today);
-    el.workDate.value = todayValue;
+    selectedDate = todayValue;
     el.filterFrom.value = todayValue;
     el.filterTo.value = todayValue;
     calendarCursor = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -108,29 +117,39 @@
         el.form.requestSubmit();
       }
     });
-    el.cancelEdit.addEventListener("click", () => {
-      resetForm({ keepDate: true, keepStaff: true });
-      renderCardDayList();
-    });
-    el.workDate.addEventListener("change", () => {
-      syncCalendarToSelectedDate();
-      refreshCustomerCombo(); // 作業月が変わると担当の並びが変わる
-      syncCustomerForTask();  // 工程の自動補完も作業月の担当で再評価
-      render();
-    });
+    el.cancelEdit.addEventListener("click", closeEntryModal);
+    el.entryModalClose.addEventListener("click", closeEntryModal);
+    el.entryModal.addEventListener("mousedown", (e) => { if (e.target === el.entryModal) closeEntryModal(); });
+    el.newEntry.addEventListener("click", () => openEntryModal(null));
+    // モーダル内で作業日（月）を変えたら担当の並び・工程自動補完を再評価
+    el.workDate.addEventListener("change", () => { refreshCustomerCombo(); syncCustomerForTask(); });
     el.prevMonth.addEventListener("click", () => shiftCalendarMonth(-1));
     el.nextMonth.addEventListener("click", () => shiftCalendarMonth(1));
-    el.copyPrevious.addEventListener("click", copyPreviousDay);
     el.exportCsv.addEventListener("click", exportCsv);
     el.importCsv.addEventListener("change", importCsv);
 
-    el.staff.addEventListener("change", () => { renderCardDayList(); refreshCustomerCombo(); syncCustomerForTask(); });
+    el.staff.addEventListener("change", () => { refreshCustomerCombo(); syncCustomerForTask(); });
     el.taskType.addEventListener("change", syncCustomerForTask);
     bindCustomerCombo();
 
     [el.filterFrom, el.filterTo, el.filterStaff, el.filterCustomer].forEach((input) => {
       input.addEventListener("input", renderEntries);
     });
+
+    el.summaryToggle.addEventListener("click", toggleSummary);
+    el.confirmCancel.addEventListener("click", closeConfirm);
+    el.confirmDelete.addEventListener("click", performDelete);
+    el.confirmModal.addEventListener("mousedown", (e) => { if (e.target === el.confirmModal) closeConfirm(); });
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      if (!el.confirmModal.hidden) closeConfirm();
+      else if (!el.entryModal.hidden) closeEntryModal();
+    });
+  }
+
+  function toggleSummary() {
+    const collapsed = el.summaryPanel.classList.toggle("is-collapsed");
+    el.summaryToggle.setAttribute("aria-expanded", String(!collapsed));
   }
 
   async function saveEntry(event) {
@@ -176,103 +195,104 @@
     }
 
     persist();
-    resetForm({ keepDate: true, keepStaff: true });
+    closeEntryModal();
     render();
-    if (!el.customer.disabled && el.customerSearch) el.customerSearch.focus();
   }
 
+  // 行の編集ボタン → モーダルを編集モードで開く
   function editEntry(id) {
     const entry = state.entries.find((item) => item.id === id);
-    if (!entry) return;
-
-    const isInternal = !entry.customerCode && !entry.taskCode;
-    el.editingId.value = entry.id;
-    el.workDate.value = entry.date;
-    el.staff.value = entry.staffCode || findMasterCodeByName("staff", entry.staff);
-    el.taskType.value = isInternal ? INTERNAL_VALUE : (normCode(entry.taskCode) || INTERNAL_VALUE);
-    el.customer.value = entry.customerCode || findMasterCodeByName("customers", entry.customer);
-    syncCustomerForTask();
-    if (el.phase && entry.phaseCode) el.phase.value = entry.phaseCode;
-    el.hours.value = entry.hours;
-    el.memo.value = entry.memo || "";
-    el.saveEntry.textContent = "更新";
-    el.cancelEdit.hidden = false;
-    syncCalendarToSelectedDate();
-    render();
-    el.hours.focus();
+    if (entry) openEntryModal(entry);
   }
 
-  async function deleteEntry(id) {
+  // entry が null なら新規（既定日付=カレンダー選択日）、あれば編集
+  function openEntryModal(entry) {
+    resetForm();
+    if (entry) {
+      const isInternal = !entry.customerCode && !entry.taskCode;
+      el.editingId.value = entry.id;
+      el.workDate.value = entry.date;
+      el.staff.value = entry.staffCode || findMasterCodeByName("staff", entry.staff);
+      el.taskType.value = isInternal ? INTERNAL_VALUE : (normCode(entry.taskCode) || INTERNAL_VALUE);
+      el.customer.value = entry.customerCode || findMasterCodeByName("customers", entry.customer);
+      syncCustomerForTask();
+      if (el.phase && entry.phaseCode) el.phase.value = entry.phaseCode;
+      el.hours.value = entry.hours;
+      el.memo.value = entry.memo || "";
+      el.saveEntry.textContent = "更新";
+      el.entryModalTitle.textContent = "工数の編集";
+    } else {
+      el.editingId.value = "";
+      el.workDate.value = selectedDate || toDateInput(new Date());
+      const fs = el.filterStaff.value;
+      el.staff.value = (fs && fs !== "すべて" && state.staff.some((s) => s.code === fs)) ? fs
+        : (state.staff[0] ? state.staff[0].code : "");
+      syncCustomerForTask();
+      el.saveEntry.textContent = "登録";
+      el.entryModalTitle.textContent = "工数の登録";
+    }
+    refreshCustomerCombo();
+    comboSync();
+    el.entryModal.hidden = false;
+    window.setTimeout(() => { try { el.hours.focus(); el.hours.select(); } catch (e) { /* noop */ } }, 0);
+  }
+
+  function closeEntryModal() {
+    el.entryModal.hidden = true;
+    resetForm();
+  }
+
+  // 削除は確認モーダル経由
+  function deleteEntry(id) {
     const entry = state.entries.find((item) => item.id === id);
     if (!entry) return;
-    const ok = window.confirm(`${entry.date} ${entry.staff} ${entry.customer} の入力を削除しますか？`);
-    if (!ok) return;
+    pendingDeleteId = id;
+    el.confirmText.textContent = `${formatDate(entry.date)} ／ ${entry.staff} ／ ${displayCustomer(entry)} ／ ${entry.taskType}（${Number(entry.hours).toFixed(2)}h）を削除します。`;
+    el.confirmModal.hidden = false;
+    el.confirmDelete.focus();
+  }
 
+  function closeConfirm() {
+    el.confirmModal.hidden = true;
+    pendingDeleteId = "";
+  }
+
+  async function performDelete() {
+    const id = pendingDeleteId;
+    if (!id) return;
+    el.confirmDelete.disabled = true;
     try {
       await window.WorklogBackend.deleteEntry(id);
     } catch (error) {
+      el.confirmDelete.disabled = false;
       showToast(error.message);
       return;
     }
+    el.confirmDelete.disabled = false;
     state.entries = state.entries.filter((item) => item.id !== id);
     persist();
-    resetForm({ keepDate: true, keepStaff: true });
+    closeConfirm();
     render();
     showToast("入力を削除しました");
   }
 
   function resetForm(options = {}) {
     const previousDate = el.workDate.value;
-    const previousStaff = el.staff.value;
     el.form.reset();
     el.editingId.value = "";
-    el.workDate.value = options.keepDate ? previousDate : toDateInput(new Date());
-    if (options.keepStaff && previousStaff) el.staff.value = previousStaff;
+    el.workDate.value = options.keepDate ? previousDate : (selectedDate || toDateInput(new Date()));
     el.hours.value = "1";
-    el.saveEntry.textContent = "登録";
-    el.cancelEdit.hidden = true;
     syncCustomerForTask();
-  }
-
-  async function copyPreviousDay() {
-    const targetDate = el.workDate.value;
-    if (!targetDate) return;
-    const previousDate = shiftDate(targetDate, -1);
-    const source = state.entries.filter((entry) => entry.date === previousDate);
-    if (source.length === 0) {
-      showToast("前日の入力がありません");
-      return;
-    }
-
-    const copies = source.map((entry) => ({
-      ...entry,
-      id: makeId(),
-      date: targetDate,
-      updatedAt: new Date().toISOString()
-    }));
-    try {
-      await window.WorklogBackend.saveEntries(copies);
-    } catch (error) {
-      showToast(error.message);
-      return;
-    }
-    state.entries.push(...copies);
-    persist();
-    render();
-    showToast(`${source.length}件をコピーしました`);
   }
 
   function render() {
     renderMasters();
-    syncCustomerForTask();
     renderCalendar();
     renderDailySummary();
     renderEntries();
-    renderCardDayList();
   }
 
   function renderCalendar() {
-    const selectedDate = el.workDate.value;
     const todayValue = toDateInput(new Date());
     const year = calendarCursor.getFullYear();
     const month = calendarCursor.getMonth();
@@ -313,7 +333,7 @@
   }
 
   function selectDate(value) {
-    el.workDate.value = value;
+    selectedDate = value;
     el.filterFrom.value = value;
     el.filterTo.value = value;
     syncCalendarToSelectedDate();
@@ -326,8 +346,8 @@
   }
 
   function syncCalendarToSelectedDate() {
-    if (!el.workDate.value) return;
-    const [year, month] = el.workDate.value.split("-").map(Number);
+    if (!selectedDate) return;
+    const [year, month] = selectedDate.split("-").map(Number);
     calendarCursor = new Date(year, month - 1, 1);
   }
 
@@ -471,7 +491,7 @@
   }
 
   function renderDailySummary() {
-    const date = el.workDate.value;
+    const date = selectedDate;
     const entries = state.entries.filter((entry) => entry.date === date);
     const totalHours = sum(entries, "hours");
     const customerCount = new Set(entries.map((entry) => entry.customer).filter(Boolean)).size;
@@ -503,50 +523,6 @@
         }
       }
     }
-  }
-
-  function renderCardDayList() {
-    const date = el.workDate.value;
-    const staffCode = el.staff.value;
-    const editingId = el.editingId.value;
-    const entries = state.entries
-      .filter((entry) => entry.date === date && (entry.staffCode || entry.staff) === staffCode)
-      .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
-    const total = sum(entries, "hours");
-    el.cardDayMeta.textContent = entries.length ? `${entries.length}件 / ${total.toFixed(2)}h` : "";
-
-    if (!staffCode) {
-      el.cardDayList.innerHTML = `<div class="empty">スタッフを選択してください</div>`;
-      return;
-    }
-    if (entries.length === 0) {
-      el.cardDayList.innerHTML = `<div class="empty">当日の入力はありません</div>`;
-      return;
-    }
-
-    el.cardDayList.innerHTML = entries.map((entry) => `
-      <div class="card-day-row${entry.id === editingId ? " is-editing" : ""}" data-id="${escapeHtml(entry.id)}">
-        <div class="cd-main">
-          <span class="cd-task">${escapeHtml(entry.taskType)}${phaseBadge(entry.phaseCode)}</span>
-          <span class="cd-customer">${escapeHtml(displayCustomer(entry))}</span>
-          ${entry.memo ? `<span class="cd-memo">${escapeHtml(entry.memo)}</span>` : ""}
-        </div>
-        <div class="cd-side">
-          <span class="cd-hours">${Number(entry.hours).toFixed(2)}h</span>
-          <div class="row-actions">
-            <button type="button" class="secondary" data-edit="${escapeHtml(entry.id)}">編集</button>
-            <button type="button" class="danger" data-delete="${escapeHtml(entry.id)}">削除</button>
-          </div>
-        </div>
-      </div>
-    `).join("");
-
-    el.cardDayList.querySelectorAll("[data-edit]").forEach((button) => {
-      button.addEventListener("click", () => editEntry(button.dataset.edit));
-    });
-    el.cardDayList.querySelectorAll("[data-delete]").forEach((button) => {
-      button.addEventListener("click", () => deleteEntry(button.dataset.delete));
-    });
   }
 
   function renderEntries() {
