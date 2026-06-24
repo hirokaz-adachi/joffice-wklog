@@ -542,7 +542,9 @@
     const td = cellTd(key, date);
     el.memoPopover.hidden = false;
     positionPopover(td);
-    if (multi) el.memoMobile.focus(); else el.memoText.focus();
+    // 初期フォーカスは時間欄（全選択で即上書き可）。複数明細はスマホ誘導ボタンへ。
+    if (multi) { el.memoMobile.focus(); }
+    else { el.memoHours.focus(); el.memoHours.select(); }
   }
 
   // 複数明細セル → スマホ用作業登録画面を当該日付・スタッフ・顧客/業務/工程プリセットで開く（戻る導線つき）
