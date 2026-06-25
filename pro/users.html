@@ -80,7 +80,7 @@
     </section>
   </main>
 
-  <script src="backend.js?v=20260625-5"></script>
+  <script src="backend.js?v=20260625-6"></script>
   <script>
     var $ = function (id) { return document.getElementById(id); };
     var users = [], staff = [], editingId = 0;
@@ -183,7 +183,6 @@
     joMe().then(async function (u) {
       if (u.mustChangePassword) { location.replace('change-password.html'); return; }
       if (u.role !== 'admin') { location.replace('index.html'); return; }
-      $('whoami').textContent = (u.displayName || u.loginId) + '（' + u.role + '）';
       var boot = await joBootstrap();
       staff = boot.staff || [];
       $('f_staffCode').innerHTML = '<option value="">（紐付けなし）</option>' +

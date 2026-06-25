@@ -36,11 +36,13 @@ async function joCall(action, params = {}, method = 'GET') {
 async function joLogin(loginId, password) {
   const r = await joCall('login', { loginId, password }, 'POST');
   JO_CSRF = r.csrf;
+  window.JO_USER = r.user;
   return r.user;
 }
 async function joMe() {
   const r = await joCall('me');
   JO_CSRF = r.csrf;
+  window.JO_USER = r.user;
   return r.user;
 }
 async function joLogout() {
@@ -119,3 +121,32 @@ window.WorklogBackend = {
   deleteCustomerStaff: joDeleteCustomerStaff,
   saveSetting: joSaveSetting,
 };
+
+// 全画面共通：ヘッダにログインユーザー（ID・名称・役割）を表示する。
+(function () {
+  function badge(u) {
+    return 'ログイン中: ' + u.loginId + (u.displayName ? ' ' + u.displayName : '') + '（' + u.role + '）';
+  }
+  function inject() {
+    var bar = document.querySelector('.top-actions');
+    var header = bar || document.querySelector('.dashboard-header') || document.querySelector('header');
+    if (!header) return;
+    joMe().then(function (u) {
+      var el = document.getElementById('whoami');
+      if (!el) {
+        el = document.createElement('span');
+        el.id = 'whoami';
+        if (bar) {
+          el.style.cssText = 'font-size:12px;color:#6b7280;white-space:nowrap;align-self:center;';
+          bar.insertBefore(el, bar.firstChild);
+        } else {
+          el.style.cssText = 'display:block;font-size:12px;color:#6b7280;margin-top:4px;';
+          header.appendChild(el);
+        }
+      }
+      el.textContent = badge(u);
+    }).catch(function () { /* 未ログインはガード側で処理 */ });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', inject);
+  else inject();
+})();

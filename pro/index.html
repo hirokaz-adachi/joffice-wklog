@@ -75,15 +75,14 @@
     </section>
   </main>
 
-  <script src="backend.js?v=20260625-4"></script>
+  <script src="backend.js?v=20260625-6"></script>
   <script>
     document.getElementById('logout').addEventListener('click', function () {
       joLogout().then(function () { location.replace('login.html'); }).catch(function () { location.replace('login.html'); });
     });
     joMe().then(function (u) {
       if (u.mustChangePassword) { location.replace('change-password.html'); return; }
-      var w = document.getElementById('whoami');
-      if (w) w.textContent = (u.displayName || u.loginId) + '（' + u.role + '）';
+      // ログインユーザー表示は backend.js のヘッダ・インジェクタが担当
       // 役割に応じて表示カードを絞る（data-roles 指定のカードのみ対象）
       document.querySelectorAll('.card[data-roles]').forEach(function (c) {
         var roles = c.getAttribute('data-roles').split(',');

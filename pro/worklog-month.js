@@ -133,6 +133,9 @@
 
   function applyRemote(remote) {
     state.staff = normMaster(remote.staff, "S");
+    if (window.JO_USER && window.JO_USER.role === "staff" && window.JO_USER.staffCode) {
+      state.staff = state.staff.filter((s) => s.code === window.JO_USER.staffCode);
+    }
     state.customers = normMaster(remote.customers, "C");
     state.taskTypes = Array.isArray(remote.taskTypes) ? remote.taskTypes : [];
     state.tasks = Array.isArray(remote.tasks)
@@ -170,6 +173,7 @@
   // ---- セレクト初期化 ----
   function fillStaffSelect() {
     el.staffSelect.innerHTML = state.staff.map((s) => `<option value="${esc(s.code)}">${esc(s.code)} ${esc(s.name)}</option>`).join("");
+    if (window.JO_USER && window.JO_USER.role === "staff") el.staffSelect.disabled = true;
   }
   function fillAddTask() {
     const svc = serviceTasks().map((t) => ({ code: normCode(t.code), name: t.name }))

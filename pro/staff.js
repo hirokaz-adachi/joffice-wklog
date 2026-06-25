@@ -101,6 +101,9 @@
       const staff = normalizeMaster(remoteState.staff, "S");
       const customers = normalizeMaster(remoteState.customers, "C");
       state.staff = staff;
+      if (window.JO_USER && window.JO_USER.role === "staff" && window.JO_USER.staffCode) {
+        state.staff = staff.filter((s) => s.code === window.JO_USER.staffCode);
+      }
       state.customers = customers;
       state.taskTypes = Array.isArray(remoteState.taskTypes) && remoteState.taskTypes.length ? remoteState.taskTypes : initialState.taskTypes;
       state.tasks = Array.isArray(remoteState.tasks)
@@ -114,6 +117,7 @@
         : [];
       state.entries = normalizeEntries(remoteState.entries, staff, customers);
       fillMasterSelect(el.staff, state.staff);
+      if (window.JO_USER && window.JO_USER.role === "staff") el.staff.disabled = true;
       fillTaskSelect(el.taskType);
       const savedStaff = localStorage.getItem(staffKey);
       if (savedStaff && state.staff.some((item) => item.code === savedStaff)) el.staff.value = savedStaff;
