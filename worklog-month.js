@@ -345,7 +345,9 @@
       const isCustStart = custKey !== lastCustomer;
       if (isCustStart) { band ^= 1; lastCustomer = custKey; }
       const rowCls = ((isCustStart ? "cust-start" : "") + (band ? " band" : "")).trim();
-      const custLabel = isCustStart ? esc(r.customerName) : "";
+      // 顧客コードを行頭に前置（名前が折り返し/省略されてもコードは必ず先頭で見える）。社内/その他はコード空。
+      const custFull = (r.customerCode ? r.customerCode + " " : "") + r.customerName;
+      const custLabel = isCustStart ? esc(custFull) : "";
       const badge = r.phaseName ? ` <span class="phase-badge phase-${(r.phaseCode || "").toLowerCase()}">${esc(r.phaseName)}</span>` : "";
       const cells = days.map((d) => {
         const id = cellId(r.key, d.date);
@@ -361,7 +363,7 @@
         return `<td class="${cls}${hasMemo ? " has-memo" : ""}" data-row="${esc(r.key)}" data-date="${d.date}" tabindex="0" role="button" aria-label="${aria}"${hasMemo ? ` title="${esc(cm.memo)}"` : ""}><span class="cell-val">${v}</span>${hasMemo ? `<span class="cell-memo-dot" aria-hidden="true"></span>` : ""}</td>`;
       }).join("");
       body += `<tr data-row="${esc(r.key)}"${rowCls ? ` class="${rowCls}"` : ""}>`
-        + `<td class="col-cust" title="${esc(r.customerName)}">${custLabel}</td>`
+        + `<td class="col-cust" title="${esc(custFull)}"><span class="ml-cust">${custLabel}</span></td>`
         + `<td class="col-task" title="${esc(r.taskName)}">${esc(r.taskName)}${badge}</td>`
         + cells
         + `<td class="col-total" data-rowtotal="${esc(r.key)}">0</td></tr>`;

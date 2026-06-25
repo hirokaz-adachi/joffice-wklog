@@ -60,6 +60,9 @@
 #masterTable .col-key { width: 200px; color: var(--muted); font-weight: 800; }
 #masterTable .ops { width: 150px; text-align: right; }
 
+/* 行ホバーのハイライト（工数入力・月間と同様）。操作ボタンは自前の白背景＋個別ホバーを維持 */
+#masterTable tbody tr:hover > td { background: var(--accent-soft); }
+
 #masterTable .row-edit {
   min-height: 30px;
   padding: 0 10px;
