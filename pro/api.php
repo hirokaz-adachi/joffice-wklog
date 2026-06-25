@@ -10,10 +10,10 @@ require_once __DIR__ . '/lib/handlers.php';
 require_once __DIR__ . '/lib/mutations.php';
 require_once __DIR__ . '/lib/users.php';
 
-// staff ロールは自分の工数のみ操作可
+// 管理者以外（manager/staff）は自分の工数のみ操作可
 function jo_assert_entry_owner(array $user, $entry): void
 {
-    if (($user['role'] ?? '') === 'staff') {
+    if (($user['role'] ?? '') !== 'admin') {
         $sc = is_array($entry) ? (string) ($entry['staffCode'] ?? '') : '';
         if ($sc !== (string) ($user['staffCode'] ?? '')) {
             jo_error('forbidden_other_staff', 403);
@@ -98,7 +98,7 @@ try {
             $user = jo_require_login();
             jo_check_csrf($in);
             $id = (string) ($in['id'] ?? '');
-            if (($user['role'] ?? '') === 'staff') {
+            if (($user['role'] ?? '') !== 'admin') {
                 $row = jo_rows('SELECT staffCode FROM jo_worklogs WHERE id = ?', [$id]);
                 if ($row && (string) $row[0]['staffCode'] !== (string) ($user['staffCode'] ?? '')) {
                     jo_error('forbidden_other_staff', 403);

@@ -122,6 +122,7 @@
     fillStaffSelect();
     const saved = (() => { try { return localStorage.getItem("sharoshiWorklogMvp.selectedStaff"); } catch (e) { return ""; } })();
     if (paramStaff && state.staff.some((s) => s.code === paramStaff)) staffCode = paramStaff;
+    else if (window.JO_USER && window.JO_USER.staffCode && state.staff.some((s) => s.code === window.JO_USER.staffCode)) staffCode = window.JO_USER.staffCode;
     else if (saved && state.staff.some((s) => s.code === saved)) staffCode = saved;
     else if (!staffCode && state.staff.length) staffCode = state.staff[0].code;
     el.staffSelect.value = staffCode;
@@ -133,7 +134,7 @@
 
   function applyRemote(remote) {
     state.staff = normMaster(remote.staff, "S");
-    if (window.JO_USER && window.JO_USER.role === "staff" && window.JO_USER.staffCode) {
+    if (window.JO_USER && window.JO_USER.role !== "admin" && window.JO_USER.staffCode) {
       state.staff = state.staff.filter((s) => s.code === window.JO_USER.staffCode);
     }
     state.customers = normMaster(remote.customers, "C");
@@ -173,7 +174,7 @@
   // ---- セレクト初期化 ----
   function fillStaffSelect() {
     el.staffSelect.innerHTML = state.staff.map((s) => `<option value="${esc(s.code)}">${esc(s.code)} ${esc(s.name)}</option>`).join("");
-    if (window.JO_USER && window.JO_USER.role === "staff") el.staffSelect.disabled = true;
+    if (window.JO_USER && window.JO_USER.role !== "admin" && window.JO_USER.staffCode) el.staffSelect.disabled = true;
   }
   function fillAddTask() {
     const svc = serviceTasks().map((t) => ({ code: normCode(t.code), name: t.name }))
