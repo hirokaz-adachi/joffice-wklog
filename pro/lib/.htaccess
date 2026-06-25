@@ -1,0 +1,11 @@
+# pro/lib/ 配下（PHP内部ファイル）へのHTTP直アクセスを禁止する。
+# PHPからの include は filesystem 経由なので影響しない。
+<IfModule mod_authz_core.c>
+    # Apache 2.4
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    # Apache 2.2
+    Order allow,deny
+    Deny from all
+</IfModule>

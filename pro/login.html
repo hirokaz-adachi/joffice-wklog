@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J-Office (pro) ログイン</title>
+  <style>
+    :root { --fg:#1f2937; --muted:#6b7280; --line:#e5e7eb; --accent:#2563eb; --bg:#f8fafc; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+           color:var(--fg); background:var(--bg); }
+    .wrap { max-width: 420px; margin: 8vh auto; padding: 0 16px; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:24px; }
+    h1 { font-size:18px; margin:0 0 4px; }
+    .sub { color:var(--muted); font-size:12px; margin:0 0 20px; }
+    label { display:block; font-size:13px; margin:14px 0 4px; }
+    input { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:15px; }
+    button { margin-top:18px; width:100%; padding:11px; border:0; border-radius:8px; background:var(--accent);
+             color:#fff; font-size:15px; cursor:pointer; }
+    button.secondary { background:#fff; color:var(--fg); border:1px solid var(--line); }
+    .row { display:flex; gap:8px; }
+    .row button { margin-top:10px; }
+    .msg { margin-top:14px; font-size:13px; white-space:pre-wrap; padding:10px 12px; border-radius:8px; display:none; }
+    .msg.err { background:#fef2f2; color:#b91c1c; display:block; }
+    .msg.ok  { background:#f0fdf4; color:#15803d; display:block; }
+    .diag { margin-top:18px; font-size:11px; color:var(--muted); border-top:1px dashed var(--line); padding-top:12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>J-Office Insight / Invoice</h1>
+      <p class="sub">本番相当（pro・PHP＋MySQL）ログイン</p>
+
+      <div id="loginBox">
+        <label for="loginId">社員番号 / ログインID</label>
+        <input id="loginId" autocomplete="username" autofocus>
+        <label for="password">パスワード</label>
+        <input id="password" type="password" autocomplete="current-password">
+        <button id="btnLogin">ログイン</button>
+      </div>
+
+      <div id="userBox" style="display:none;">
+        <p class="sub" id="userInfo"></p>
+        <button class="secondary" id="btnLogout">ログアウト</button>
+      </div>
+
+      <div id="msg" class="msg"></div>
+
+      <div class="diag">
+        <div class="row">
+          <button class="secondary" id="btnPing">疎通確認 (ping)</button>
+          <button class="secondary" id="btnMe">セッション確認 (me)</button>
+        </div>
+        <div id="diagOut" style="margin-top:8px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="backend.js?v=20260625-1"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const msg = (text, ok) => { const m = $('msg'); m.textContent = text; m.className = 'msg ' + (ok ? 'ok' : 'err'); };
+
+    function showUser(u) {
+      if (u) {
+        $('loginBox').style.display = 'none';
+        $('userBox').style.display = 'block';
+        $('userInfo').textContent = `ログイン中: ${u.displayName || u.loginId}（${u.role}）`;
+      } else {
+        $('loginBox').style.display = 'block';
+        $('userBox').style.display = 'none';
+      }
+    }
+
+    $('btnLogin').onclick = async () => {
+      try {
+        const u = await joLogin($('loginId').value.trim(), $('password').value);
+        msg('ログインしました。', true);
+        showUser(u);
+      } catch (e) {
+        msg('ログイン失敗: ' + e.message, false);
+      }
+    };
+    $('btnLogout').onclick = async () => {
+      try { await joLogout(); msg('ログアウトしました。', true); showUser(null); }
+      catch (e) { msg('ログアウト失敗: ' + e.message, false); }
+    };
+    $('btnPing').onclick = async () => {
+      try { const r = await joPing(); $('diagOut').textContent = `PHP ${r.php} / DB ${r.db ? 'OK' : 'NG'} / env ${r.env}`; }
+      catch (e) { $('diagOut').textContent = 'ping 失敗: ' + e.message; }
+    };
+    $('btnMe').onclick = async () => {
+      try { const u = await joMe(); $('diagOut').textContent = 'セッション有効: ' + (u.displayName || u.loginId); showUser(u); }
+      catch (e) { $('diagOut').textContent = '未ログイン (' + e.message + ')'; }
+    };
+
+    // 初期表示：既存セッションがあればユーザー表示
+    joMe().then(showUser).catch(() => showUser(null));
+  </script>
+</body>
+</html>

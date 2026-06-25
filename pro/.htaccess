@@ -1,0 +1,22 @@
+# /joffice-pro/ ルート
+DirectoryIndex login.html index.html
+Options -Indexes
+AddDefaultCharset UTF-8
+
+# 開発中はディレクトリ全体を BASIC 認証で覆う運用（デモ /joffice/ と同様）。
+# お名前.com コントロールパネルで設定するか、下記を有効化（.htpasswd は公開フォルダ外推奨）。
+# AuthType Basic
+# AuthName "joffice-pro (dev)"
+# AuthUserFile /home/xxxx/.htpasswd_joffice_pro
+# Require valid-user
+
+# 設定・内部ファイルの保険（lib/ は lib/.htaccess でも拒否済み）
+<FilesMatch "\.(sql|md|sample\.php)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
