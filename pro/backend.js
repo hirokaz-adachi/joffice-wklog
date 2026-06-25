@@ -51,3 +51,9 @@ async function joLogout() {
 async function joPing() {
   return joCall('ping');
 }
+
+// 参照系：bootstrap（マスタ＋工数）。要ログイン。data を返す。
+async function joBootstrap() {
+  const r = await joCall('bootstrap');
+  return r.data;
+}

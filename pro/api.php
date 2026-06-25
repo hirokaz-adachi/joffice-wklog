@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/lib/helpers.php';
 require_once __DIR__ . '/lib/auth.php';
+require_once __DIR__ . '/lib/handlers.php';
 
 jo_session_start();
 
@@ -49,7 +50,13 @@ try {
             jo_json(['ok' => true, 'user' => $user, 'csrf' => jo_csrf_token()]);
             break;
 
-        // --- 以降、bootstrap / dashboard / save* などを順次追加 ---
+        // --- 参照系 ---
+        case 'bootstrap':
+            $user = jo_require_login();
+            jo_json(['ok' => true, 'data' => jo_handle_bootstrap($user)]);
+            break;
+
+        // --- 以降、dashboard / save* などを順次追加 ---
 
         default:
             jo_error('unknown_action: ' . $action, 404);
