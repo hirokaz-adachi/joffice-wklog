@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>J-Office Insight ｜ 工数入力（月間）</title>
+  <link rel="stylesheet" href="worklog-month.css?v=20260625-1">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">J-Office Insight</p>
+      <h1>工数入力（月間）</h1>
+    </div>
+    <div class="top-actions">
+      <a class="nav-button nav-home" href="index.html">メニュー</a>
+      <a class="nav-button" href="staff.html">作業内容登録（スマホ）</a>
+    </div>
+  </header>
+
+  <section class="toolbar">
+    <div class="tool-group">
+      <label class="tool-field">
+        スタッフ
+        <select id="staffSelect"></select>
+      </label>
+      <label class="tool-field">
+        対象月
+        <span class="month-control">
+          <button id="prevMonth" type="button" class="icon-button" aria-label="前月">‹</button>
+          <input id="monthInput" type="month">
+          <button id="nextMonth" type="button" class="icon-button" aria-label="翌月">›</button>
+        </span>
+      </label>
+    </div>
+    <div class="tool-group tool-right">
+      <span class="grand">月合計 <strong id="grandTotal">0h</strong></span>
+      <span id="pendingInfo" class="pending"></span>
+      <button id="copyPrev" type="button" class="secondary">前月構成コピー</button>
+      <button id="saveAll" type="button" class="primary" disabled>保存</button>
+    </div>
+  </section>
+
+  <section class="addbar">
+    <span class="addbar-label">行を追加</span>
+    <select id="addCustomer" aria-label="追加する顧客"></select>
+    <select id="addTask" aria-label="追加する業務"></select>
+    <span id="addPhaseField" class="add-phase" hidden>
+      <select id="addPhase" aria-label="追加する工程"></select>
+    </span>
+    <button id="addRowBtn" type="button" class="secondary">＋ 追加</button>
+    <span class="addbar-hint">担当顧客はリスト上位・工程は担当役割で既定。スポットや担当外もここから追加できます。</span>
+  </section>
+
+  <p id="statusNote" class="status-note" role="status" aria-live="polite"></p>
+
+  <main class="grid-wrap" id="gridWrap"></main>
+
+  <section class="legend">
+    <span><span class="lg-box lg-weekend"></span> 土日</span>
+    <span><span class="lg-box lg-zero"></span> 平日で入力ゼロ（漏れの目安）</span>
+    <span><span class="phase-badge phase-pre">Prepare</span><span class="phase-badge phase-rev">Review</span> 担当役割から工程を自動補完</span>
+    <span><span class="multi-dot">複</span> 同一セルに複数明細あり</span>
+  </section>
+
+  <div id="memoPopover" class="memo-pop" hidden role="dialog" aria-label="工数・メモ編集">
+    <h3 id="memoHeader"></h3>
+    <div class="mp-row">
+      <label for="memoHours">時間</label>
+      <input id="memoHours" type="number" inputmode="decimal" step="0.25" min="0" max="24">
+      <span id="memoHint" class="mp-hint">時間を0にすると削除</span>
+    </div>
+    <textarea id="memoText" rows="3" maxlength="200" placeholder="メモ（改行可）"></textarea>
+    <p id="memoMulti" class="mp-multi" hidden>このセルは複数明細（同一日・顧客・業務・工程に2件以上）です。修正はスマホ用画面で行ってください。</p>
+    <div class="mp-actions">
+      <div class="mp-left">
+        <button id="memoApply" type="button" class="mp-apply">適用</button>
+        <button id="memoClear" type="button" class="mp-clear">クリア</button>
+        <button id="memoMobile" type="button" class="mp-mobile" hidden>スマホ用画面で編集</button>
+      </div>
+      <button id="memoClose" type="button" class="mp-close">閉じる</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="backend.js?v=20260625-4"></script>
+  <script src="allocation.js?v=20260625-1"></script>
+  <script>
+    // 認証ガード：未ログインは login.html へ。OKなら CSRF 確保後に画面JSを読み込む。
+    joMe().then(function () {
+      var s = document.createElement('script');
+      s.src = 'worklog-month.js?v=20260625-1';
+      document.body.appendChild(s);
+    }).catch(function () { location.replace('login.html'); });
+  </script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>J-Office (pro) ｜ メニュー</title>
+  <style>
+    :root { --fg:#1f2937; --muted:#6b7280; --line:#e5e7eb; --accent:#0f766e; --bg:#f8fafc; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; color:var(--fg); background:var(--bg); }
+    .topbar { display:flex; justify-content:space-between; align-items:flex-start; padding:20px 28px; border-bottom:1px solid var(--line); background:#fff; }
+    .eyebrow { color:var(--muted); font-size:12px; margin:0; }
+    h1 { font-size:20px; margin:2px 0 0; }
+    .top-actions { display:flex; gap:10px; align-items:center; }
+    .whoami { color:var(--muted); font-size:13px; }
+    .btn { padding:8px 14px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--fg); font-size:13px; cursor:pointer; text-decoration:none; }
+    main { max-width:1000px; margin:24px auto; padding:0 20px; }
+    .group { margin-bottom:28px; }
+    .group h2 { font-size:14px; color:var(--muted); margin:0 0 10px; font-weight:600; }
+    .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:14px; }
+    .card { display:block; padding:18px; border:1px solid var(--line); border-radius:12px; background:#fff; text-decoration:none; color:var(--fg); transition:box-shadow .15s, transform .15s; }
+    .card:hover { box-shadow:0 4px 14px rgba(0,0,0,.06); transform:translateY(-1px); }
+    .card .title { font-size:15px; font-weight:600; }
+    .card .desc { font-size:12px; color:var(--muted); margin-top:6px; line-height:1.5; }
+    .card .badge { display:inline-block; font-size:11px; color:#fff; background:var(--accent); border-radius:999px; padding:1px 8px; margin-left:6px; vertical-align:middle; }
+    .card.pending { opacity:.55; cursor:default; pointer-events:none; }
+    .card.pending .badge { background:#9ca3af; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">J-Office (pro)・本番相当（PHP＋MySQL）</p>
+      <h1>メニュー</h1>
+    </div>
+    <div class="top-actions">
+      <span id="whoami" class="whoami"></span>
+      <button id="logout" class="btn" type="button">ログアウト</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="group">
+      <h2>日常の入力</h2>
+      <div class="cards">
+        <a class="card" href="worklog-month.html"><span class="title">工数入力（月間）</span><div class="desc">スタッフ1名×1か月のマトリクス入力（PC）。</div></a>
+        <a class="card" href="staff.html"><span class="title">作業内容登録</span><div class="desc">現場で打つ簡易入力（スマホ）。</div></a>
+      </div>
+    </section>
+
+    <section class="group">
+      <h2>分析・可視化</h2>
+      <div class="cards">
+        <span class="card pending"><span class="title">経営ダッシュボード<span class="badge">準備中</span></span><div class="desc">月次KPI・生産性分析（バッチ2で移行）。</div></span>
+        <span class="card pending"><span class="title">詳細分析<span class="badge">準備中</span></span><div class="desc">期間×軸の多角分析（バッチ2で移行）。</div></span>
+      </div>
+    </section>
+
+    <section class="group">
+      <h2>管理・設定</h2>
+      <div class="cards">
+        <a class="card" href="master.html"><span class="title">マスタメンテナンス</span><div class="desc">スタッフ／顧客／業務区分・工程／顧客担当／設定。</div></a>
+        <span class="card pending"><span class="title">売上目標<span class="badge">準備中</span></span><div class="desc">スタッフ×月の目標（バッチ2で移行）。</div></span>
+        <span class="card pending"><span class="title">請求 照会・訂正<span class="badge">準備中</span></span><div class="desc">請求グリッド・CSV取込（バッチ2で移行）。</div></span>
+        <span class="card pending"><span class="title">工数 照会・訂正<span class="badge">準備中</span></span><div class="desc">工数の照会・訂正（バッチ2で移行）。</div></span>
+      </div>
+    </section>
+
+    <section class="group">
+      <h2>請求書</h2>
+      <div class="cards">
+        <span class="card pending"><span class="title">請求書発行<span class="badge">今後</span></span><div class="desc">請求書払い分の発行・PDF・billing連携（新機能）。</div></span>
+      </div>
+    </section>
+  </main>
+
+  <script src="backend.js?v=20260625-4"></script>
+  <script>
+    document.getElementById('logout').addEventListener('click', function () {
+      joLogout().then(function () { location.replace('login.html'); }).catch(function () { location.replace('login.html'); });
+    });
+    joMe().then(function (u) {
+      var w = document.getElementById('whoami');
+      if (w) w.textContent = (u.displayName || u.loginId) + '（' + u.role + '）';
+    }).catch(function () { location.replace('login.html'); });
+  </script>
+</body>
+</html>

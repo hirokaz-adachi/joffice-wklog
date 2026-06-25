@@ -1,0 +1,372 @@
+:root {
+  --bg: #f3f6f6;
+  --surface: #ffffff;
+  --ink: #142025;
+  --muted: #677780;
+  --line: #d9e2e4;
+  --accent: #0f766e;
+  --accent-soft: #e0f3ef;
+  --danger: #a33b16;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.app {
+  width: min(100%, 520px);
+  margin: 0 auto;
+  padding: 18px 14px 28px;
+}
+
+header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+header p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+h1,
+h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+h1 {
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+h2 {
+  font-size: 17px;
+}
+
+header input {
+  width: 142px;
+}
+
+/* 工数入力（月間）からの誘導時のみ表示する戻る導線 */
+.back-month {
+  display: block;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+  text-align: center;
+}
+.back-month:hover { background: var(--accent); color: #fff; }
+.back-month[hidden] { display: none; }
+
+.identity,
+.entry-card,
+.today {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.identity {
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.entry-card {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+label,
+fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+legend {
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: #fff;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+  outline: 3px solid rgba(15, 118, 110, 0.14);
+}
+
+textarea {
+  width: 100%;
+  min-height: 60px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: #fff;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+/* 担当工程に固定された工程セレクト等、非活性の入力欄をはっきりグレーアウト */
+select:disabled,
+input:disabled,
+textarea:disabled {
+  background: #d7dee0;
+  color: #5a6a72;
+  border-color: #c2cccf;
+  opacity: 1;
+  cursor: not-allowed;
+  -webkit-text-fill-color: #5a6a72;
+}
+
+button {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 0 10px;
+  color: var(--ink);
+  background: #fff;
+  cursor: pointer;
+}
+
+.duration-stepper {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.duration-unit {
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafb;
+}
+
+.duration-label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.duration-control {
+  display: grid;
+  grid-template-columns: 46px minmax(48px, 1fr) 46px;
+  gap: 6px;
+  align-items: center;
+}
+
+.duration-control strong {
+  color: var(--ink);
+  font-size: 28px;
+  line-height: 1;
+  text-align: center;
+}
+
+.duration-control button {
+  width: 46px;
+  min-height: 42px;
+  padding: 0;
+  color: var(--accent);
+  background: #fff;
+  border-color: #9fd4cd;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.duration-control button:active {
+  background: var(--accent-soft);
+}
+
+.duration-total {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.primary {
+  min-height: 52px;
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.today {
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.today-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.today-head strong {
+  color: var(--accent);
+  font-size: 18px;
+}
+
+.today-list {
+  display: grid;
+}
+
+.today-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.today-item:last-child {
+  border-bottom: 0;
+}
+
+.today-main {
+  min-width: 0;
+}
+
+.today-customer {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+}
+
+.today-sub {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.today-side {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.today-hours {
+  font-weight: 900;
+}
+
+.delete {
+  min-height: 28px;
+  border-color: #efc7b8;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.empty {
+  padding: 18px 14px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  width: min(420px, calc(100vw - 28px));
+  padding: 12px 14px;
+  border-radius: 8px;
+  color: #fff;
+  background: #1f2933;
+  text-align: center;
+  transform: translate(-50%, 18px);
+  opacity: 0;
+  pointer-events: none;
+  transition: 180ms ease;
+}
+
+.toast.show {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+@media (max-width: 380px) {
+  header {
+    grid-template-columns: 1fr;
+  }
+
+  header input {
+    width: 100%;
+  }
+
+  .duration-stepper {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* hidden 属性を確実に効かせる（label/fieldset の display 指定に勝たせる）。単一工程時の工程欄を隠す */
+label[hidden], fieldset[hidden] { display: none !important; }
+
+/* 案2: 工程バッジ（Prepare/Review） */
+.phase-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.phase-badge.phase-pre { background: #dff3ef; color: #0b5d57; }
+.phase-badge.phase-rev { background: #eef2ff; color: #3730a3; }
