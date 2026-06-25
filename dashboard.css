@@ -54,6 +54,27 @@ button:hover,
   border-color: var(--accent-dark);
 }
 
+/* ナビ: 横移動（同カテゴリ）はソフト、メニュー（ホーム）はフィルで差別化 */
+.header-nav a {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  border-color: var(--accent-soft);
+}
+.header-nav a:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.header-nav a.nav-home {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.header-nav a.nav-home:hover {
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+}
+
 button.secondary {
   color: var(--accent-dark);
   background: #fff;
