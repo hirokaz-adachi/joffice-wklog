@@ -137,11 +137,16 @@
 残（要確認）:
 - **X-Server の契約形態**。共通最安定条件で組めば影響は小だが、DB上限・PHP上限・SSH可否・SSL仕様の最終確認は要（判明次第バージョン微調整）。
 - **GAS版と本番の並行運用期間**（一気に切替か、段階移行か）。
-- **請求書発行（JOfficeInvoice）の機能設計**（適格請求書対応・採番ルール・PDF生成方式・billing_data への射影規約・口座振替CSVとの二重計上防止）。別途設計。
+- ~~**請求書発行（JOfficeInvoice）の機能設計**~~ → **設計済（2026-06-25・[invoice-feature-design.md](./invoice-feature-design.md)）**。残るは適格登録番号(T+13桁)の所長確認・発行者情報の実値・mPDF導入確認・様式レイアウト確定。
 
 ---
 
 ## 8. 更新履歴
+
+### 2026-06-25（請求書発行 機能設計・スキーマ確定）
+- **[invoice-feature-design.md](./invoice-feature-design.md)** を新規作成（JOfficeInvoice の機能設計正本）。確定：採番＝年月＋連番（`YYYYMM-NNN`・請求対象月基準・行ロック原子採番）／適格＝前提で枠だけ（登録番号は設定後入力）／PDF＝PHPライブラリ(mPDF)サーバ生成／消費税端数＝切り捨て／支払期限＝3方式を請求ごと選択／発行済み訂正＝取消→再発行(物理削除しない)。
+- `db/schema.sql` を更新：**`jo_invoice_seq`（採番カウンタ）追加・`jo_invoices.dueRule` 追加**（→全13テーブル）。`jo_invoices`/`jo_invoice_lines` の暫定を正式化。
+- §7 の「請求書発行の機能設計」を解決済へ更新。
 
 ### 2026-06-25（DBスキーマ初版作成 `db/schema.sql`）
 - 統合スキーマDDLの正本 **[../db/schema.sql](../db/schema.sql)** を新規作成（MySQL 5.7・InnoDB・utf8mb4_unicode_ci・`jo_` 接頭辞・全12テーブル）。既存9シート＋認証 `jo_users`＋請求書 `jo_invoices`/`jo_invoice_lines`（暫定）を統合。

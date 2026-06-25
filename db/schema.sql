@@ -5,17 +5,17 @@
 -- 命名   : テーブル=jo_ 接頭辞(小文字) / 列=既存JSONキーに合わせ camelCase
 -- 規約   : コード列=VARCHAR(前ゼロ保持) / 金額=DECIMAL(円・整数) / 月=CHAR(7)'YYYY-MM'
 -- 由来   : design.md 第4章(9シート)+案2新シート3 / production-auth-db-memo.md(users・RBAC)
---          + 請求書発行(jo_invoices/jo_invoice_lines ※暫定・機能設計確定で精緻化)
+--          + 請求書発行(jo_invoices/jo_invoice_lines/jo_invoice_seq・invoice-feature-design.md)
 -- 注意   : MySQL 5.7 前提。ウィンドウ関数/CTE/JSON_TABLE 等 8.0 専用機能は使わない。
 --          集計・配賦は PHP 側(allocation.js 移植)で実施しビューに寄せない。
--- 更新   : 2026-06-25 初版
+-- 更新   : 2026-06-25 初版 / 2026-06-25 jo_invoice_seq・jo_invoices.dueRule 追加
 -- =====================================================================
 SET NAMES utf8mb4;
 
 -- 開発・検証での再適用用(本番初回適用時は不要)
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS
-  jo_invoice_lines, jo_invoices, jo_billings, jo_worklogs, jo_users,
+  jo_invoice_seq, jo_invoice_lines, jo_invoices, jo_billings, jo_worklogs, jo_users,
   jo_staff_targets, jo_customer_staff, jo_task_phases, jo_app_settings,
   jo_task_types, jo_customers, jo_staff;
 SET FOREIGN_KEY_CHECKS = 1;
@@ -91,7 +91,7 @@ CREATE TABLE jo_staff_targets (               -- 売上目標(スタッフ×月)
   CONSTRAINT fk_target_staff FOREIGN KEY (staffCode) REFERENCES jo_staff(code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE jo_app_settings (                -- 設定(作業→請求オフセット 等)
+CREATE TABLE jo_app_settings (                -- 設定(作業→請求オフセット・発行者情報 等)
   settingKey   VARCHAR(64) NOT NULL,
   settingValue VARCHAR(255) NULL,
   updatedAt    DATETIME NULL,
@@ -148,22 +148,23 @@ CREATE TABLE jo_billings (                    -- 請求(集計用の射影: CSV/
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================================
--- 請求書発行(原本)  ※暫定: 採番ルール・適格登録番号・宛名/住所は機能設計で確定
+-- 請求書発行(原本)  ※適格様式前提で枠を用意・採番=年月+連番(YYYYMM-NNN)
 -- =====================================================================
 
 CREATE TABLE jo_invoices (                    -- 請求書ヘッダ
-  invoiceNo       VARCHAR(30) NOT NULL,       -- 採番(ルール要確定)
+  invoiceNo       VARCHAR(30) NOT NULL,       -- 採番 YYYYMM-NNN (請求対象月基準)
   customerCode    VARCHAR(20) NOT NULL,
   billingMonth    CHAR(7) NOT NULL,           -- 請求対象月
   issueDate       DATE NOT NULL,
-  dueDate         DATE NULL,
+  dueDate         DATE NULL,                  -- 支払期限(dueRuleから自動算出・編集可)
+  dueRule         ENUM('net30','issueNextMonthEnd','billingNextMonthEnd') NULL,  -- 支払期限の算出方式(請求ごと選択)
   billToName      VARCHAR(200) NOT NULL,      -- 宛名 snapshot
   billToHonorific VARCHAR(10) NOT NULL DEFAULT '御中',
   billToAddress   VARCHAR(255) NULL,
   subtotal        DECIMAL(13,0) NOT NULL DEFAULT 0,  -- 税抜計
-  tax             DECIMAL(13,0) NOT NULL DEFAULT 0,  -- 消費税
+  tax             DECIMAL(13,0) NOT NULL DEFAULT 0,  -- 消費税(税率ごと切り捨て)
   total           DECIMAL(13,0) NOT NULL DEFAULT 0,  -- 税込計
-  issuerRegNo     VARCHAR(20) NULL,           -- 適格 登録番号 T+13桁(自社)
+  issuerRegNo     VARCHAR(20) NULL,           -- 適格 登録番号 T+13桁(発行時スナップショット)
   status          ENUM('draft','issued','sent','paid','void') NOT NULL DEFAULT 'draft',
   pdfPath         VARCHAR(255) NULL,
   memo            TEXT NULL,
@@ -190,6 +191,12 @@ CREATE TABLE jo_invoice_lines (               -- 請求書明細
   PRIMARY KEY (id),
   UNIQUE KEY uq_inv_line (invoiceNo, lineNo),
   CONSTRAINT fk_line_inv FOREIGN KEY (invoiceNo) REFERENCES jo_invoices(invoiceNo) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE jo_invoice_seq (                 -- 採番カウンタ(年月リセット・行ロックで一意採番)
+  periodKey CHAR(6) NOT NULL,                 -- 'YYYYMM' (請求対象月)
+  lastSeq   INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (periodKey)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================================
