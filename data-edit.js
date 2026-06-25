@@ -46,19 +46,14 @@
   }
 
   function bindEvents() {
-    el.tabWork.addEventListener("click", () => switchTab("work"));
-    el.tabBill.addEventListener("click", () => switchTab("bill"));
+    // 請求（billing）専念。工数の訂正は工数管理画面（worklog.html）へ。
     el.addRow.addEventListener("click", addRow);
     el.saveAll.addEventListener("click", saveAll);
     el.reload.addEventListener("click", reload);
-    [el.workBody, el.billBody].forEach((body) => {
-      body.addEventListener("input", onCellInput);
-      body.addEventListener("change", onCellInput);
-      body.addEventListener("click", onBodyClick);
-    });
-    [el.wFrom, el.wTo, el.wStaff, el.wCust].forEach((x) => x.addEventListener("input", renderWork));
+    el.billBody.addEventListener("input", onCellInput);
+    el.billBody.addEventListener("change", onCellInput);
+    el.billBody.addEventListener("click", onBodyClick);
     [el.bFrom, el.bTo, el.bCust].forEach((x) => x.addEventListener("input", renderBill));
-    el.wClear.addEventListener("click", clearWorkFilter);
     el.bClear.addEventListener("click", clearBillFilter);
   }
 
@@ -174,7 +169,6 @@
   }
 
   function renderAll() {
-    renderWork();
     renderBill();
     updateDirtyInfo();
   }
@@ -221,18 +215,10 @@
   }
 
   function fillFilters() {
-    const cw = el.wStaff.value;
-    el.wStaff.innerHTML = [`<option value="すべて">スタッフ：すべて</option>`]
-      .concat(state.staff.map((sf) => `<option value="${esc(sf.code)}">${esc(sf.code)} ${esc(sf.name)}</option>`)).join("");
-    el.wStaff.value = Array.from(el.wStaff.options).some((o) => o.value === cw) ? cw : "すべて";
     const cc = el.bCust.value;
     el.bCust.innerHTML = [`<option value="すべて">顧客：すべて</option>`]
       .concat(state.customers.map((c) => `<option value="${esc(c.code)}">${esc(c.code)} ${esc(c.name)}</option>`)).join("");
     el.bCust.value = Array.from(el.bCust.options).some((o) => o.value === cc) ? cc : "すべて";
-    const wc = el.wCust.value;
-    el.wCust.innerHTML = [`<option value="すべて">顧客：すべて</option>`]
-      .concat(state.customers.map((c) => `<option value="${esc(c.code)}">${esc(c.code)} ${esc(c.name)}</option>`)).join("");
-    el.wCust.value = Array.from(el.wCust.options).some((o) => o.value === wc) ? wc : "すべて";
   }
 
   function clearWorkFilter() {
@@ -508,57 +494,22 @@
   }
 
   function addRow() {
-    if (activeTab === "work") {
-      const r = normWork({ id: makeId(), date: today(), taskType: state.taskTypes[0] || "顧問対応", hours: 1 });
-      state.work.unshift(r);
-      newWork.add(r.id);
-      dirtyWork.add(r.id);
-      renderWork();
-    } else {
-      const r = normBill({ invoiceId: makeInvoiceId(), billingMonth: currentMonth() });
-      state.bill.unshift(r);
-      newBill.add(r.invoiceId);
-      dirtyBill.add(r.invoiceId);
-      renderBill();
-    }
+    const r = normBill({ invoiceId: makeInvoiceId(), billingMonth: currentMonth() });
+    state.bill.unshift(r);
+    newBill.add(r.invoiceId);
+    dirtyBill.add(r.invoiceId);
+    renderBill();
     updateDirtyInfo();
-    showToast("行を追加しました（保存で確定）");
+    showToast("請求行を追加しました（保存で確定）");
   }
 
   async function saveAll() {
-    const workToSave = [];
-    for (const id of dirtyWork) {
-      const r = findRow("work", id);
-      if (!r) continue;
-      const requiresCustomer = r.taskType !== TASK_INTERNAL;
-      if (!r.date || !r.staffCode || !r.taskType || !(Number(r.hours) > 0) || (requiresCustomer && !r.customerCode)) {
-        showToast("工数：未入力または時間の値を確認してください");
-        switchTab("work");
-        return;
-      }
-      workToSave.push({
-        id: r.id,
-        date: r.date,
-        staffCode: r.staffCode,
-        staff: masterName("staff", r.staffCode),
-        customerCode: r.customerCode,
-        customer: r.customerCode ? masterName("customers", r.customerCode) : "",
-        taskType: r.taskType,
-        taskCode: r.taskCode || "",
-        phaseCode: r.phaseCode || "",
-        hours: Number(r.hours),
-        memo: r.memo || "",
-        updatedAt: new Date().toISOString()
-      });
-    }
-
     const billToSave = [];
     for (const id of dirtyBill) {
       const r = findRow("bill", id);
       if (!r) continue;
       if (!r.billingMonth || !Number.isFinite(Number(r.netAmount))) {
-        showToast("売上：請求月と税抜金額を確認してください");
-        switchTab("bill");
+        showToast("請求：請求月と税抜金額を確認してください");
         return;
       }
       billToSave.push({
@@ -580,14 +531,13 @@
       });
     }
 
-    if (workToSave.length === 0 && billToSave.length === 0) {
+    if (billToSave.length === 0) {
       showToast("保存する変更がありません");
       return;
     }
 
     el.saveAll.disabled = true;
     try {
-      if (workToSave.length) await window.WorklogBackend.saveEntries(workToSave);
       if (billToSave.length) await window.WorklogBackend.saveBillings(billToSave);
     } catch (error) {
       showToast(error.message);
@@ -597,10 +547,6 @@
     el.saveAll.disabled = false;
 
     // ローカル状態を保存値で更新（名称解決済みの値を反映）
-    workToSave.forEach((e) => {
-      const idx = state.work.findIndex((w) => w.id === e.id);
-      if (idx >= 0) state.work[idx] = normWork(e); else state.work.push(normWork(e));
-    });
     billToSave.forEach((b) => {
       const idx = state.bill.findIndex((x) => x.invoiceId === b.invoiceId);
       if (idx >= 0) state.bill[idx] = normBill(b); else state.bill.push(normBill(b));
@@ -609,7 +555,7 @@
     clearDirty();
     persistLocal();
     renderAll();
-    showToast(`保存しました（工数${workToSave.length}件・売上${billToSave.length}件）`);
+    showToast(`保存しました（請求${billToSave.length}件）`);
   }
 
   function findRow(kind, id) {
