@@ -5,26 +5,55 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>J-Office (pro) ｜ メニュー</title>
   <style>
-    :root { --fg:#1f2937; --muted:#6b7280; --line:#e5e7eb; --accent:#0f766e; --bg:#f8fafc; }
+    :root {
+      --bg: #f4f7f7; --surface: #fff; --ink: #172026; --muted: #65737c;
+      --line: #d9e1e3; --accent: #0f766e; --accent-dark: #0b5d57; --accent-soft: #dff3ef;
+      --shadow: 0 12px 30px rgba(23, 32, 38, 0.08);
+    }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; color:var(--fg); background:var(--bg); }
-    .topbar { display:flex; justify-content:space-between; align-items:flex-start; padding:20px 28px; border-bottom:1px solid var(--line); background:#fff; }
-    .eyebrow { color:var(--muted); font-size:12px; margin:0; }
-    h1 { font-size:20px; margin:2px 0 0; }
-    .top-actions { display:flex; gap:10px; align-items:center; }
-    .whoami { color:var(--muted); font-size:13px; }
-    .btn { padding:8px 14px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--fg); font-size:13px; cursor:pointer; text-decoration:none; }
-    main { max-width:1000px; margin:24px auto; padding:0 20px; }
-    .group { margin-bottom:28px; }
-    .group h2 { font-size:14px; color:var(--muted); margin:0 0 10px; font-weight:600; }
-    .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:14px; }
-    .card { display:block; padding:18px; border:1px solid var(--line); border-radius:12px; background:#fff; text-decoration:none; color:var(--fg); transition:box-shadow .15s, transform .15s; }
-    .card:hover { box-shadow:0 4px 14px rgba(0,0,0,.06); transform:translateY(-1px); }
-    .card .title { font-size:15px; font-weight:600; }
-    .card .desc { font-size:12px; color:var(--muted); margin-top:6px; line-height:1.5; }
-    .card .badge { display:inline-block; font-size:11px; color:#fff; background:var(--accent); border-radius:999px; padding:1px 8px; margin-left:6px; vertical-align:middle; }
-    .card.pending { opacity:.55; cursor:default; pointer-events:none; }
-    .card.pending .badge { background:#9ca3af; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--ink); background: var(--bg);
+      font-family: "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .topbar { width: 100%; padding: 22px clamp(18px, 4vw, 48px); background: #fff;
+      border-bottom: 1px solid var(--line); display: flex; align-items: center;
+      justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .eyebrow { margin: 0 0 4px; color: var(--accent-dark); font-size: 12px; font-weight: 800; letter-spacing: .04em; }
+    h1 { margin: 0; font-size: clamp(22px, 4vw, 32px); }
+    .top-actions { display: flex; align-items: center; gap: 12px; }
+    .logout-btn { border: 1px solid var(--line); background: #fff; color: var(--ink);
+      border-radius: 8px; padding: 9px 14px; font-size: 13px; cursor: pointer; }
+    .logout-btn:hover { border-color: var(--accent); color: var(--accent-dark); }
+
+    .menu { width: min(960px, 100%); padding: clamp(20px, 4vw, 40px); }
+    .lead { color: var(--muted); margin: 0 0 20px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .card {
+      display: block; text-decoration: none; color: inherit; background: var(--surface);
+      border: 1px solid var(--line); border-radius: 10px; padding: 22px; box-shadow: var(--shadow);
+      transition: transform .08s ease, box-shadow .08s ease, border-color .08s ease;
+    }
+    .card:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 16px 36px rgba(23,32,38,.12); }
+    .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .badge { display: inline-flex; align-items: center; justify-content: center;
+      width: 40px; height: 40px; border-radius: 9px; background: var(--accent-soft);
+      color: var(--accent-dark); font-weight: 800; font-size: 18px; }
+    .card h2 { margin: 0 0 6px; font-size: 18px; }
+    .card p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .card.pending { opacity: .6; cursor: default; }
+    .card.pending:hover { transform: none; border-color: var(--line); box-shadow: var(--shadow); }
+
+    .menu-group { margin-top: 28px; }
+    .menu-group:first-of-type { margin-top: 4px; }
+    .group-title { display: flex; align-items: center; gap: 8px; margin: 0 0 12px;
+      font-size: 14px; font-weight: 800; color: var(--accent-dark); }
+    .group-title::before { content: ""; width: 4px; height: 16px; border-radius: 2px; background: var(--accent); }
+    .group-note { color: var(--muted); font-weight: 600; font-size: 12px; }
+    .device { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .device.pc { background: #eef2ff; color: #3730a3; }
+    .device.mobile { background: #dff3ef; color: #0b5d57; }
+    .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #f1f5f9; color: #64748b; }
   </style>
 </head>
 <body>
@@ -34,64 +63,101 @@
       <h1>メニュー</h1>
     </div>
     <div class="top-actions">
-      <span id="whoami" class="whoami"></span>
-      <button id="logout" class="btn" type="button">ログアウト</button>
+      <button id="logout" class="logout-btn" type="button">ログアウト</button>
     </div>
   </header>
 
-  <main>
-    <section class="group">
-      <h2>工数入力</h2>
+  <main id="menu" class="menu">
+    <p class="lead">利用する画面を選んでください。</p>
+
+    <section class="menu-group">
+      <h2 class="group-title">工数入力 <span class="group-note">毎日の作業時間・工数を登録</span></h2>
       <div class="cards">
-        <a class="card" href="staff.html"><span class="title">工数登録（スマホ）</span><div class="desc">現場で打つ簡易入力（スマホ）。</div></a>
-        <a class="card" href="worklog-month.html"><span class="title">工数登録（月間）</span><div class="desc">1か月のマトリクス入力（PC）。</div></a>
+        <a class="card" href="staff.html">
+          <div class="card-top"><span class="badge">登</span><span class="device mobile">スマホ</span></div>
+          <h2>工数登録（スマホ）</h2>
+          <p>現場でその場で作業時間を登録。担当顧客は上位に表示。</p>
+        </a>
+        <a class="card" href="worklog-month.html">
+          <div class="card-top"><span class="badge">月</span><span class="device pc">PC</span></div>
+          <h2>工数登録（月間）</h2>
+          <p>1か月を、顧客×業務×工程の表で俯瞰しながら入力。</p>
+        </a>
       </div>
     </section>
 
-    <section class="group">
-      <h2>分析</h2>
+    <section class="menu-group">
+      <h2 class="group-title">分析 <span class="group-note">売上・工数の状況を把握</span></h2>
       <div class="cards">
-        <a class="card" data-roles="admin,manager" href="dashboard.html"><span class="title">経営ダッシュボード</span><div class="desc">月次KPI・スタッフ別／顧客別の生産性分析。</div></a>
-        <a class="card" data-roles="admin,manager" href="analysis.html"><span class="title">詳細分析</span><div class="desc">任意期間×スタッフ／顧客／業務区分の多角分析。</div></a>
+        <a class="card" data-roles="admin,manager" href="dashboard.html">
+          <div class="card-top"><span class="badge">経</span><span class="device pc">PC</span></div>
+          <h2>経営ダッシュボード</h2>
+          <p>売上・工数・時間単価・達成率を月次で可視化。</p>
+        </a>
+        <a class="card" data-roles="admin,manager" href="analysis.html">
+          <div class="card-top"><span class="badge">析</span><span class="device pc">PC</span></div>
+          <h2>詳細分析</h2>
+          <p>任意期間でスタッフ・顧客・業務区分を多角的に分析。</p>
+        </a>
       </div>
     </section>
 
-    <section class="group">
-      <h2>運用</h2>
+    <section class="menu-group">
+      <h2 class="group-title">運用 <span class="group-note">管理者向け（照会・訂正／目標／請求）</span></h2>
       <div class="cards">
-        <a class="card" data-roles="admin" href="worklog.html"><span class="title">工数 照会・訂正</span><div class="desc">工数の照会・訂正（編集モーダル）。</div></a>
-        <a class="card" data-roles="admin" href="data-edit.html"><span class="title">請求 照会・訂正</span><div class="desc">請求グリッド・CSV取込・一括修正。</div></a>
-        <a class="card" data-roles="admin" href="targets.html"><span class="title">売上目標設定</span><div class="desc">スタッフ×月の目標・前月コピー・一括保存。</div></a>
-        <span class="card pending" data-roles="admin"><span class="title">請求書発行<span class="badge">今後</span></span><div class="desc">請求書払い分の発行・PDF・billing連携（新機能）。</div></span>
+        <a class="card" data-roles="admin" href="worklog.html">
+          <div class="card-top"><span class="badge">工</span><span class="device pc">PC</span></div>
+          <h2>工数 照会・訂正</h2>
+          <p>工数をカレンダー・日次サマリー・一覧で照会し、モーダルで訂正。</p>
+        </a>
+        <a class="card" data-roles="admin" href="data-edit.html">
+          <div class="card-top"><span class="badge">請</span><span class="device pc">PC</span></div>
+          <h2>請求 照会・訂正</h2>
+          <p>請求（売上）データをグリッドで照会・一括修正。CSV取込対応。</p>
+        </a>
+        <a class="card" data-roles="admin" href="targets.html">
+          <div class="card-top"><span class="badge">目</span><span class="device pc">PC</span></div>
+          <h2>売上目標設定</h2>
+          <p>スタッフ別の月次売上目標を登録。前月コピー・一括保存。</p>
+        </a>
+        <span class="card pending" data-roles="admin">
+          <div class="card-top"><span class="badge">発</span><span class="pill">今後</span></div>
+          <h2>請求書発行</h2>
+          <p>請求書払い分の発行・PDF・billing 連携（新機能・実装予定）。</p>
+        </span>
       </div>
     </section>
 
-    <section class="group">
-      <h2>管理</h2>
+    <section class="menu-group">
+      <h2 class="group-title">管理 <span class="group-note">管理者向け（マスタ・ユーザー）</span></h2>
       <div class="cards">
-        <a class="card" data-roles="admin" href="master.html"><span class="title">マスタメンテナンス</span><div class="desc">スタッフ／顧客／業務区分・工程／顧客担当／設定。</div></a>
-        <a class="card" data-roles="admin" href="users.html"><span class="title">ユーザー管理</span><div class="desc">アカウント発行・役割（admin/manager/staff）・パスワード。</div></a>
+        <a class="card" data-roles="admin" href="master.html">
+          <div class="card-top"><span class="badge">マ</span><span class="device pc">PC</span></div>
+          <h2>マスタメンテナンス</h2>
+          <p>スタッフ・顧客・業務区分・工程・顧客担当・設定を管理。</p>
+        </a>
+        <a class="card" data-roles="admin" href="users.html">
+          <div class="card-top"><span class="badge">ユ</span><span class="device pc">PC</span></div>
+          <h2>ユーザー管理</h2>
+          <p>アカウント発行・役割（admin/manager/staff）・パスワード。</p>
+        </a>
       </div>
     </section>
   </main>
 
-  <script src="backend.js?v=20260625-6"></script>
+  <script src="backend.js?v=20260625-7"></script>
   <script>
     document.getElementById('logout').addEventListener('click', function () {
       joLogout().then(function () { location.replace('login.html'); }).catch(function () { location.replace('login.html'); });
     });
+    // 認証ガード＋役割別の表示制御（ログインユーザー名は backend.js のインジェクタが表示）
     joMe().then(function (u) {
       if (u.mustChangePassword) { location.replace('change-password.html'); return; }
-      // ログインユーザー表示は backend.js のヘッダ・インジェクタが担当
-      // 役割に応じて表示カードを絞る（data-roles 指定のカードのみ対象）
       document.querySelectorAll('.card[data-roles]').forEach(function (c) {
-        var roles = c.getAttribute('data-roles').split(',');
-        if (roles.indexOf(u.role) < 0) c.style.display = 'none';
+        if (c.getAttribute('data-roles').split(',').indexOf(u.role) < 0) c.style.display = 'none';
       });
-      // 表示カードが無くなったグループは見出しごと隠す
-      document.querySelectorAll('.group').forEach(function (g) {
-        var visible = g.querySelectorAll('.card:not([style*="display: none"])').length;
-        if (!visible) g.style.display = 'none';
+      document.querySelectorAll('.menu-group').forEach(function (g) {
+        if (!g.querySelectorAll('.card:not([style*="display: none"])').length) g.style.display = 'none';
       });
     }).catch(function () { location.replace('login.html'); });
   </script>

@@ -128,17 +128,18 @@ window.WorklogBackend = {
     return 'ログイン中: ' + u.loginId + (u.displayName ? ' ' + u.displayName : '') + '（' + u.role + '）';
   }
   function inject() {
-    var bar = document.querySelector('.top-actions');
-    var header = bar || document.querySelector('.dashboard-header') || document.querySelector('header');
+    // 横並びのアクション領域（.top-actions / .header-nav）優先。無ければ header に縦積み。
+    var inlineBar = document.querySelector('.top-actions') || document.querySelector('.header-nav');
+    var header = inlineBar || document.querySelector('header');
     if (!header) return;
     joMe().then(function (u) {
       var el = document.getElementById('whoami');
       if (!el) {
         el = document.createElement('span');
         el.id = 'whoami';
-        if (bar) {
+        if (inlineBar) {
           el.style.cssText = 'font-size:12px;color:#6b7280;white-space:nowrap;align-self:center;';
-          bar.insertBefore(el, bar.firstChild);
+          inlineBar.insertBefore(el, inlineBar.firstChild);
         } else {
           el.style.cssText = 'display:block;font-size:12px;color:#6b7280;margin-top:4px;';
           header.appendChild(el);
