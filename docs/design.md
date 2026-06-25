@@ -86,6 +86,8 @@
 
 GAS `CONFIG.headers` が正本。デプロイ済みスプレッドシート `joffice_wklog_demo` と一致を確認済み。案2で task_phase_master / customer_staff_master / app_settings を新設、2026-06-24 に item_master を撤去（→9シート）。
 
+> 本番（PHP＋MySQL）移行版のDDL正本は [../db/schema.sql](../db/schema.sql)（MySQL 5.7・`jo_` 接頭辞・列は本JSONキーに合わせ camelCase・認証 `jo_users`＋請求書 `jo_invoices`/`jo_invoice_lines` を追加）。シート→テーブル対応と移行戦略は [migration-plan-php-mysql-2026-06-22.md](./migration-plan-php-mysql-2026-06-22.md) を参照。
+
 | シート | カラム |
 |---|---|
 | worklogs | id, date, staffCode, staff, customerCode, customer, taskType, hours, memo, updatedAt, **taskCode, phaseCode** |

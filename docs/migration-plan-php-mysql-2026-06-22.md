@@ -83,7 +83,7 @@
 - **通信層**: `backend.js` を JSONP（`<script>` 動的生成＋URLトークン）から、**同一オリジンの `fetch()`（PHPエンドポイント）**へ差し替える。同一オリジン化により httpOnly・Secure・SameSite な Cookie セッションが素直に使える（JSONP由来の制約が解消）。
 - **フロント**: 既存 HTML/CSS/JS をほぼ流用。画面（index/worklog/staff/dashboard/master/targets/data-edit/analysis）は維持し、データ取得関数の実装だけ差し替える。`backend.js` のクライアント関数のシグネチャを保てば画面側の改修を最小化できる。
 - **集計・配賦ロジック**: dashboard.js のクライアント集計（時間単価・達成率・工数按分・案2の主担当フォールバック）を、PHP（API層）へ移植。MySQL 5.7 ではウィンドウ関数・CTE が使えないため、ビューに寄せず**PHP側で集計**する。**指標定義は design.md 第5章、配賦は第6〜8章を正本**として一致させ、`allocation.js` の回帰テスト（`test-allocation.mjs`／`verify-demo.mjs`）と突き合わせる。
-- **シート→テーブル**: production-auth-db-memo.md 第4章の対応表（worklogs/staff/customers/task_types/billings/staff_targets ＋ users）に従う。さらに案2の新シート3（task_phase_master＝工程／customer_staff_master＝顧客担当・時系列／app_settings＝設定）と、請求書発行の新テーブル（invoice_header／invoice_line）を追加。**`item_master`（品目）は 2026-06-24 に撤去済みのため作らない**（恒等マッチングで業務区分マスタ task_types に一本化・design.md 第8-2）。全テーブル `jo_` 接頭辞・コード列は VARCHAR。
+- **シート→テーブル**: production-auth-db-memo.md 第4章の対応表（worklogs/staff/customers/task_types/billings/staff_targets ＋ users）に従う。さらに案2の新シート3（task_phase_master＝工程／customer_staff_master＝顧客担当・時系列／app_settings＝設定）と、請求書発行の新テーブル（**jo_invoices**／**jo_invoice_lines**）を追加。**`item_master`（品目）は 2026-06-24 に撤去済みのため作らない**（恒等マッチングで業務区分マスタ task_types に一本化・design.md 第8-2）。全テーブル `jo_` 接頭辞・コード列は VARCHAR。**DDLの正本は [../db/schema.sql](../db/schema.sql)**（2026-06-25 初版・MySQL 5.7・列は既存JSONキーに合わせ camelCase・氏名は保存せずAPIでJOIN付与・`jo_invoices`/`jo_invoice_lines` は請求書機能設計が確定するまでの暫定）。
 - **シークレット**: DB接続情報等は**公開フォルダ外**に置く（`config.js` のようなブラウザ配布ファイルに絶対入れない）。production-auth-db-memo.md 第7章の方針。
 
 ---
@@ -142,6 +142,12 @@
 ---
 
 ## 8. 更新履歴
+
+### 2026-06-25（DBスキーマ初版作成 `db/schema.sql`）
+- 統合スキーマDDLの正本 **[../db/schema.sql](../db/schema.sql)** を新規作成（MySQL 5.7・InnoDB・utf8mb4_unicode_ci・`jo_` 接頭辞・全12テーブル）。既存9シート＋認証 `jo_users`＋請求書 `jo_invoices`/`jo_invoice_lines`（暫定）を統合。
+- 設計判断3点を確定：①**列名は既存JSONキーに合わせ camelCase**（PHPを薄い通過層にし front-end／`allocation.js` を無改修）②**氏名はworklogs/billingsに保存せずAPIでJOIN付与**（billings.customer のみ未登録顧客の snapshot として残す）③**請求書3テーブルは暫定**（採番ルール・適格登録番号 T+13桁・宛名/住所の置き場所は請求書機能設計で確定）。
+- FK方針：整合保証箇所のみFK（工程→業務区分／明細→請求書 CASCADE／目標→スタッフ／users→スタッフ SET NULL）。外部由来コード（billings.customerCode/invoiceItemCode・worklogs.customerCode・customer_staff）は**ソフト参照**（マッチング漏れは警告で扱い拒否しない）。
+- 二重計上対策：`jo_customers.paymentMethod`（transfer/invoice）と `jo_billings.source`（csv/invoice/manual）を新設。
 
 ### 2026-06-25（環境確定・スペック更新・移行契機の追記）
 - お名前.com（HLS・ステージング）の MySQL を実測し **5.7.44（純正MySQL・Source distribution）** と確認。X-Server の MySQL 5.7.x と一致したため、**DB＝MySQL 5.7 決め打ち・PHP 8.1 固定**を確定（§0-3・§2・§6）。MariaDB 考慮は不要に。
