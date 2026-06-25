@@ -48,7 +48,7 @@
             staff: t.staff || "",
             targetAmount: Number(t.targetAmount || 0)
           }));
-          setStatus("スプレッドシートから読み込みました");
+          setStatus("読み込みました");
         }
       } catch (error) {
         setStatus("読み込み失敗: " + error.message);

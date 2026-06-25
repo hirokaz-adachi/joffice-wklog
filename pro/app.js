@@ -102,7 +102,7 @@
         : [];
       state.entries = normalizeEntries(remoteState.entries, staff, customers);
       persist();
-      showToast("スプレッドシートから読み込みました");
+      showToast("読み込みました");
     } catch (error) {
       showToast(error.message);
     }

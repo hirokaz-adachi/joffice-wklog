@@ -112,7 +112,7 @@
           state.bill = (db.billing || []).map(normBill);
         }
         loaded = true;
-        setStatus("スプレッドシートから読み込みました");
+        setStatus("読み込みました");
       } catch (error) {
         setStatus("読み込み失敗: " + error.message);
         showToast(error.message);

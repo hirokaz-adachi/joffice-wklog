@@ -120,8 +120,8 @@
 
   async function loadData(forceServerRefresh) {
     if (!window.WorklogBackend || !window.WorklogBackend.isRemote()) {
-      el.dataStatus.textContent = "スプレッドシート接続が設定されていません";
-      showToast("config.js の接続設定が未設定です");
+      el.dataStatus.textContent = "データに接続できません";
+      showToast("接続設定が未設定です");
       return;
     }
     const startedAt = performance.now();
