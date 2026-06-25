@@ -457,6 +457,11 @@ tr:last-child td {
   border-bottom: 0;
 }
 
+/* 行ホバーのハイライト（工数 照会・訂正の入力一覧。工数入力・月間と同様。#entryRows 限定で他画面に影響させない） */
+#entryRows tr:hover > td {
+  background: var(--accent-soft);
+}
+
 .num {
   text-align: right;
 }

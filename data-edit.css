@@ -94,6 +94,11 @@
   white-space: nowrap;
 }
 
+/* 行ホバーのハイライト（工数入力・月間と同様）。is-dirty/is-new の黄色は後続規則で優先＝維持。 */
+.edit-grid tbody tr:hover td {
+  background: var(--accent-soft);
+}
+
 .edit-grid tbody tr.is-dirty td {
   background: #fffbeb;
 }
