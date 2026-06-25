@@ -78,9 +78,8 @@
 
     $('btnLogin').onclick = async () => {
       try {
-        const u = await joLogin($('loginId').value.trim(), $('password').value);
-        msg('ログインしました。', true);
-        showUser(u);
+        await joLogin($('loginId').value.trim(), $('password').value);
+        location.replace('index.html');
       } catch (e) {
         msg('ログイン失敗: ' + e.message, false);
       }
@@ -105,8 +104,8 @@
       } catch (e) { $('diagOut').textContent = 'bootstrap 失敗: ' + e.message; }
     };
 
-    // 初期表示：既存セッションがあればユーザー表示
-    joMe().then(showUser).catch(() => showUser(null));
+    // 既にログイン済みならメニューへ。未ログインならフォーム表示。
+    joMe().then(() => location.replace('index.html')).catch(() => showUser(null));
   </script>
 </body>
 </html>
