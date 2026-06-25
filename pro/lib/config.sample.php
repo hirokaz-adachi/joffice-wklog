@@ -4,10 +4,11 @@
 // config.php は .gitignore 対象（DB接続情報・setup_key を含むためコミットしない）。
 return [
     'db' => [
-        'host'    => 'localhost',          // お名前.com 共用サーバは通常 localhost
-        'name'    => '2vt7g_joffice_pro',  // データベース名
-        'user'    => 'xxxxxxxx',           // DBユーザー名
-        'pass'    => 'xxxxxxxx',           // DBパスワード
+        // お名前.com「データベース詳細 ＞ 接続先ホスト」の値。localhost ではない！（例 mysql92.onamae.ne.jp）
+        'host'    => 'mysqlXX.onamae.ne.jp',
+        'name'    => '2vt7g_joffice_pro',   // データベース名
+        'user'    => '2vt7g_joffice_app',   // DBユーザー名（データベース詳細 ＞ ユーザー一覧）
+        'pass'    => 'xxxxxxxx',            // DBユーザーのパスワード
         'charset' => 'utf8mb4',
     ],
 

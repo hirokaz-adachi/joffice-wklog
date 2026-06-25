@@ -1,4 +1,4 @@
-# joffice-pro（PHP＋MySQL 本番相当）を FTPS で /joffice-pro/ へ配信する。
+﻿# joffice-pro（PHP＋MySQL 本番相当）を FTPS で /joffice-pro/ へ配信する。
 # 認証情報は scripts\deploy.config.ps1（デモ用と同じFTPアカウント）を流用し、
 # 配置先だけ /joffice-pro/ に差し替える。pro\ 配下を再帰的にアップロードする。
 #
@@ -26,11 +26,15 @@ if (-not (Test-Path $cfg)) {
   exit 1
 }
 . $cfg
-if (-not $FtpHost -or -not $FtpUser -or -not $FtpPass) {
-  Write-Host "!! deploy.config.ps1 の FtpHost / FtpUser / FtpPass を設定してください。"
+if (-not $FtpHost -or -not $FtpUser -or -not $FtpPass -or -not $RemoteDir) {
+  Write-Host "!! deploy.config.ps1 の FtpHost / FtpUser / FtpPass / RemoteDir を設定してください。"
   exit 1
 }
-$ProRemoteDir = '/joffice-pro/'
+# デモの RemoteDir(.../joffice/) と同じ階層に joffice-pro を配置（ドメインフォルダ構成に自動追従）
+$base = $RemoteDir.TrimEnd('/')
+$idx  = $base.LastIndexOf('/')
+$parent = if ($idx -ge 0) { $base.Substring(0, $idx + 1) } else { '/' }
+$ProRemoteDir = $parent + 'joffice-pro/'
 
 # 2) WinSCP.com を探す
 $winscp = $null
