@@ -1,0 +1,116 @@
+/* マスタメンテナンス画面 専用スタイル（styles.css / data-edit.css を併用） */
+.master-edit-form {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafb;
+}
+
+.master-edit-form label {
+  font-size: 12px;
+}
+
+.master-edit-form input {
+  width: auto;
+  min-width: 200px;
+}
+
+.master-edit-form .form-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.master-edit-form.is-editing {
+  border-color: #d8a657;
+  background: #fffbeb;
+}
+
+.master-edit-form.is-editing .primary {
+  background: #b45309;
+  border-color: #b45309;
+}
+
+.master-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.master-search input {
+  width: auto;
+  min-width: 240px;
+}
+
+.master-search .filter-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+#masterTable { min-width: 520px; }
+#masterTable th { background: #f8fafb; }
+#masterTable .col-key { width: 200px; color: var(--muted); font-weight: 800; }
+#masterTable .ops { width: 150px; text-align: right; }
+
+/* 行ホバーのハイライト（工数入力・月間と同様）。操作ボタンは自前の白背景＋個別ホバーを維持 */
+#masterTable tbody tr:hover > td { background: var(--accent-soft); }
+
+#masterTable .row-edit {
+  min-height: 30px;
+  padding: 0 10px;
+  color: var(--accent-dark);
+  background: #fff;
+  border-color: var(--accent);
+}
+#masterTable .row-edit:hover { background: var(--accent-soft); }
+
+#masterTable .row-del {
+  min-height: 30px;
+  padding: 0 10px;
+  color: var(--warn);
+  background: #fff;
+  border-color: #f3c6b1;
+}
+#masterTable .row-del:hover { background: #fff7ed; }
+
+@media (max-width: 640px) {
+  .master-edit-form input,
+  .master-search input { min-width: 0; width: 100%; }
+}
+
+/* 案2: 業務区分フォームの配賦区分・工程比、顧客担当グリッドのセレクト */
+.master-edit-form select { min-width: 160px; min-height: 36px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; }
+.master-edit-form .phase-input input { min-width: 90px; }
+#masterTable .num { text-align: right; font-variant-numeric: tabular-nums; }
+#masterBody select { width: 100%; min-height: 34px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; }
+#masterTable .row-edit[data-save] { color: #fff; background: var(--accent); border-color: var(--accent); }
+
+/* 顧客担当（時系列）: 対象月バー（年/月セレクト＋前月/翌月）・有効状態のタグ */
+.assignee-month-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.amb-label { font-weight: 800; color: var(--ink); }
+/* ベースの select{width:100%} を打ち消し、内容幅で横並び固定 */
+.amb-select { flex: 0 0 auto; width: auto; min-height: 34px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; font-weight: 700; background: #fff; }
+#assigneeYear { min-width: 96px; }
+#assigneeMon { min-width: 76px; }
+.amb-nav { min-height: 34px; min-width: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; font-size: 18px; line-height: 1; color: var(--accent); }
+.amb-nav:hover { background: var(--accent-soft); }
+.amb-note { margin-left: 6px; color: var(--muted); font-size: 12px; }
+/* セレクトとタグを横並び。セレクトは伸縮、タグは右側に固定幅で中央整列 */
+.assignee-cell { display: flex; align-items: center; gap: 8px; }
+.assignee-cell select { flex: 1 1 auto; min-width: 0; }
+.eff-tag {
+  flex: 0 0 auto; display: inline-block; padding: 3px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; line-height: 1.4; white-space: nowrap; vertical-align: middle;
+}
+.eff-tag.eff-this { background: #dff3ef; color: #0b5d57; }
+.eff-tag.eff-inh { background: #eef2ff; color: #3730a3; }
+.eff-tag.eff-none { background: #f1f3f5; color: #868e96; }
+.row-revert { margin-left: 6px; border-color: #efc7b8; color: #9a3412; }

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>J-Office (pro) ｜ マスタメンテナンス</title>
+  <link rel="stylesheet" href="styles.css?v=20260625-1">
+  <link rel="stylesheet" href="data-edit.css?v=20260625-1">
+  <link rel="stylesheet" href="master.css?v=20260625-1">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">J-Office (pro)</p>
+      <h1>マスタメンテナンス</h1>
+    </div>
+    <div class="top-actions">
+      <span id="whoami" class="edit-status"></span>
+      <button id="reload" type="button" class="secondary">再読込</button>
+      <button id="logout" type="button" class="secondary">ログアウト</button>
+    </div>
+  </header>
+
+  <main class="edit-shell">
+    <section class="edit-panel">
+      <div class="edit-toolbar">
+        <div class="tabs" role="tablist" aria-label="マスタ選択">
+          <button type="button" class="tab is-active" data-master="staff" role="tab">スタッフ</button>
+          <button type="button" class="tab" data-master="customers" role="tab">顧客</button>
+          <button type="button" class="tab" data-master="tasks" role="tab">業務区分・工程</button>
+          <button type="button" class="tab" data-master="assignees" role="tab">顧客担当</button>
+          <button type="button" class="tab" data-master="settings" role="tab">設定</button>
+        </div>
+        <div class="edit-actions">
+          <span id="dataStatus" class="edit-status">読み込み中…</span>
+        </div>
+      </div>
+
+      <p id="masterHint" class="edit-hint"></p>
+
+      <form id="masterForm" class="master-edit-form" autocomplete="off"></form>
+
+      <div class="master-search">
+        <input id="masterSearch" type="search" placeholder="絞り込み（コード・名称）">
+        <span id="masterCount" class="filter-count"></span>
+      </div>
+
+      <div class="table-wrap edit-grid">
+        <table id="masterTable">
+          <thead id="masterHead"></thead>
+          <tbody id="masterBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="backend.js?v=20260625-4"></script>
+  <script src="allocation.js?v=20260625-1"></script>
+  <script>
+    // ログアウト
+    document.getElementById('logout').addEventListener('click', function () {
+      joLogout().then(function () { location.replace('login.html'); })
+                .catch(function () { location.replace('login.html'); });
+    });
+    // 認証ガード：未ログインなら login.html へ。OKなら CSRF を確保してから master.js を読み込む。
+    joMe().then(function (u) {
+      var w = document.getElementById('whoami');
+      if (w) w.textContent = (u.displayName || u.loginId) + '（' + u.role + '）';
+      var s = document.createElement('script');
+      s.src = 'master.js?v=20260625-1';
+      document.body.appendChild(s);
+    }).catch(function () {
+      location.replace('login.html');
+    });
+  </script>
+</body>
+</html>

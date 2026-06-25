@@ -86,3 +86,30 @@ const joSaveCustomerStaffs = (rows) => joWrite('saveCustomerStaffs', { rows });
 const joDeleteCustomerStaff = (customerCode, role, effectiveFrom) => joWrite('deleteCustomerStaff', { customerCode, role, effectiveFrom });
 // 設定
 const joSaveSetting = (key, value) => joWrite('saveSetting', { key, value });
+
+// ---- 旧 WorklogBackend 互換シム ----
+// 既存画面（master.js 等）はインクルード差し替えのみで再利用するため、
+// GAS版 backend.js と同じ window.WorklogBackend API を fetch 実装で提供する。
+window.WorklogBackend = {
+  isRemote: () => true,
+  loadState: () => joBootstrap(),
+  loadDashboard: (force) => joCall('dashboard', { forceRefresh: !!force }).then((r) => r.data),
+  saveEntry: joSaveEntry,
+  saveEntries: joSaveEntries,
+  deleteEntry: joDeleteEntry,
+  saveBilling: joSaveBilling,
+  saveBillings: joSaveBillings,
+  deleteBilling: joDeleteBilling,
+  saveTarget: joSaveTarget,
+  saveTargets: joSaveTargets,
+  deleteTarget: joDeleteTarget,
+  upsertMaster: joUpsertMaster,
+  removeMaster: joRemoveMaster,
+  saveTaskPhase: joSaveTaskPhase,
+  saveTaskPhases: joSaveTaskPhases,
+  deleteTaskPhase: joDeleteTaskPhase,
+  saveCustomerStaff: joSaveCustomerStaff,
+  saveCustomerStaffs: joSaveCustomerStaffs,
+  deleteCustomerStaff: joDeleteCustomerStaff,
+  saveSetting: joSaveSetting,
+};
