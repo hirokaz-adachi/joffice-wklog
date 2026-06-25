@@ -35,8 +35,22 @@
     bCust: document.getElementById("bCust"),
     bClear: document.getElementById("bClear"),
     bCount: document.getElementById("bCount"),
+    csvImport: document.getElementById("csvImport"),
+    csvFile: document.getElementById("csvFile"),
+    csvModal: document.getElementById("csvModal"),
+    csvClose: document.getElementById("csvClose"),
+    csvCancel: document.getElementById("csvCancel"),
+    csvConfirm: document.getElementById("csvConfirm"),
+    csvMonth: document.getElementById("csvMonth"),
+    csvTransfer: document.getElementById("csvTransfer"),
+    csvSummary: document.getElementById("csvSummary"),
+    csvWarn: document.getElementById("csvWarn"),
+    csvPreviewBody: document.getElementById("csvPreviewBody"),
     toast: document.getElementById("toast")
   };
+
+  // CSV取込プレビューの作業用ステート（確定前の解析結果を保持）
+  let csvDraft = null;
 
   init();
 
@@ -55,6 +69,13 @@
     el.billBody.addEventListener("click", onBodyClick);
     [el.bFrom, el.bTo, el.bCust].forEach((x) => x.addEventListener("input", renderBill));
     el.bClear.addEventListener("click", clearBillFilter);
+    // CSV取込（かつ・かいしゅう 口座振替CSV・Shift-JIS）
+    el.csvImport.addEventListener("click", () => el.csvFile.click());
+    el.csvFile.addEventListener("change", onCsvFile);
+    el.csvClose.addEventListener("click", closeCsvModal);
+    el.csvCancel.addEventListener("click", closeCsvModal);
+    el.csvConfirm.addEventListener("click", confirmCsvImport);
+    el.csvMonth.addEventListener("change", onCsvMonthChange);
   }
 
   function isRemote() {
@@ -79,14 +100,14 @@
           state.taskPhases = (Array.isArray(st.taskPhases) ? st.taskPhases : [])
             .map((p) => ({ taskCode: String(p.taskCode), phaseCode: String(p.phaseCode), ratio: Number(p.ratio || 0), sortOrder: Number(p.sortOrder || 0) }));
           state.tasks = (Array.isArray(st.tasks) ? st.tasks : [])
-            .map((t) => ({ code: normCode(t.code), name: String(t.name || "") })).filter((t) => t.code && t.name);
+            .map((t) => ({ code: normCode(t.code), name: String(t.name || ""), allocationType: String(t.allocationType || "service") })).filter((t) => t.code && t.name);
           state.work = (st.entries || []).map(normWork);
         }
         if (db) {
           if (!state.staff.length && db.staff) state.staff = normMaster(db.staff);
           if (!state.customers.length && db.customers) state.customers = normMaster(db.customers);
           if (!state.tasks.length && Array.isArray(db.tasks)) {
-            state.tasks = db.tasks.map((t) => ({ code: normCode(t.code), name: String(t.name || "") })).filter((t) => t.code && t.name);
+            state.tasks = db.tasks.map((t) => ({ code: normCode(t.code), name: String(t.name || ""), allocationType: String(t.allocationType || "service") })).filter((t) => t.code && t.name);
           }
           state.bill = (db.billing || []).map(normBill);
         }
@@ -629,6 +650,205 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
   function currentMonth() { return today().slice(0, 7); }
+
+  // ===== CSV取込（かつ・かいしゅう 口座振替CSV・Shift-JIS・20列固定） =====
+  // 列: [0]振替日 [6]関与先コード [7]関与先名 [8]内訳=業務コード [9]報酬額 [10]源泉税額
+  const CSV_COL = { transfer: 0, custCode: 6, custName: 7, itemCode: 8, amount: 9 };
+
+  function onCsvFile(event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = ""; // 同一ファイルの連続選択を可能に
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const text = new TextDecoder("shift_jis").decode(new Uint8Array(reader.result));
+        const draft = buildCsvDraft(text);
+        if (!draft) return;
+        csvDraft = draft;
+        openCsvModal(draft);
+      } catch (error) {
+        showToast("CSV解析に失敗しました: " + error.message);
+      }
+    };
+    reader.onerror = () => showToast("ファイル読込に失敗しました");
+    reader.readAsArrayBuffer(file);
+  }
+
+  // 引用符対応のCSVパーサ（app.js parseCsv 相当。Shift-JISデコード済み文字列を渡す）
+  function parseCsvText(text) {
+    const rows = []; let row = []; let cell = ""; let quoted = false;
+    const s = String(text).replace(/^﻿/, "");
+    for (let i = 0; i < s.length; i += 1) {
+      const ch = s[i], nx = s[i + 1];
+      if (quoted) {
+        if (ch === '"' && nx === '"') { cell += '"'; i += 1; }
+        else if (ch === '"') { quoted = false; }
+        else { cell += ch; }
+      } else if (ch === '"') { quoted = true; }
+      else if (ch === ",") { row.push(cell); cell = ""; }
+      else if (ch === "\n") { row.push(cell.replace(/\r$/, "")); rows.push(row); row = []; cell = ""; }
+      else { cell += ch; }
+    }
+    if (cell || row.length) { row.push(cell); rows.push(row); }
+    return rows.filter((r) => r.some((c) => String(c).trim()));
+  }
+
+  function normTransferDate(v) {
+    const m = String(v || "").trim().match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/);
+    return m ? `${m[1]}-${String(m[2]).padStart(2, "0")}-${String(m[3]).padStart(2, "0")}` : "";
+  }
+  // 振替月 − 1 ＝ 請求月（YYYY-MM）
+  function transferToBillingMonth(iso) {
+    const m = String(iso || "").match(/^(\d{4})-(\d{2})/);
+    if (!m) return "";
+    let y = Number(m[1]), mo = Number(m[2]) - 1;
+    if (mo <= 0) { mo += 12; y -= 1; }
+    return `${y}-${String(mo).padStart(2, "0")}`;
+  }
+  function csvNum(v) { const n = Number(String(v == null ? "" : v).replace(/[,\s]/g, "")); return Number.isFinite(n) ? n : 0; }
+  function fmtYen(n) { return Number(n || 0).toLocaleString("ja-JP"); }
+
+  function buildCsvDraft(text) {
+    const rows = parseCsvText(text);
+    if (rows.length < 2) { showToast("CSVにデータ行がありません"); return null; }
+    // 先頭がヘッダー行（[0]が日付でない）ならスキップ
+    let dataRows = rows;
+    if (!/^\d{4}\D\d/.test(String((rows[0] || [])[CSV_COL.transfer] || ""))) dataRows = rows.slice(1);
+    if (dataRows.some((r) => r.length < 11)) { showToast("想定外の列構成です（20列のかつ・かいしゅうCSVを指定してください）"); return null; }
+
+    // 振替日の単一性（1ファイル＝1請求月）
+    const transfers = Array.from(new Set(dataRows.map((r) => normTransferDate(r[CSV_COL.transfer])).filter(Boolean)));
+    if (transfers.length === 0) { showToast("振替日を読み取れませんでした"); return null; }
+    if (transfers.length > 1) { showToast("振替日が複数あります（1ファイル＝1請求月）。ファイルを分けてください"); return null; }
+    const transferDate = transfers[0];
+    const billingMonth = transferToBillingMonth(transferDate);
+
+    const items = [];
+    let skipped = 0;
+    const unknownCodes = new Set();
+    const unknownCusts = new Map();
+    dataRows.forEach((r) => {
+      const amount = csvNum(r[CSV_COL.amount]);
+      if (amount === 0) { skipped += 1; return; } // ¥0行（コード000等）はスキップ
+      const code = normCode(r[CSV_COL.itemCode]);
+      const custCode = String(r[CSV_COL.custCode] || "").trim();
+      const custName = String(r[CSV_COL.custName] || "").trim();
+      const task = state.tasks.find((t) => t.code === code);
+      const type = task ? task.allocationType : "unknown";
+      if (!task) unknownCodes.add(code);
+      if (custCode && !state.customers.some((c) => c.code === custCode)) unknownCusts.set(custCode, custName);
+      items.push({ code, amount, custCode, custName, type, taskName: task ? task.name : "" });
+    });
+    if (!items.length) { showToast("取り込める行がありませんでした（全行¥0など）"); return null; }
+
+    return {
+      transferDate, billingMonth, items, skipped,
+      unknownCodes: Array.from(unknownCodes).sort(),
+      unknownCusts: Array.from(unknownCusts.entries())
+    };
+  }
+
+  // 決定論ID（b_請求月_顧客_内訳）で billing 行を生成。再取込は upsert 上書き＝重複なし。
+  // 080消費税は独立行・netAmount＝税額（既存デモ/allocation.js 踏襲）。
+  function csvBillingRows(draft, month) {
+    return draft.items.map((it) => ({
+      invoiceId: `b_${month}_${it.custCode}_${it.code}`,
+      billingMonth: month,
+      customerCode: it.custCode,
+      customer: it.custName || masterName("customers", it.custCode),
+      invoiceItem: it.taskName || it.code,
+      invoiceItemCode: it.code,
+      transferDate: draft.transferDate,
+      paymentMethod: "口座振替",
+      netAmount: it.amount,
+      taxAmount: 0,
+      grossAmount: it.amount,
+      issuedDate: "",
+      paymentDueDate: "",
+      paymentStatus: "",
+      memo: ""
+    }));
+  }
+
+  function openCsvModal(draft) {
+    el.csvTransfer.textContent = draft.transferDate || "—";
+    el.csvMonth.value = draft.billingMonth;
+    renderCsvPreview(draft);
+    el.csvModal.hidden = false;
+  }
+  function closeCsvModal() { el.csvModal.hidden = true; csvDraft = null; }
+  function onCsvMonthChange() { if (csvDraft) renderCsvPreview(csvDraft); }
+
+  function renderCsvPreview(draft) {
+    const month = el.csvMonth.value || draft.billingMonth;
+    let service = 0, excluded = 0, tax = 0, unknownAmt = 0;
+    const custSet = new Set();
+    draft.items.forEach((it) => {
+      custSet.add(it.custCode);
+      const t = it.code === "080" ? "tax" : it.type;
+      if (t === "tax") tax += it.amount;
+      else if (t === "excluded") excluded += it.amount;
+      else if (t === "unknown") unknownAmt += it.amount;
+      else service += it.amount;
+    });
+    const taxable = service + excluded + unknownAmt; // 税抜（080除く）
+    el.csvSummary.innerHTML = `<div class="csv-sum-grid">
+      <div><span>請求月</span><b>${esc(month)}</b></div>
+      <div><span>顧客数</span><b>${custSet.size}</b></div>
+      <div><span>取込行</span><b>${draft.items.length}</b></div>
+      <div><span>スキップ(¥0)</span><b>${draft.skipped}</b></div>
+      <div><span>役務</span><b>¥${fmtYen(service)}</b></div>
+      <div><span>配賦対象外</span><b>¥${fmtYen(excluded)}</b></div>
+      ${unknownAmt ? `<div class="is-warn"><span>未マッチ</span><b>¥${fmtYen(unknownAmt)}</b></div>` : ""}
+      <div><span>消費税(080)</span><b>¥${fmtYen(tax)}</b></div>
+      <div class="csv-sum-total"><span>税抜計</span><b>¥${fmtYen(taxable)}</b></div>
+      <div class="csv-sum-total"><span>税込計</span><b>¥${fmtYen(taxable + tax)}</b></div>
+    </div>`;
+
+    const warns = [];
+    if (draft.unknownCodes.length) warns.push(`マッチング漏れ業務コード: ${draft.unknownCodes.join(", ")}（業務区分マスタに未登録）`);
+    if (draft.unknownCusts.length) warns.push(`顧客マスタ未登録: ${draft.unknownCusts.map((e) => `${e[0]} ${e[1]}`).join(" / ")}`);
+    if (warns.length) { el.csvWarn.hidden = false; el.csvWarn.innerHTML = warns.map((w) => `<div>⚠ ${esc(w)}</div>`).join(""); }
+    else { el.csvWarn.hidden = true; el.csvWarn.innerHTML = ""; }
+
+    const typeLabel = { service: "役務", excluded: "対象外", tax: "税", unknown: "未マッチ" };
+    const max = 200;
+    const body = draft.items.slice(0, max).map((it) => {
+      const t = it.code === "080" ? "tax" : it.type;
+      return `<tr class="${t === "unknown" ? "is-warn" : ""}">
+        <td>${esc(it.custCode)} ${esc(it.custName)}</td>
+        <td>${esc(it.code)} ${esc(it.taskName)}</td>
+        <td class="num">¥${fmtYen(it.amount)}</td>
+        <td><span class="csv-tag tag-${t}">${typeLabel[t] || esc(t)}</span></td>
+      </tr>`;
+    }).join("");
+    el.csvPreviewBody.innerHTML = body + (draft.items.length > max ? `<tr><td colspan="4" class="csv-more">ほか ${draft.items.length - max} 行</td></tr>` : "");
+  }
+
+  async function confirmCsvImport() {
+    if (!csvDraft) return;
+    const month = el.csvMonth.value || csvDraft.billingMonth;
+    if (!/^\d{4}-\d{2}$/.test(month)) { showToast("請求月を確認してください"); return; }
+    const rows = csvBillingRows(csvDraft, month);
+    el.csvConfirm.disabled = true;
+    try {
+      await window.WorklogBackend.saveBillings(rows); // 未接続時は null（ローカルのみ更新）
+    } catch (error) {
+      showToast(error.message); el.csvConfirm.disabled = false; return;
+    }
+    el.csvConfirm.disabled = false;
+    rows.forEach((b) => {
+      const idx = state.bill.findIndex((x) => x.invoiceId === b.invoiceId);
+      if (idx >= 0) state.bill[idx] = normBill(b); else state.bill.push(normBill(b));
+    });
+    persistLocal();
+    closeCsvModal();
+    el.bFrom.value = month; el.bTo.value = month; // 取込月で絞り込み表示
+    renderBill();
+    updateDirtyInfo();
+    showToast(`取り込みました（${rows.length}件・${month}）`);
+  }
 
   function numAttr(v) {
     const n = Number(v);

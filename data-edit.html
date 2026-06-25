@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>J-Office Insight ｜ 請求 照会・訂正</title>
   <link rel="stylesheet" href="styles.css?v=20260624-5">
-  <link rel="stylesheet" href="data-edit.css?v=20260624-2">
+  <link rel="stylesheet" href="data-edit.css?v=20260625-1">
 </head>
 <body>
   <header class="topbar">
@@ -29,8 +29,10 @@
         <div class="edit-actions">
           <span id="dataStatus" class="edit-status">読み込み中…</span>
           <span id="dirtyInfo" class="dirty-info" aria-live="polite"></span>
+          <button id="csvImport" type="button" class="secondary">CSV取込</button>
           <button id="addRow" type="button" class="secondary">＋ 請求行を追加</button>
           <button id="saveAll" type="button">変更を保存</button>
+          <input id="csvFile" type="file" accept=".csv,text/csv" hidden>
         </div>
       </div>
 
@@ -72,10 +74,40 @@
     </section>
   </main>
 
+  <!-- CSV取込プレビュー（かつ・かいしゅう 口座振替CSV・Shift-JIS） -->
+  <div id="csvModal" class="modal-overlay" hidden>
+    <div class="modal-card csv-modal">
+      <div class="modal-head">
+        <h2>請求CSVの取込プレビュー</h2>
+        <button id="csvClose" type="button" class="modal-x" aria-label="閉じる">×</button>
+      </div>
+      <div class="csv-controls">
+        <label>請求月
+          <input type="month" id="csvMonth">
+        </label>
+        <span class="csv-month-note">振替日 <b id="csvTransfer">—</b> → 請求月＝振替月−1（手修正可）</span>
+      </div>
+      <div id="csvSummary" class="csv-summary"></div>
+      <div id="csvWarn" class="csv-warn" hidden></div>
+      <div class="csv-preview-wrap">
+        <table class="csv-preview-table">
+          <thead>
+            <tr><th>顧客</th><th>業務</th><th class="num">税抜</th><th>区分</th></tr>
+          </thead>
+          <tbody id="csvPreviewBody"></tbody>
+        </table>
+      </div>
+      <div class="csv-actions">
+        <button id="csvCancel" type="button" class="secondary">キャンセル</button>
+        <button id="csvConfirm" type="button">この内容で取込</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="config.js"></script>
   <script src="backend.js?v=20260623-2"></script>
   <script src="allocation.js?v=20260623-3"></script>
-  <script src="data-edit.js?v=20260624-2"></script>
+  <script src="data-edit.js?v=20260625-1"></script>
 </body>
 </html>

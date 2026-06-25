@@ -226,3 +226,45 @@
 .col-phase.is-mismatch { background: #fff5e6; }
 .col-phase.is-mismatch select { border-color: #d98324; box-shadow: 0 0 0 2px rgba(217, 131, 36, 0.18); }
 .col-phase.is-mismatch::after { content: "⚠"; margin-left: 4px; color: #b45309; font-weight: 700; }
+
+/* CSV取込プレビュー */
+.csv-modal { width: min(760px, 100%); }
+.csv-controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+.csv-controls label { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+.csv-controls input[type="month"] { min-height: 36px; }
+.csv-month-note { color: var(--muted); font-size: 12px; }
+.csv-month-note b { color: var(--ink); }
+
+.csv-sum-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px;
+  margin-bottom: 12px;
+}
+.csv-sum-grid > div {
+  background: var(--surface-2, #f6f8f9); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; display: flex; flex-direction: column; gap: 2px;
+}
+.csv-sum-grid span { color: var(--muted); font-size: 11px; }
+.csv-sum-grid b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.csv-sum-grid .csv-sum-total { background: var(--accent-soft); border-color: var(--accent); }
+.csv-sum-grid .is-warn { background: #fff5e6; border-color: #d98324; }
+
+.csv-warn {
+  background: #fff5e6; border: 1px solid #d98324; border-radius: 8px;
+  padding: 8px 12px; margin-bottom: 12px; color: #92400e; font-size: 12px; line-height: 1.6;
+}
+
+.csv-preview-wrap { max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.csv-preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.csv-preview-table th, .csv-preview-table td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.csv-preview-table th { position: sticky; top: 0; background: var(--surface); color: var(--muted); font-weight: 700; }
+.csv-preview-table td.num, .csv-preview-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.csv-preview-table tr.is-warn { background: #fff5e6; }
+.csv-preview-table .csv-more { text-align: center; color: var(--muted); }
+
+.csv-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.csv-tag.tag-service { background: #e6f4ea; color: #1d6b38; }
+.csv-tag.tag-excluded { background: #eef0f2; color: #5b6770; }
+.csv-tag.tag-tax { background: #eae6f7; color: #5b3da6; }
+.csv-tag.tag-unknown { background: #fde2e1; color: #b91c1c; }
+
+.csv-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
