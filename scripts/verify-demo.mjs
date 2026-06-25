@@ -19,7 +19,7 @@ console.log(`スタッフ ${data.staff.length}名 / 顧客 ${data.customers.leng
 console.log(`工数 ${data.entries.length}件 / 請求 ${data.billing.length}行\n`);
 
 check("スタッフ8名", data.staff.length === 8);
-check("顧客22社", data.customers.length === 22);
+check("顧客40社", data.customers.length === 40);
 check("業務区分15件", data.tasks.length === 15);
 check("全工数にメモあり", data.entries.every((e) => e.memo && String(e.memo).trim() !== ""),
   `空メモ ${data.entries.filter((e) => !e.memo || !String(e.memo).trim()).length}件`);
@@ -50,7 +50,7 @@ MONTHS.forEach((month) => {
   console.log(`[${month}] 税抜(総) ${yen(gross)}  役務 ${yen(m.firm.serviceRevenue)}  配賦対象外 ${yen(m.firm.excludedRevenue)}  消費税 ${yen(m.firm.tax)}  税込 ${yen(gross + m.firm.tax)}`);
   console.log(`        Σ帰属 ${yen(sumAttr)}  工数対応 ${yen(sumBacked)}  未配賦 ${yen(m.firm.unallocated)}  複数明細セル ${mc}個  週末工数 ${weekendEntries}件`);
 
-  check(`[${month}] 税抜(総) 200〜250万`, gross >= 2000000 && gross <= 2500000, yen(gross));
+  check(`[${month}] 税抜(総) 330〜460万`, gross >= 3300000 && gross <= 4600000, yen(gross));
   check(`[${month}] Σ帰属 = 役務売上`, Math.abs(sumAttr - m.firm.serviceRevenue) < 1);
   check(`[${month}] 税抜 = 役務+配賦対象外`, Math.abs(gross - (m.firm.serviceRevenue + m.firm.excludedRevenue)) < 1);
   check(`[${month}] 未配賦 = 0`, m.firm.unallocated === 0);
@@ -60,11 +60,11 @@ MONTHS.forEach((month) => {
   check(`[${month}] 週末工数なし`, weekendEntries === 0);
 });
 
-// 時系列担当交代（C001 PRE: 4月 preStaff(0)=S001 / 5月以降 S002）
+// 時系列担当交代（顧客index0=0001 PRE: 4月 preStaff(0)=S001 / 5月以降 S002）
 console.log("");
 const apr = ENGINE.buildMonthModel(data, "2026-04");
 const may = ENGINE.buildMonthModel(data, "2026-05");
-check("[時系列] C001 4月の主担当=S001", (apr.customers.find((c) => c.code === "C001") || {}).leadPre === undefined || true); // 表示確認は実機。配賦のみ検証
+check("[時系列] 0001 4月の主担当=S001", (apr.customers.find((c) => c.code === "0001") || {}).leadPre === undefined || true); // 表示確認は実機。配賦のみ検証
 const s1apr = (apr.staff.find((s) => s.code === "S001") || {}).attributedRevenue || 0;
 const s2may = (may.staff.find((s) => s.code === "S002") || {}).attributedRevenue || 0;
 check("[時系列] 担当交代で配賦先が動く（S001 4月>0・S002 5月>0）", s1apr > 0 && s2may > 0);
