@@ -120,3 +120,44 @@ function jo_handle_bootstrap(array $user): array
         'entries'       => $entries,
     ];
 }
+
+// dashboard：集計用フルデータ。bootstrap のコア＋billing＋targets。admin/manager 専用（呼び出し側で制御）。
+function jo_handle_dashboard(array $user): array
+{
+    $core = jo_handle_bootstrap($user); // admin/manager のため entries は全件
+
+    $billing = array_map(static function ($r) {
+        return [
+            'invoiceId'       => (string) $r['invoiceId'],
+            'billingMonth'    => (string) $r['billingMonth'],
+            'customerCode'    => (string) ($r['customerCode'] ?? ''),
+            'customer'        => (string) ($r['customer'] ?? ''),
+            'invoiceItem'     => (string) ($r['invoiceItem'] ?? ''),
+            'invoiceItemCode' => (string) ($r['invoiceItemCode'] ?? ''),
+            'paymentMethod'   => (string) ($r['paymentMethod'] ?? ''),
+            'netAmount'       => (float) $r['netAmount'],
+            'taxAmount'       => (float) $r['taxAmount'],
+            'grossAmount'     => (float) $r['grossAmount'],
+            'transferDate'    => (string) ($r['transferDate'] ?? ''),
+            'issuedDate'      => (string) ($r['issuedDate'] ?? ''),
+            'paymentDueDate'  => (string) ($r['paymentDueDate'] ?? ''),
+            'paymentStatus'   => (string) ($r['paymentStatus'] ?? ''),
+            'memo'            => (string) ($r['memo'] ?? ''),
+        ];
+    }, jo_rows('SELECT invoiceId, billingMonth, customerCode, customer, invoiceItem, invoiceItemCode, paymentMethod, netAmount, taxAmount, grossAmount, transferDate, issuedDate, paymentDueDate, paymentStatus, memo FROM jo_billings ORDER BY billingMonth, invoiceId'));
+
+    $targets = array_map(static function ($r) {
+        return [
+            'targetMonth'  => (string) $r['targetMonth'],
+            'staffCode'    => (string) $r['staffCode'],
+            'staff'        => (string) ($r['staff'] ?? ''),
+            'targetAmount' => (float) $r['targetAmount'],
+        ];
+    }, jo_rows('SELECT t.targetMonth, t.staffCode, s.name AS staff, t.targetAmount FROM jo_staff_targets t LEFT JOIN jo_staff s ON s.code = t.staffCode ORDER BY t.targetMonth, t.staffCode'));
+
+    return array_merge($core, [
+        'generatedAt' => date('c'),
+        'billing'     => $billing,
+        'targets'     => $targets,
+    ]);
+}

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>J-Office Insight ｜ 売上目標登録</title>
+  <link rel="stylesheet" href="styles.css?v=20260624-5">
+  <link rel="stylesheet" href="data-edit.css?v=20260622-1">
+  <link rel="stylesheet" href="targets.css?v=20260622-1">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">J-Office Insight</p>
+      <h1>売上目標登録</h1>
+    </div>
+    <div class="top-actions">
+      <a class="nav-button nav-home" href="index.html">メニュー</a>
+      <a class="nav-button" href="master.html">マスタ</a>
+      <a class="nav-button" href="data-edit.html">請求 照会・訂正</a>
+      <a class="nav-button" href="worklog.html">工数 照会・訂正</a>
+      <button id="reload" type="button" class="secondary">再読込</button>
+    </div>
+  </header>
+
+  <main class="edit-shell">
+    <section class="edit-panel">
+      <div class="edit-toolbar">
+        <div class="month-control">
+          <label class="inline-label">対象月
+            <input id="targetMonth" type="month">
+          </label>
+          <button id="copyPrev" type="button" class="secondary">前月の目標をコピー</button>
+        </div>
+        <div class="edit-actions">
+          <span id="dataStatus" class="edit-status">読み込み中…</span>
+          <span id="dirtyInfo" class="dirty-info" aria-live="polite"></span>
+          <button id="saveAll" type="button">変更を保存</button>
+        </div>
+      </div>
+
+      <p class="edit-hint">対象月を選び、各スタッフの売上目標額を入力して「変更を保存」を押してください。空欄にして保存すると、その月の目標は削除されます。「前月の目標をコピー」は未入力のスタッフに前月の額を入れます。</p>
+
+      <div class="table-wrap edit-grid">
+        <table id="targetTable">
+          <thead>
+            <tr>
+              <th class="col-staff">スタッフ</th>
+              <th class="col-amt num">売上目標（税抜・円）</th>
+            </tr>
+          </thead>
+          <tbody id="targetBody"></tbody>
+          <tfoot>
+            <tr>
+              <th>合計</th>
+              <th class="num"><span id="targetTotal">0</span></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="backend.js?v=20260625-4"></script>
+  <script>
+    joMe().then(function () {
+      var s = document.createElement('script');
+      s.src = 'targets.js?v=20260625-1';
+      document.body.appendChild(s);
+    }).catch(function () { location.replace('login.html'); });
+  </script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>J-Office Insight ｜ 請求 照会・訂正</title>
+  <link rel="stylesheet" href="styles.css?v=20260624-5">
+  <link rel="stylesheet" href="data-edit.css?v=20260625-2">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">J-Office Insight</p>
+      <h1>請求 照会・訂正</h1>
+    </div>
+    <div class="top-actions">
+      <a class="nav-button nav-home" href="index.html">メニュー</a>
+      <a class="nav-button" href="master.html">マスタ</a>
+      <a class="nav-button" href="targets.html">売上目標</a>
+      <a class="nav-button" href="worklog.html">工数 照会・訂正</a>
+      <button id="reload" type="button" class="secondary">再読込</button>
+    </div>
+  </header>
+
+  <main class="edit-shell">
+    <section class="edit-panel">
+      <div class="edit-toolbar">
+        <div class="edit-title">請求（売上）データ</div>
+        <div class="edit-actions">
+          <span id="dataStatus" class="edit-status">読み込み中…</span>
+          <span id="dirtyInfo" class="dirty-info" aria-live="polite"></span>
+          <button id="csvImport" type="button" class="secondary">CSV取込</button>
+          <button id="addRow" type="button" class="secondary">＋ 請求行を追加</button>
+          <button id="saveAll" type="button">変更を保存</button>
+          <input id="csvFile" type="file" accept=".csv,text/csv" hidden>
+        </div>
+      </div>
+
+      <p class="edit-hint">請求（売上）データをセルで直接編集できます。編集・追加した行は黄色でハイライトされ、「変更を保存」でまとめて反映します。削除は各行のボタンから行います（保存済みデータは即時削除）。工数の訂正は「工数管理」画面で行ってください。</p>
+
+      <div id="panelBill" class="grid-panel" role="tabpanel">
+        <div class="grid-filters">
+          <label>請求月（開始）<input type="month" id="bFrom"></label>
+          <label>請求月（終了）<input type="month" id="bTo"></label>
+          <label>顧客 <select id="bCust"></select></label>
+          <button id="bClear" type="button" class="secondary">クリア</button>
+          <span id="bCount" class="filter-count"></span>
+        </div>
+        <div class="table-wrap edit-grid">
+          <table class="bill-table">
+            <thead>
+              <tr>
+                <th class="col-invid">請求ID</th>
+                <th class="col-month">請求月</th>
+                <th class="col-customer">顧客</th>
+                <th class="col-code">業務コード</th>
+                <th class="col-item">請求項目</th>
+                <th class="col-pay">入金方法</th>
+                <th class="col-amt num">税抜</th>
+                <th class="col-amt num">消費税</th>
+                <th class="col-amt num">税込</th>
+                <th class="col-date2">振替日</th>
+                <th class="col-date2">発行日</th>
+                <th class="col-date2">入金期日</th>
+                <th class="col-status">入金状況</th>
+                <th class="col-memo">メモ</th>
+                <th class="col-ops">操作</th>
+              </tr>
+            </thead>
+            <tbody id="billBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- CSV取込プレビュー（かつ・かいしゅう 口座振替CSV・Shift-JIS） -->
+  <div id="csvModal" class="modal-overlay" hidden>
+    <div class="modal-card csv-modal">
+      <div class="modal-head">
+        <h2>請求CSVの取込プレビュー</h2>
+        <button id="csvClose" type="button" class="modal-x" aria-label="閉じる">×</button>
+      </div>
+      <div class="csv-controls">
+        <label>請求月
+          <input type="month" id="csvMonth">
+        </label>
+        <span class="csv-month-note">振替日 <b id="csvTransfer">—</b> → 請求月＝振替月−1（手修正可）</span>
+      </div>
+      <div id="csvSummary" class="csv-summary"></div>
+      <div id="csvWarn" class="csv-warn" hidden></div>
+      <div class="csv-preview-wrap">
+        <table class="csv-preview-table">
+          <thead>
+            <tr><th>顧客</th><th>業務</th><th class="num">税抜</th><th>区分</th></tr>
+          </thead>
+          <tbody id="csvPreviewBody"></tbody>
+        </table>
+      </div>
+      <div class="csv-actions">
+        <button id="csvCancel" type="button" class="secondary">キャンセル</button>
+        <button id="csvConfirm" type="button">この内容で取込</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="backend.js?v=20260625-4"></script>
+  <script src="allocation.js?v=20260625-1"></script>
+  <script>
+    joMe().then(function () {
+      var s = document.createElement('script');
+      s.src = 'data-edit.js?v=20260625-1';
+      document.body.appendChild(s);
+    }).catch(function () { location.replace('login.html'); });
+  </script>
+</body>
+</html>

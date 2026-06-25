@@ -68,6 +68,11 @@ try {
             jo_json(['ok' => true, 'data' => jo_handle_bootstrap($user)]);
             break;
 
+        case 'dashboard':
+            $user = jo_require_role(['admin', 'manager']);
+            jo_json(['ok' => true, 'data' => jo_handle_dashboard($user)]);
+            break;
+
         // --- 更新系：工数（本人 or 管理者/マネージャ）---
         case 'saveEntry': {
             $user = jo_require_login();
