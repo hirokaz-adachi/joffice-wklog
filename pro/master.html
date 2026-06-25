@@ -67,6 +67,8 @@
     });
     // 認証ガード：未ログインなら login.html へ。OKなら CSRF を確保してから master.js を読み込む。
     joMe().then(function (u) {
+      if (u.mustChangePassword) { location.replace('change-password.html'); return; }
+      if (u.role !== 'admin') { location.replace('index.html'); return; }
       var w = document.getElementById('whoami');
       if (w) w.textContent = (u.displayName || u.loginId) + '（' + u.role + '）';
       var s = document.createElement('script');
