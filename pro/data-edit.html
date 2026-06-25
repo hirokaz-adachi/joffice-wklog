@@ -106,7 +106,9 @@
   <script src="backend.js?v=20260625-6"></script>
   <script src="allocation.js?v=20260625-1"></script>
   <script>
-    joMe().then(function () {
+    joMe().then(function (u) {
+      if (u.mustChangePassword) { location.replace('change-password.html'); return; }
+      if (u.role !== 'admin') { location.replace('index.html'); return; }
       var s = document.createElement('script');
       s.src = 'data-edit.js?v=20260625-2';
       document.body.appendChild(s);

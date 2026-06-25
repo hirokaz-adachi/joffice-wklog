@@ -84,7 +84,8 @@
   <script src="allocation.js?v=20260625-1"></script>
   <script>
     // 認証ガード：未ログインは login.html へ。OKなら CSRF 確保後に画面JSを読み込む。
-    joMe().then(function () {
+    joMe().then(function (u) {
+      if (u.mustChangePassword) { location.replace('change-password.html'); return; }
       var s = document.createElement('script');
       s.src = 'staff.js?v=20260625-3';
       document.body.appendChild(s);
