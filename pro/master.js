@@ -64,7 +64,7 @@
           effectiveFrom: String(c.effectiveFrom || ""), sortOrder: Number(c.sortOrder || 0)
         }));
         state.settings = (st.settings && typeof st.settings === "object") ? st.settings : {};
-        setStatus("スプレッドシートから読み込みました");
+        setStatus("読み込みました");
       }
     } catch (error) {
       setStatus("読み込み失敗: " + error.message);
