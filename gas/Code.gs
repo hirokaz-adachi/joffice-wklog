@@ -101,6 +101,12 @@ function applyCodeFormats_() {
   fmt(CONFIG.sheets.worklogs, CONFIG.headers.worklogs.indexOf("taskCode") + 1);
   fmt(CONFIG.sheets.billing, CONFIG.headers.billing.indexOf("invoiceItemCode") + 1);
   fmt(CONFIG.sheets.customerStaff, CONFIG.headers.customerStaff.indexOf("effectiveFrom") + 1); // 有効開始月 "YYYY-MM" をテキスト保持
+  // 顧客コードはかつ・かいしゅう関与先コード（4桁固定 "0001"形式）。数値化で前ゼロが落ちないよう全箇所をテキスト保持。
+  fmt(CONFIG.sheets.customers, 1);   // customer_master.code
+  fmt(CONFIG.sheets.staff, 1);       // staff_master.code（S001形式・防御的に）
+  fmt(CONFIG.sheets.billing, CONFIG.headers.billing.indexOf("customerCode") + 1);
+  fmt(CONFIG.sheets.worklogs, CONFIG.headers.worklogs.indexOf("customerCode") + 1);
+  fmt(CONFIG.sheets.customerStaff, CONFIG.headers.customerStaff.indexOf("customerCode") + 1);
 }
 
 // 案2: 業務区分カタログ・工程・設定をシードし直す（マスタのみ作り直し）。

@@ -508,6 +508,7 @@ sharoshi-worklog-mvp/
 - 名称はマスタ正本36社＋マスタ欠番4社 `0003/0009/0021/0023` は請求CSV由来（要所長確認）。生成ロジック（顧客index基準の按分・担当巡回・複数明細・時系列交代）は不変。
 - `scripts/verify-demo.mjs` を顧客40社・売上レンジ 330〜460万・時系列コード 0001 に更新（30/30）。`test-allocation.mjs` は自前フィクスチャのため不変（24/24）。
 - **顧客コードが請求CSVと恒等一致**となり、実請求CSV取込が同コードでマッチ（第15-3）。第4章・第8-10-1・第8-13 を更新。
+- **コード列のテキスト保持を顧客コードへ拡張（バグ修正）**: `Code.gs applyCodeFormats_()` が顧客コード列（customer_master.code／billing.customerCode／worklogs.customerCode／customer_staff_master.customerCode／staff.code）を未フォーマットだったため、4桁固定の関与先コード `0001` が数値化し前ゼロが落ちていた（旧 `C001` 形式では非数値で顕在化せず）。全該当列を `@`（テキスト）化。**反映には再 `rebuildDemo()` が必要**。
 - 反映には GAS 協調デプロイ（`deploy-an2.ps1`）＋ Apps Script で `rebuildDemo()` 実行が必要。
 
 ### 2026-06-25（請求CSV取込の実装：data-edit）
