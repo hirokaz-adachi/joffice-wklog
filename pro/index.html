@@ -51,18 +51,19 @@
     <section class="group">
       <h2>分析・可視化</h2>
       <div class="cards">
-        <a class="card" href="dashboard.html"><span class="title">経営ダッシュボード</span><div class="desc">月次KPI・スタッフ別／顧客別の生産性分析。</div></a>
-        <a class="card" href="analysis.html"><span class="title">詳細分析</span><div class="desc">任意期間×スタッフ／顧客／業務区分の多角分析。</div></a>
+        <a class="card" data-roles="admin,manager" href="dashboard.html"><span class="title">経営ダッシュボード</span><div class="desc">月次KPI・スタッフ別／顧客別の生産性分析。</div></a>
+        <a class="card" data-roles="admin,manager" href="analysis.html"><span class="title">詳細分析</span><div class="desc">任意期間×スタッフ／顧客／業務区分の多角分析。</div></a>
       </div>
     </section>
 
     <section class="group">
       <h2>管理・設定</h2>
       <div class="cards">
-        <a class="card" href="master.html"><span class="title">マスタメンテナンス</span><div class="desc">スタッフ／顧客／業務区分・工程／顧客担当／設定。</div></a>
-        <a class="card" href="targets.html"><span class="title">売上目標</span><div class="desc">スタッフ×月の目標・前月コピー・一括保存。</div></a>
-        <a class="card" href="data-edit.html"><span class="title">請求 照会・訂正</span><div class="desc">請求グリッド・CSV取込・一括修正。</div></a>
-        <a class="card" href="worklog.html"><span class="title">工数 照会・訂正</span><div class="desc">工数の照会・訂正（編集モーダル）。</div></a>
+        <a class="card" data-roles="admin" href="master.html"><span class="title">マスタメンテナンス</span><div class="desc">スタッフ／顧客／業務区分・工程／顧客担当／設定。</div></a>
+        <a class="card" data-roles="admin" href="users.html"><span class="title">ユーザー管理</span><div class="desc">アカウント発行・役割（admin/manager/staff）・パスワード。</div></a>
+        <a class="card" data-roles="admin,manager" href="targets.html"><span class="title">売上目標</span><div class="desc">スタッフ×月の目標・前月コピー・一括保存。</div></a>
+        <a class="card" data-roles="admin,manager" href="data-edit.html"><span class="title">請求 照会・訂正</span><div class="desc">請求グリッド・CSV取込・一括修正。</div></a>
+        <a class="card" data-roles="admin,manager" href="worklog.html"><span class="title">工数 照会・訂正</span><div class="desc">工数の照会・訂正（編集モーダル）。</div></a>
       </div>
     </section>
 
@@ -80,8 +81,19 @@
       joLogout().then(function () { location.replace('login.html'); }).catch(function () { location.replace('login.html'); });
     });
     joMe().then(function (u) {
+      if (u.mustChangePassword) { location.replace('change-password.html'); return; }
       var w = document.getElementById('whoami');
       if (w) w.textContent = (u.displayName || u.loginId) + '（' + u.role + '）';
+      // 役割に応じて表示カードを絞る（data-roles 指定のカードのみ対象）
+      document.querySelectorAll('.card[data-roles]').forEach(function (c) {
+        var roles = c.getAttribute('data-roles').split(',');
+        if (roles.indexOf(u.role) < 0) c.style.display = 'none';
+      });
+      // 表示カードが無くなったグループは見出しごと隠す
+      document.querySelectorAll('.group').forEach(function (g) {
+        var visible = g.querySelectorAll('.card:not([style*="display: none"])').length;
+        if (!visible) g.style.display = 'none';
+      });
     }).catch(function () { location.replace('login.html'); });
   </script>
 </body>

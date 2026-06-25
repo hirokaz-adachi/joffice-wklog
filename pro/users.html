@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J-Office (pro) ｜ ユーザー管理</title>
+  <style>
+    :root { --fg:#1f2937; --muted:#6b7280; --line:#e5e7eb; --accent:#0f766e; --bg:#f8fafc; --danger:#b91c1c; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; color:var(--fg); background:var(--bg); }
+    .topbar { display:flex; justify-content:space-between; align-items:flex-start; padding:18px 24px; border-bottom:1px solid var(--line); background:#fff; }
+    .eyebrow { color:var(--muted); font-size:12px; margin:0; }
+    h1 { font-size:19px; margin:2px 0 0; }
+    .top-actions { display:flex; gap:10px; align-items:center; }
+    .whoami { color:var(--muted); font-size:13px; }
+    .btn { padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--fg); font-size:13px; cursor:pointer; text-decoration:none; }
+    .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .btn.danger { color:var(--danger); border-color:#fecaca; }
+    main { max-width:1000px; margin:22px auto; padding:0 20px; }
+    .panel { background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:18px; }
+    .form-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:12px; align-items:end; }
+    label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+    input, select { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:#fff; }
+    .checks { display:flex; gap:16px; align-items:center; margin-top:10px; font-size:13px; }
+    .checks label { display:flex; gap:6px; align-items:center; color:var(--fg); margin:0; }
+    .checks input { width:auto; }
+    .form-buttons { margin-top:14px; display:flex; gap:8px; }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); }
+    th { color:var(--muted); font-weight:600; font-size:12px; }
+    .tag { font-size:11px; border-radius:999px; padding:1px 8px; background:#e5e7eb; color:#374151; }
+    .tag.admin { background:#fde68a; } .tag.manager { background:#bfdbfe; } .tag.staff { background:#d1fae5; }
+    .tag.off { background:#fee2e2; color:#991b1b; }
+    .tag.must { background:#fef9c3; color:#854d0e; }
+    .ops { white-space:nowrap; }
+    .msg { margin-top:12px; font-size:13px; white-space:pre-wrap; padding:9px 12px; border-radius:8px; display:none; }
+    .msg.err { background:#fef2f2; color:var(--danger); display:block; }
+    .msg.ok  { background:#f0fdf4; color:#15803d; display:block; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">J-Office (pro)</p>
+      <h1>ユーザー管理</h1>
+    </div>
+    <div class="top-actions">
+      <span id="whoami" class="whoami"></span>
+      <a class="btn" href="index.html">メニュー</a>
+      <button id="logout" class="btn" type="button">ログアウト</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="form-grid">
+        <div><label>ログインID（社員番号）</label><input id="f_loginId" type="text" autocomplete="off"></div>
+        <div><label>表示名</label><input id="f_displayName" type="text" autocomplete="off"></div>
+        <div><label>役割</label><select id="f_role"><option value="staff">staff（一般）</option><option value="manager">manager（マネージャ）</option><option value="admin">admin（管理者）</option></select></div>
+        <div><label>スタッフ紐付け</label><select id="f_staffCode"></select></div>
+        <div><label>パスワード<span id="pwHint" style="color:var(--muted)"></span></label><input id="f_password" type="text" autocomplete="off" placeholder="新規は必須・8文字以上"></div>
+      </div>
+      <div class="checks">
+        <label><input id="f_isActive" type="checkbox" checked>有効</label>
+        <label><input id="f_must" type="checkbox" checked>次回ログイン時に変更を要求</label>
+        <span id="editingTag" class="tag" style="display:none"></span>
+      </div>
+      <div class="form-buttons">
+        <button id="btnSave" class="btn primary" type="button">追加</button>
+        <button id="btnCancel" class="btn" type="button" style="display:none">取消</button>
+      </div>
+      <div id="msg" class="msg"></div>
+    </section>
+
+    <section class="panel">
+      <table>
+        <thead><tr><th>ログインID</th><th>表示名</th><th>役割</th><th>スタッフ</th><th>状態</th><th>最終ログイン</th><th class="ops">操作</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="backend.js?v=20260625-5"></script>
+  <script>
+    var $ = function (id) { return document.getElementById(id); };
+    var users = [], staff = [], editingId = 0;
+    function msg(t, ok) { var m = $('msg'); m.textContent = t; m.className = 'msg ' + (ok ? 'ok' : 'err'); }
+    function esc(v) { return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function staffName(code) { var s = staff.find(function (x) { return x.code === code; }); return s ? (s.code + ' ' + s.name) : (code || '—'); }
+
+    $('logout').addEventListener('click', function () {
+      joLogout().then(function () { location.replace('login.html'); }).catch(function () { location.replace('login.html'); });
+    });
+
+    function render() {
+      $('tbody').innerHTML = users.map(function (u) {
+        var st = (u.isActive ? '' : '<span class="tag off">無効</span> ') + (u.mustChangePassword ? '<span class="tag must">要PW変更</span>' : '');
+        return '<tr>'
+          + '<td>' + esc(u.loginId) + '</td>'
+          + '<td>' + esc(u.displayName) + '</td>'
+          + '<td><span class="tag ' + esc(u.role) + '">' + esc(u.role) + '</span></td>'
+          + '<td>' + esc(u.staffCode ? staffName(u.staffCode) : '—') + '</td>'
+          + '<td>' + (st || '有効') + '</td>'
+          + '<td>' + esc(u.lastLoginAt || '—') + '</td>'
+          + '<td class="ops"><button class="btn" data-edit="' + u.id + '">編集</button> '
+          + '<button class="btn danger" data-del="' + u.id + '">削除</button></td>'
+          + '</tr>';
+      }).join('') || '<tr><td colspan="7" style="color:var(--muted)">ユーザーがありません。</td></tr>';
+    }
+
+    function resetForm() {
+      editingId = 0;
+      $('f_loginId').value = ''; $('f_displayName').value = ''; $('f_role').value = 'staff';
+      $('f_staffCode').value = ''; $('f_password').value = '';
+      $('f_isActive').checked = true; $('f_must').checked = true;
+      $('f_loginId').disabled = false;
+      $('btnSave').textContent = '追加'; $('btnCancel').style.display = 'none';
+      $('editingTag').style.display = 'none'; $('pwHint').textContent = '';
+      msg('', true); $('msg').className = 'msg';
+    }
+
+    function startEdit(id) {
+      var u = users.find(function (x) { return x.id === id; });
+      if (!u) return;
+      editingId = id;
+      $('f_loginId').value = u.loginId; $('f_displayName').value = u.displayName;
+      $('f_role').value = u.role; $('f_staffCode').value = u.staffCode || '';
+      $('f_password').value = ''; $('f_isActive').checked = !!u.isActive; $('f_must').checked = !!u.mustChangePassword;
+      $('btnSave').textContent = '更新'; $('btnCancel').style.display = '';
+      $('editingTag').style.display = ''; $('editingTag').textContent = '編集中: ' + u.loginId;
+      $('pwHint').textContent = '（空欄で現状維持）';
+      window.scrollTo(0, 0);
+    }
+
+    $('btnCancel').addEventListener('click', resetForm);
+
+    $('btnSave').addEventListener('click', async function () {
+      var payload = {
+        loginId: $('f_loginId').value.trim(),
+        displayName: $('f_displayName').value.trim(),
+        role: $('f_role').value,
+        staffCode: $('f_staffCode').value,
+        isActive: $('f_isActive').checked ? 1 : 0,
+        mustChangePassword: $('f_must').checked ? 1 : 0
+      };
+      var pw = $('f_password').value;
+      if (pw) payload.password = pw;
+      if (editingId) payload.id = editingId;
+      try {
+        await joSaveUser(payload);
+        msg(editingId ? '更新しました。' : '追加しました。', true);
+        resetForm();
+        users = await joListUsers();
+        render();
+      } catch (e) {
+        var d = (e.data && e.data.detail) || e.message;
+        if (d === 'loginId_duplicate') d = 'ログインIDが重複しています。';
+        else if (d === 'password_required_min8') d = '新規はパスワード（8文字以上）が必須です。';
+        else if (d === 'password_too_short') d = 'パスワードは8文字以上にしてください。';
+        else if (d === 'loginId_required') d = 'ログインIDを入力してください。';
+        msg('保存失敗: ' + d, false);
+      }
+    });
+
+    $('tbody').addEventListener('click', async function (ev) {
+      var ed = ev.target.getAttribute('data-edit'), dl = ev.target.getAttribute('data-del');
+      if (ed) { startEdit(parseInt(ed, 10)); return; }
+      if (dl) {
+        var u = users.find(function (x) { return x.id === parseInt(dl, 10); });
+        if (!u || !window.confirm('ユーザー「' + u.loginId + '」を削除しますか？')) return;
+        try {
+          await joDeleteUser(u.id);
+          users = await joListUsers(); render(); msg('削除しました。', true);
+        } catch (e) {
+          var d = (e.data && e.data.detail) || e.message;
+          if (d === 'cannot_delete_self') d = '自分自身は削除できません。';
+          msg('削除失敗: ' + d, false);
+        }
+      }
+    });
+
+    // 認証ガード（admin のみ）＋初期ロード
+    joMe().then(async function (u) {
+      if (u.mustChangePassword) { location.replace('change-password.html'); return; }
+      if (u.role !== 'admin') { location.replace('index.html'); return; }
+      $('whoami').textContent = (u.displayName || u.loginId) + '（' + u.role + '）';
+      var boot = await joBootstrap();
+      staff = boot.staff || [];
+      $('f_staffCode').innerHTML = '<option value="">（紐付けなし）</option>' +
+        staff.map(function (s) { return '<option value="' + esc(s.code) + '">' + esc(s.code + ' ' + s.name) + '</option>'; }).join('');
+      users = await joListUsers();
+      render();
+    }).catch(function () { location.replace('login.html'); });
+  </script>
+</body>
+</html>

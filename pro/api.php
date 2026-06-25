@@ -8,6 +8,7 @@ require_once __DIR__ . '/lib/helpers.php';
 require_once __DIR__ . '/lib/auth.php';
 require_once __DIR__ . '/lib/handlers.php';
 require_once __DIR__ . '/lib/mutations.php';
+require_once __DIR__ . '/lib/users.php';
 
 // staff ロールは自分の工数のみ操作可
 function jo_assert_entry_owner(array $user, $entry): void
@@ -196,9 +197,36 @@ try {
             jo_json(['ok' => true, 'data' => jo_save_setting((string) ($in['key'] ?? ''), $in['value'] ?? null)]);
             break;
 
+        // --- ユーザー管理（admin）／パスワード変更（本人）---
+        case 'listUsers':
+            jo_require_role(['admin']);
+            jo_json(['ok' => true, 'data' => jo_list_users()]);
+            break;
+        case 'saveUser':
+            jo_require_role(['admin']);
+            jo_check_csrf($in);
+            jo_json(['ok' => true, 'data' => jo_save_user($in['user'] ?? [])]);
+            break;
+        case 'deleteUser':
+            $admin = jo_require_role(['admin']);
+            jo_check_csrf($in);
+            jo_delete_user((int) ($in['id'] ?? 0), $admin);
+            jo_json(['ok' => true, 'data' => ['id' => (int) ($in['id'] ?? 0)]]);
+            break;
+        case 'changePassword':
+            $user = jo_require_login();
+            jo_check_csrf($in);
+            $r = jo_change_password($user, (string) ($in['current'] ?? ''), (string) ($in['next'] ?? ''));
+            $_SESSION['user']['mustChangePassword'] = 0;
+            jo_json(['ok' => true, 'data' => $r]);
+            break;
+
         default:
             jo_error('unknown_action: ' . $action, 404);
     }
+} catch (InvalidArgumentException $e) {
+    // 入力検証エラーは 400 で理由を返す
+    jo_error('bad_request', 400, ['detail' => $e->getMessage()]);
 } catch (Throwable $e) {
     $extra = jo_is_debug() ? ['detail' => $e->getMessage()] : [];
     jo_error('server_error', 500, $extra);

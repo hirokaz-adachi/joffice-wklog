@@ -78,8 +78,8 @@
 
     $('btnLogin').onclick = async () => {
       try {
-        await joLogin($('loginId').value.trim(), $('password').value);
-        location.replace('index.html');
+        const u = await joLogin($('loginId').value.trim(), $('password').value);
+        location.replace(u.mustChangePassword ? 'change-password.html' : 'index.html');
       } catch (e) {
         msg('ログイン失敗: ' + e.message, false);
       }
@@ -104,8 +104,8 @@
       } catch (e) { $('diagOut').textContent = 'bootstrap 失敗: ' + e.message; }
     };
 
-    // 既にログイン済みならメニューへ。未ログインならフォーム表示。
-    joMe().then(() => location.replace('index.html')).catch(() => showUser(null));
+    // 既にログイン済みならメニュー（要PW変更なら変更画面）へ。未ログインならフォーム表示。
+    joMe().then((u) => location.replace(u.mustChangePassword ? 'change-password.html' : 'index.html')).catch(() => showUser(null));
   </script>
 </body>
 </html>
