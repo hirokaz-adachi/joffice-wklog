@@ -300,6 +300,11 @@ function normalizeWorklog_(row) {
   };
 }
 
+// 新規行の追記は setValues で行う（appendRow は "0001"/"026" 等を数値化するため使わない・行119と同方針）。
+function appendRowSafe_(sheet, values) {
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, values.length).setValues([values]);
+}
+
 function saveEntry_(entry) {
   if (!entry || !entry.id) throw new Error("entry.id is required");
   const sheet = getSheet_(CONFIG.sheets.worklogs);
@@ -308,7 +313,7 @@ function saveEntry_(entry) {
   if (row) {
     sheet.getRange(row, 1, 1, values.length).setValues([values]);
   } else {
-    sheet.appendRow(values);
+    appendRowSafe_(sheet, values);
   }
   return entry;
 }
@@ -331,7 +336,7 @@ function saveTarget_(row) {
   if (r) {
     sheet.getRange(r, 1, 1, values.length).setValues([values]);
   } else {
-    sheet.appendRow(values);
+    appendRowSafe_(sheet, values);
   }
   return row;
 }
@@ -350,7 +355,7 @@ function saveBilling_(row) {
   if (r) {
     sheet.getRange(r, 1, 1, values.length).setValues([values]);
   } else {
-    sheet.appendRow(values);
+    appendRowSafe_(sheet, values);
   }
   return row;
 }
@@ -364,7 +369,7 @@ function saveTaskPhase_(row) {
   if (r) {
     sheet.getRange(r, 1, 1, values.length).setValues([values]);
   } else {
-    sheet.appendRow(values);
+    appendRowSafe_(sheet, values);
   }
   return row;
 }
@@ -410,7 +415,7 @@ function saveSetting_(key, value) {
   if (r) {
     sheet.getRange(r, 1, 1, 2).setValues([[key, value]]);
   } else {
-    sheet.appendRow([key, value]);
+    appendRowSafe_(sheet, [key, value]);
   }
   return { key: key, value: value };
 }
@@ -442,7 +447,7 @@ function upsertMaster_(type, item, oldCode) {
   if (row) {
     sheet.getRange(row, 1, 1, values.length).setValues([values]);
   } else {
-    sheet.appendRow(values);
+    appendRowSafe_(sheet, values);
   }
   return item;
 }

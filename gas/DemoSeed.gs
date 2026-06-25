@@ -62,13 +62,14 @@ function seedSettings_() {
 }
 
 function seedStaffAndCustomers_() {
+  // コード列を数値化させないため setValues で書き込む（appendRow は "0001" を数値1に変換するため使わない）。
   const staffSheet = ensureSheet_(CONFIG.sheets.staff, CONFIG.headers.staff);
   clearDataRows_(staffSheet);
-  DEMO.staff.forEach((s) => staffSheet.appendRow([s[0], s[1]]));
+  if (DEMO.staff.length) staffSheet.getRange(2, 1, DEMO.staff.length, 2).setValues(DEMO.staff.map((s) => [s[0], s[1]]));
 
   const custSheet = ensureSheet_(CONFIG.sheets.customers, CONFIG.headers.customers);
   clearDataRows_(custSheet);
-  DEMO.customers.forEach((c) => custSheet.appendRow([c[0], c[1]]));
+  if (DEMO.customers.length) custSheet.getRange(2, 1, DEMO.customers.length, 2).setValues(DEMO.customers.map((c) => [c[0], c[1]]));
 }
 
 // 1顧客=Prepare担当1名＋Review担当1名（8名を巡回・REVは+3オフセット）。
