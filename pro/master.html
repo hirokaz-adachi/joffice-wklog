@@ -6,7 +6,7 @@
   <title>J-Office (pro) ｜ マスタメンテナンス</title>
   <link rel="stylesheet" href="styles.css?v=20260625-1">
   <link rel="stylesheet" href="data-edit.css?v=20260625-1">
-  <link rel="stylesheet" href="master.css?v=20260625-1">
+  <link rel="stylesheet" href="master.css?v=20260626-1">
 </head>
 <body>
   <header class="topbar">
@@ -70,7 +70,7 @@
       if (u.mustChangePassword) { location.replace('change-password.html'); return; }
       if (u.role !== 'admin') { location.replace('index.html'); return; }
       var s = document.createElement('script');
-      s.src = 'master.js?v=20260625-2';
+      s.src = 'master.js?v=20260626-2';
       document.body.appendChild(s);
     }).catch(function () {
       location.replace('login.html');

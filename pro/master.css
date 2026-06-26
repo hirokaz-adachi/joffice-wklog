@@ -81,6 +81,22 @@
 }
 #masterTable .row-del:hover { background: #fff7ed; }
 
+/* 有効/無効トグル（soft-delete 導線）。操作列は3ボタン分に拡張 */
+#masterTable .ops { width: 220px; }
+#masterTable .row-toggle {
+  min-height: 30px;
+  padding: 0 10px;
+  margin-right: 6px;
+  color: var(--muted);
+  background: #fff;
+  border-color: var(--line);
+}
+#masterTable .row-toggle:hover { background: var(--accent-soft); }
+.status-on { font-size: 12px; color: #15803d; font-weight: 700; }
+.status-off { display: inline-block; font-size: 11px; border-radius: 999px; padding: 1px 8px; background: #fee2e2; color: #991b1b; font-weight: 700; }
+#masterBody tr.row-inactive > td { color: #9ca3af; background: #fafafa; }
+#masterBody tr.row-inactive .col-key { color: #b6bcc4; }
+
 @media (max-width: 640px) {
   .master-edit-form input,
   .master-search input { min-width: 0; width: 100%; }

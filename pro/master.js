@@ -77,7 +77,12 @@
 
   function normPair(items) {
     return (Array.isArray(items) ? items : [])
-      .map((it) => ({ code: String(it.code || "").trim(), name: String(it.name || "").trim() }))
+      .map((it) => ({
+        code: String(it.code || "").trim(),
+        name: String(it.name || "").trim(),
+        isActive: (it.isActive === 0 || it.isActive === false || it.isActive === "0") ? 0 : 1,
+        sortOrder: Number(it.sortOrder || 0)
+      }))
       .filter((it) => it.code && it.name);
   }
 
@@ -133,11 +138,14 @@
     el.hint.textContent = def.hint;
     const editing = Boolean(editingKey);
     el.form.className = "master-edit-form" + (editing ? " is-editing" : "");
-    el.form.innerHTML = def.fields.map((f) => `<label>${esc(f.label)}<input type="text" data-f="${esc(f.k)}" id="mf_${esc(f.k)}"></label>`).join("")
+    el.form.innerHTML = def.fields.map((f) => {
+      const ro = (editing && f.k === def.key);  // 編集時はコード（PK）を変更不可
+      return `<label>${esc(f.label)}${ro ? "（変更不可）" : ""}<input type="text" data-f="${esc(f.k)}" id="mf_${esc(f.k)}"${ro ? " readonly" : ""}></label>`;
+    }).join("")
       + `<div class="form-buttons"><button type="submit" class="primary">${editing ? "更新" : "追加"}</button>${editing ? '<button type="button" class="secondary" id="mfCancel">取消</button>' : ""}</div>`;
     const cancel = document.getElementById("mfCancel");
     if (cancel) cancel.addEventListener("click", resetForm);
-    el.head.innerHTML = `<tr>${def.fields.map((f, i) => `<th class="${i === 0 ? "col-key" : ""}">${esc(f.label)}</th>`).join("")}<th class="ops">操作</th></tr>`;
+    el.head.innerHTML = `<tr>${def.fields.map((f, i) => `<th class="${i === 0 ? "col-key" : ""}">${esc(f.label)}</th>`).join("")}<th>状態</th><th class="ops">操作</th></tr>`;
     renderList();
     if (editingKey) {
       const item = state[active].find((r) => String(r[def.key]) === String(editingKey));
@@ -153,11 +161,17 @@
     const rows = all.filter((r) => !q || def.fields.some((f) => String(r[f.k] || "").toLowerCase().includes(q)))
       .slice().sort((a, b) => String(a[def.key]).localeCompare(String(b[def.key]), "ja"));
     if (!rows.length) {
-      el.body.innerHTML = `<tr><td class="grid-empty" colspan="${def.fields.length + 1}">${all.length ? "該当するデータがありません。" : "登録がありません。"}</td></tr>`;
+      el.body.innerHTML = `<tr><td class="grid-empty" colspan="${def.fields.length + 2}">${all.length ? "該当するデータがありません。" : "登録がありません。"}</td></tr>`;
     } else {
       el.body.innerHTML = rows.map((r) => {
         const cells = def.fields.map((f, i) => `<td class="${i === 0 ? "col-key" : ""}">${esc(r[f.k] || "")}</td>`).join("");
-        return `<tr data-key="${esc(r[def.key])}">${cells}<td class="ops"><button type="button" class="row-edit" data-edit>編集</button><button type="button" class="row-del" data-del>削除</button></td></tr>`;
+        const active0 = r.isActive !== 0;
+        const status = active0 ? `<span class="status-on">有効</span>` : `<span class="status-off">無効</span>`;
+        const toggle = active0 ? "無効化" : "有効化";
+        return `<tr data-key="${esc(r[def.key])}"${active0 ? "" : ' class="row-inactive"'}>${cells}<td>${status}</td>`
+          + `<td class="ops"><button type="button" class="row-edit" data-edit>編集</button>`
+          + `<button type="button" class="row-toggle" data-toggle>${toggle}</button>`
+          + `<button type="button" class="row-del" data-del>削除</button></td></tr>`;
       }).join("");
     }
     el.count.textContent = `${rows.length} / ${all.length} 件`;
@@ -176,7 +190,7 @@
     const editing = Boolean(editingKey);
     el.form.className = "master-edit-form is-tasks" + (editing ? " is-editing" : "");
     el.form.innerHTML = `
-      <label>業務コード<input type="text" id="mf_code"></label>
+      <label>業務コード${editing ? "（変更不可）" : ""}<input type="text" id="mf_code"${editing ? " readonly" : ""}></label>
       <label>名称<input type="text" id="mf_name"></label>
       <label>配賦区分<select id="mf_alloc">
         <option value="service">役務</option>
@@ -239,25 +253,17 @@
       if (Math.round(pre + rev) !== 100) { showToast("工程比の合計を100にしてください（現在 " + (pre + rev) + "）"); return; }
     }
     try {
+      // コードは編集不可（PK）。oldCode は新規/更新の判定に渡すのみ（差分時はサーバが拒否）。
       await window.WorklogBackend.upsertMaster("tasks", { code, name, allocationType: alloc }, editingKey || "");
-      if (editingKey && String(editingKey) !== code) {
-        await window.WorklogBackend.deleteTaskPhase(String(editingKey), "PRE");
-        await window.WorklogBackend.deleteTaskPhase(String(editingKey), "REV");
-      }
       if (alloc === "service") {
         await window.WorklogBackend.saveTaskPhases([
           { taskCode: code, phaseCode: "PRE", phaseName: "Prepare", ratio: pre, sortOrder: 1 },
           { taskCode: code, phaseCode: "REV", phaseName: "Review", ratio: rev, sortOrder: 2 }
         ]);
       }
-    } catch (error) { showToast(error.message); return; }
+    } catch (error) { showToast(masterErrMsg(error)); return; }
 
-    // ローカル反映
-    const old = editingKey;
-    if (old && String(old) !== code) {
-      state.tasks = state.tasks.filter((t) => t.code !== String(old));
-      state.taskPhases = state.taskPhases.filter((p) => p.taskCode !== String(old));
-    }
+    // ローカル反映（コードは不変なので追加 or 同コード更新のみ）
     const ex = state.tasks.find((t) => t.code === code);
     if (ex) { ex.name = name; ex.allocationType = alloc; } else state.tasks.push({ code, name, allocationType: alloc });
     state.taskPhases = state.taskPhases.filter((p) => p.taskCode !== code);
@@ -393,7 +399,26 @@
       return;
     }
     if (event.target.closest("[data-edit]")) startEdit(key);
+    else if (event.target.closest("[data-toggle]")) toggleActive(key);
     else if (event.target.closest("[data-del]")) removeItem(key);
+  }
+
+  // 有効/無効の切替（soft-delete 導線）。staff/customers のみ（tasks に isActive 列は無い）。
+  async function toggleActive(key) {
+    const def = GENERIC[active];
+    if (!def) return;
+    const item = state[active].find((r) => String(r[def.key]) === String(key));
+    if (!item) return;
+    const next = item.isActive !== 0 ? 0 : 1;
+    const verb = next ? "有効化" : "無効化";
+    if (!window.confirm(`${item.code} ${item.name} を${verb}しますか？`)) return;
+    try {
+      // code は不変。name/isActive のみ更新（顧客の住所等は upsert 対象外なので保持される）。
+      await window.WorklogBackend.upsertMaster(active, { code: item.code, name: item.name, isActive: next }, "");
+    } catch (error) { showToast(masterErrMsg(error)); return; }
+    item.isActive = next;
+    renderGeneric();
+    showToast(`${verb}しました`);
   }
 
   function startEdit(key) { editingKey = key; renderAll(); const f = el.form.querySelector("input"); if (f) f.focus(); }
@@ -414,11 +439,9 @@
       showToast(`${def.fields[0].label}が重複しています`); return;
     }
     try { await window.WorklogBackend.upsertMaster(active, item, editingKey || ""); }
-    catch (error) { showToast(error.message); return; }
-    const old = editingKey;
-    if (old && String(old) !== String(item[def.key])) state[active] = state[active].filter((r) => String(r[def.key]) !== String(old));
+    catch (error) { showToast(masterErrMsg(error)); return; }
     const ex = state[active].find((r) => String(r[def.key]) === String(item[def.key]));
-    if (ex) def.fields.forEach((f) => { ex[f.k] = item[f.k]; }); else state[active].push(Object.assign({}, item));
+    if (ex) def.fields.forEach((f) => { ex[f.k] = item[f.k]; }); else state[active].push(Object.assign({ isActive: 1, sortOrder: 0 }, item));
     const wasEditing = Boolean(editingKey);
     editingKey = "";
     renderGeneric();
@@ -430,10 +453,9 @@
       const t = state.tasks.find((x) => x.code === String(key));
       if (!t || !window.confirm(`${t.code} ${t.name} を削除しますか？`)) return;
       try {
+        // 工程（子レコード）はサーバ側で本体と一緒に削除される。
         await window.WorklogBackend.removeMaster("tasks", key);
-        await window.WorklogBackend.deleteTaskPhase(String(key), "PRE");
-        await window.WorklogBackend.deleteTaskPhase(String(key), "REV");
-      } catch (error) { showToast(error.message); return; }
+      } catch (error) { reportDeleteError(error); return; }
       state.tasks = state.tasks.filter((x) => x.code !== String(key));
       state.taskPhases = state.taskPhases.filter((p) => p.taskCode !== String(key));
       if (String(editingKey) === String(key)) editingKey = "";
@@ -445,11 +467,36 @@
     const item = state[active].find((r) => String(r[def.key]) === String(key));
     if (!item || !window.confirm(`${def.fields.map((f) => item[f.k]).join(" ")} を削除しますか？`)) return;
     try { await window.WorklogBackend.removeMaster(active, key); }
-    catch (error) { showToast(error.message); return; }
+    catch (error) { reportDeleteError(error); return; }
     state[active] = state[active].filter((r) => String(r[def.key]) !== String(key));
     if (String(editingKey) === String(key)) editingKey = "";
     renderGeneric();
     showToast("削除しました");
+  }
+
+  // サーバのエラーコード（e.data.detail）を日本語化。未知コードは素のメッセージへフォールバック。
+  function masterErrMsg(error) {
+    const data = (error && error.data) || {};
+    const d = data.detail || (error && error.message) || "";
+    switch (d) {
+      case "code_immutable": return "コード（番号）は変更できません。";
+      case "item.code required": return "コードを入力してください。";
+      case "master_in_use": {
+        const refs = Array.isArray(data.refs) ? data.refs : [];
+        const br = refs.map((r) => r.label + " " + r.count + "件").join("／");
+        return "参照があるため削除できません：" + br + "。\n運用を止める場合は「無効化（isActive=0）」をご利用ください。";
+      }
+      case "constraint_violation": return "関連データがあるため、この操作はできません。";
+      default: return (error && error.message) || "不明なエラー";
+    }
+  }
+
+  // 削除ブロック（参照あり）は内訳が長く重要なので alert で明示。その他は短いトースト。
+  function reportDeleteError(error) {
+    const d = error && error.data && error.data.detail;
+    const m = masterErrMsg(error);
+    if (d === "master_in_use" || d === "constraint_violation") window.alert(m);
+    else showToast(m);
   }
 
   function setStatus(t) { el.status.textContent = t; }

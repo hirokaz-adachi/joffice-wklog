@@ -21,8 +21,17 @@ function jo_list_users(): array
     }, $st->fetchAll());
 }
 
+// 有効な admin の人数を数える（除外IDを指定可）。最後の admin 保護に使う。
+function jo_count_active_admins(int $excludeId = 0): int
+{
+    $st = jo_db()->prepare("SELECT COUNT(*) FROM jo_users WHERE role = 'admin' AND isActive = 1 AND id <> ?");
+    $st->execute([$excludeId]);
+    return (int) $st->fetchColumn();
+}
+
 // 作成 or 更新。password 指定時のみハッシュ更新。新規は password 必須。
-function jo_save_user(array $in): array
+// $sessionUser はログイン中の管理者（自己無効化・自己降格の防止に使う）。
+function jo_save_user(array $in, array $sessionUser = []): array
 {
     $db = jo_db();
     $loginId = trim((string) ($in['loginId'] ?? ''));
@@ -42,6 +51,7 @@ function jo_save_user(array $in): array
     $must = array_key_exists('mustChangePassword', $in) ? (int) $in['mustChangePassword'] : null;
     $password = (string) ($in['password'] ?? '');
     $id = (isset($in['id']) && $in['id'] !== '') ? (int) $in['id'] : 0;
+    $selfId = (int) ($sessionUser['id'] ?? 0);
     $now = date('Y-m-d H:i:s');
 
     // loginId 重複チェック（自分以外）
@@ -52,7 +62,43 @@ function jo_save_user(array $in): array
         throw new InvalidArgumentException('loginId_duplicate');
     }
 
+    // staffCode 重複チェック（1スタッフ=1ユーザー。NULL=紐付けなしは複数可）
+    if ($staffCode !== null) {
+        $sc = $db->prepare('SELECT loginId FROM jo_users WHERE staffCode = ? AND id <> ? LIMIT 1');
+        $sc->execute([$staffCode, $id]);
+        $other = $sc->fetch();
+        if ($other) {
+            throw new JoConflictException('staffCode_in_use', ['otherLoginId' => (string) $other['loginId']]);
+        }
+    }
+
     if ($id > 0) {
+        // 既存ユーザーの現状を取得（自己防止・最後のadmin保護の判定用）
+        $cur = $db->prepare('SELECT role, isActive FROM jo_users WHERE id = ?');
+        $cur->execute([$id]);
+        $before = $cur->fetch();
+        if (!$before) {
+            throw new InvalidArgumentException('user_not_found');
+        }
+        $wasAdmin = ((string) $before['role'] === 'admin');
+
+        // 自分自身の無効化・管理者権限の自己剥奪を防止
+        if ($id === $selfId) {
+            if ($isActive === 0) {
+                throw new InvalidArgumentException('cannot_deactivate_self');
+            }
+            if ($wasAdmin && $role !== 'admin') {
+                throw new InvalidArgumentException('cannot_demote_self');
+            }
+        }
+
+        // 最後の admin を無効化・降格できない
+        if ($wasAdmin && ($role !== 'admin' || $isActive === 0)) {
+            if (jo_count_active_admins($id) === 0) {
+                throw new InvalidArgumentException('last_admin');
+            }
+        }
+
         $cols = [
             'loginId'     => $loginId,
             'role'        => $role,
@@ -93,7 +139,15 @@ function jo_delete_user(int $id, array $sessionUser): void
     if ($id === (int) ($sessionUser['id'] ?? 0)) {
         throw new InvalidArgumentException('cannot_delete_self');
     }
-    jo_db()->prepare('DELETE FROM jo_users WHERE id = ?')->execute([$id]);
+    $db = jo_db();
+    // 最後の有効 admin は削除不可（管理機能からの全員締め出し防止）
+    $cur = $db->prepare('SELECT role, isActive FROM jo_users WHERE id = ?');
+    $cur->execute([$id]);
+    $u = $cur->fetch();
+    if ($u && (string) $u['role'] === 'admin' && (int) $u['isActive'] === 1 && jo_count_active_admins($id) === 0) {
+        throw new InvalidArgumentException('last_admin');
+    }
+    $db->prepare('DELETE FROM jo_users WHERE id = ?')->execute([$id]);
 }
 
 // 本人パスワード変更。成功で mustChangePassword=0。

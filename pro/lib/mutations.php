@@ -149,19 +149,86 @@ function jo_upsert_master(string $type, array $item, string $oldCode = ''): arra
     }
     $cols['updatedAt'] = jo_now();
 
+    // コード（PK）は変更不可。値参照（工数・請求・顧客担当など）へ波及しないため、
+    // リネームはデータ破壊になる。改番が必要な稀ケースは「削除→再追加」または手動移行で対応。
     if ($oldCode !== '' && $oldCode !== (string) $item['code']) {
-        // コード変更（リネーム）：oldCode の行を更新
-        $sets = implode(', ', array_map(static fn($c) => "`$c` = ?", array_keys($cols)));
-        jo_exec("UPDATE `{$def['table']}` SET $sets WHERE code = ?", array_merge(array_values($cols), [$oldCode]));
-    } else {
-        jo_upsert($def['table'], $cols);
+        throw new InvalidArgumentException('code_immutable');
     }
+    jo_upsert($def['table'], $cols);
     return $item;
+}
+
+// マスタ削除時に確認する依存（参照）一覧。type別に [テーブル, 列, 日本語ラベル] を返す。
+// label は master_in_use の内訳メッセージ組み立て用にフロントへそのまま渡す。
+function jo_master_dependencies(string $type): array
+{
+    switch ($type) {
+        case 'staff':
+            return [
+                ['table' => 'jo_worklogs',       'col' => 'staffCode',       'label' => '工数'],
+                ['table' => 'jo_staff_targets',  'col' => 'staffCode',       'label' => '売上目標'],
+                ['table' => 'jo_customer_staff', 'col' => 'staffCode',       'label' => '顧客担当'],
+                ['table' => 'jo_users',          'col' => 'staffCode',       'label' => 'ユーザー紐付け'],
+            ];
+        case 'customers':
+            return [
+                ['table' => 'jo_worklogs',       'col' => 'customerCode',    'label' => '工数'],
+                ['table' => 'jo_billings',       'col' => 'customerCode',    'label' => '請求'],
+                ['table' => 'jo_customer_staff', 'col' => 'customerCode',    'label' => '顧客担当'],
+                ['table' => 'jo_invoices',       'col' => 'customerCode',    'label' => '請求書'],
+            ];
+        case 'tasks':
+            // jo_task_phases（工程）は業務区分の子レコードなので外部参照に含めない（本体と一緒に削除）。
+            return [
+                ['table' => 'jo_worklogs',       'col' => 'taskCode',        'label' => '工数'],
+                ['table' => 'jo_billings',       'col' => 'invoiceItemCode', 'label' => '請求内訳'],
+                ['table' => 'jo_invoice_lines',  'col' => 'taskCode',        'label' => '請求書明細'],
+            ];
+        default:
+            return [];
+    }
+}
+
+// 指定コードを参照している行数を返す（0 件は除外）。
+function jo_master_ref_counts(string $type, string $code): array
+{
+    $refs = [];
+    foreach (jo_master_dependencies($type) as $d) {
+        $st = jo_db()->prepare("SELECT COUNT(*) FROM `{$d['table']}` WHERE `{$d['col']}` = ?");
+        $st->execute([$code]);
+        $n = (int) $st->fetchColumn();
+        if ($n > 0) {
+            $refs[] = ['label' => $d['label'], 'count' => $n];
+        }
+    }
+    return $refs;
 }
 
 function jo_remove_master(string $type, string $code): void
 {
     $def = jo_master_def($type);
+    if ($code === '') {
+        throw new InvalidArgumentException('item.code required');
+    }
+    // 参照があれば削除をブロックし、内訳を返す（孤児化防止）。停止は isActive=0 で行う。
+    $refs = jo_master_ref_counts($type, $code);
+    if ($refs) {
+        throw new JoConflictException('master_in_use', ['refs' => $refs]);
+    }
+    if ($type === 'tasks') {
+        // 工程（子レコード）を本体と一緒に削除。FK(RESTRICT) 対策で工程→本体の順・1トランザクション。
+        $db = jo_db();
+        $db->beginTransaction();
+        try {
+            jo_exec('DELETE FROM jo_task_phases WHERE taskCode = ?', [$code]);
+            jo_exec("DELETE FROM `{$def['table']}` WHERE code = ?", [$code]);
+            $db->commit();
+        } catch (Throwable $e) {
+            $db->rollBack();
+            throw $e;
+        }
+        return;
+    }
     jo_exec("DELETE FROM `{$def['table']}` WHERE code = ?", [$code]);
 }
 

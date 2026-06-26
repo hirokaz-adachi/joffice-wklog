@@ -158,6 +158,13 @@
         else if (d === 'password_required_min8') d = '新規はパスワード（8文字以上）が必須です。';
         else if (d === 'password_too_short') d = 'パスワードは8文字以上にしてください。';
         else if (d === 'loginId_required') d = 'ログインIDを入力してください。';
+        else if (d === 'staffCode_in_use') d = 'このスタッフは既に別のユーザーに紐付いています' + ((e.data && e.data.otherLoginId) ? '（' + e.data.otherLoginId + '）' : '') + '。';
+        else if (d === 'cannot_deactivate_self') d = 'ログイン中の自分自身は無効化できません。';
+        else if (d === 'cannot_demote_self') d = 'ログイン中の自分自身の管理者権限は外せません。';
+        else if (d === 'last_admin') d = '最後の管理者（admin）は無効化・降格できません。先に別の管理者を用意してください。';
+        else if (d === 'user_not_found') d = '対象ユーザーが見つかりません。';
+        else if (d === 'constraint_violation') d = '関連データの制約により保存できません（スタッフ紐付けの重複など）。';
+        else if (d === 'invalid_role') d = '役割の指定が不正です。';
         msg('保存失敗: ' + d, false);
       }
     });
@@ -174,6 +181,7 @@
         } catch (e) {
           var d = (e.data && e.data.detail) || e.message;
           if (d === 'cannot_delete_self') d = '自分自身は削除できません。';
+          else if (d === 'last_admin') d = '最後の管理者（admin）は削除できません。先に別の管理者を用意してください。';
           msg('削除失敗: ' + d, false);
         }
       }

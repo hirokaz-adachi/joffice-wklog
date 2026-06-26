@@ -9,6 +9,7 @@
 -- 注意   : MySQL 5.7 前提。ウィンドウ関数/CTE/JSON_TABLE 等 8.0 専用機能は使わない。
 --          集計・配賦は PHP 側(allocation.js 移植)で実施しビューに寄せない。
 -- 更新   : 2026-06-25 初版 / 2026-06-25 jo_invoice_seq・jo_invoices.dueRule 追加
+--          2026-06-26 jo_users.staffCode を UNIQUE 化(uq_user_staff・1スタッフ=1ユーザー)
 -- =====================================================================
 SET NAMES utf8mb4;
 
@@ -219,7 +220,7 @@ CREATE TABLE jo_users (
   updatedAt          DATETIME NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_login (loginId),
-  KEY idx_user_staff (staffCode),
+  UNIQUE KEY uq_user_staff (staffCode),         -- 1スタッフ=1ユーザー(NULL=紐付けなしは複数可)
   CONSTRAINT fk_user_staff FOREIGN KEY (staffCode) REFERENCES jo_staff(code) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

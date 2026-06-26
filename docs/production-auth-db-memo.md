@@ -118,3 +118,56 @@ BASIC認証の本番での位置づけは限定的で、管理画面やステー
 - MySQL前提なら **社員番号＋パスワードのログインは容易**（PHPなら認証コアは数十行規模）。
 - 最大の作業は認証ではなく **GAS＋シート → PHP＋MySQL の移行**。
 - デモはこのまま進め、本番化の段階でスキーマ・API・認証・移行手順を本設計に落とす。
+
+---
+
+## 9. 整合性ガードとエラーメッセージ（2026-06-26 実装）
+
+ユーザー（`jo_users`）とスタッフマスタ（`jo_staff`）は**別テーブル**で、`jo_users.staffCode → jo_staff.code`（任意・`ON DELETE SET NULL`）でリンクする。スタッフはアカウント無しでも存在でき、アカウントは紐付け無しでも存在できる（例: `hlsadmin`）。この前提のうえで、誤操作の防止と分かりやすいエラー表示を次のとおり実装した。
+
+### 9.1 方針
+
+- **事前チェック（pre-check）を基本**：削除・更新の前に依存件数を `SELECT COUNT` で確認し、具体的なエラーコード＋内訳を投げる。
+- **二重防御**：事前チェックを潜り抜けたDB制約違反（`PDOException` SQLSTATE `23000`）は front controller の catch で捕捉し、`409 conflict / detail=constraint_violation` で返す（本番では内部詳細を出さない）。
+- **コードは英語スネークケースで安定**、日本語化はフロント（`master.js` / `users.html`）の対訳辞書で実施。
+- 例外設計：入力検証・運用ガード＝`InvalidArgumentException`（400 / `detail=コード`）、整合性衝突＝`JoConflictException`（409 / `detail=コード` ＋ `refs`/`otherLoginId` 等の付帯情報）。`api.php` で振り分ける。
+
+### 9.2 マスタ code（PK）の変更不可
+
+`staffCode`/`customerCode`/`taskCode` は工数・請求・顧客担当などに**値参照**で散在し、改番しても波及しない（＝データ破壊）。よって**編集時に code は変更不可**（`jo_upsert_master` が `oldCode != code` で `code_immutable` を投げ、UIは編集時に code 入力を `readonly`）。改番は「削除→再追加」または手動マイグレーションで対応。
+
+### 9.3 マスタ削除の依存チェック（孤児化防止）
+
+`jo_remove_master` は削除前に参照を集計し、1件でもあれば `master_in_use`（内訳 `refs` 付き）でブロック。運用停止は物理削除でなく **`isActive=0`** を推奨。
+
+| マスタ | ブロックする参照（外部） | 本体と一緒に削除（子レコード） |
+|---|---|---|
+| staff | 工数 `jo_worklogs` / 売上目標 `jo_staff_targets` / 顧客担当 `jo_customer_staff` / ユーザー紐付け `jo_users` | — |
+| customers | 工数 / 請求 `jo_billings` / 顧客担当 / 請求書 `jo_invoices` | — |
+| tasks | 工数 / 請求内訳 `jo_billings.invoiceItemCode` / 請求書明細 `jo_invoice_lines` | 工程 `jo_task_phases`（トランザクションで工程→本体の順に削除） |
+
+### 9.4 ユーザー操作のガード
+
+- **最後の有効 admin** は削除・無効化・降格を不可（`last_admin`）。
+- **自分自身**の無効化（`cannot_deactivate_self`）・管理者権限の自己剥奪（`cannot_demote_self`）・削除（`cannot_delete_self`）を不可。
+- **staffCode は1ユーザーにつき一意**（`staffCode_in_use`）。アプリ事前チェック＋DB一意制約 `uq_user_staff`（NULL=紐付けなしは複数可）の二段構え。
+
+### 9.5 エラーコード ⇔ 日本語（フロント対訳）
+
+| コード | HTTP | 日本語 |
+|---|---|---|
+| `code_immutable` | 400 | コード（番号）は変更できません。 |
+| `last_admin` | 400 | 最後の管理者（admin）は削除・無効化・降格できません。 |
+| `cannot_deactivate_self` | 400 | ログイン中の自分自身は無効化できません。 |
+| `cannot_demote_self` | 400 | ログイン中の自分自身の管理者権限は外せません。 |
+| `cannot_delete_self` | 400 | 自分自身は削除できません。 |
+| `staffCode_in_use` | 409 | このスタッフは既に別のユーザーに紐付いています（{otherLoginId}）。 |
+| `master_in_use` | 409 | 参照があるため削除できません：{refs 内訳}。無効化での停止をご検討ください。 |
+| `constraint_violation` | 409 | 関連データがあるため、この操作はできません。 |
+
+### 9.6 関連ファイル・残課題
+
+- 実装：`pro/lib/mutations.php`・`pro/lib/users.php`・`pro/lib/helpers.php`（`JoConflictException`）・`pro/api.php`・`pro/master.js`・`pro/users.html`。
+- スキーマ：`db/schema.sql`（`uq_user_staff`）／既存DB適用は `db/migrations/2026-06-26_user_staff_unique.sql`。
+- **soft-delete トグル（2026-06-26 実装）**：マスタUI（`master.html`/`master.js`）の staff/customers タブに **状態列（有効/無効）＋有効化/無効化ボタン**を追加。無効化は `upsertMaster` で `isActive=0` を送る（`{code,name,isActive}` のみ送るため顧客の住所等は upsert 対象外で保持）。tasks は `jo_task_types` に isActive 列が無いため対象外。無効行はグレー表示。
+- **残課題（follow-up）**：無効化したマスタは**現状まだ入力画面の選択肢から除外されない**（`app.js`/`worklog-month.js` の `normalizeMaster` が isActive を保持せず、選択肢を active で絞っていない）。完全な「停止」には、入力セレクタを active のみ＋現在選択値は残す形に絞る横展開が必要（**編集時に過去エントリの無効マスタを表示し続ける扱い**を含む）。工数入力という安全重要画面のため別タスクで慎重に対応する。

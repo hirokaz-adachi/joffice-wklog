@@ -4,6 +4,20 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
 
+// 整合性の衝突（参照あり削除・重複紐付け等）を表す例外。
+// $info はフロントへ渡す付帯情報（refs 内訳・相手loginId 等）。HTTP 409 で返す。
+class JoConflictException extends RuntimeException
+{
+    /** @var array */
+    public $info;
+
+    public function __construct(string $code, array $info = [])
+    {
+        parent::__construct($code);
+        $this->info = $info;
+    }
+}
+
 // JSON を返して終了する。
 function jo_json($data, int $status = 200): void
 {

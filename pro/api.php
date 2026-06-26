@@ -203,9 +203,9 @@ try {
             jo_json(['ok' => true, 'data' => jo_list_users()]);
             break;
         case 'saveUser':
-            jo_require_role(['admin']);
+            $admin = jo_require_role(['admin']);
             jo_check_csrf($in);
-            jo_json(['ok' => true, 'data' => jo_save_user($in['user'] ?? [])]);
+            jo_json(['ok' => true, 'data' => jo_save_user($in['user'] ?? [], $admin)]);
             break;
         case 'deleteUser':
             $admin = jo_require_role(['admin']);
@@ -225,8 +225,17 @@ try {
             jo_error('unknown_action: ' . $action, 404);
     }
 } catch (InvalidArgumentException $e) {
-    // 入力検証エラーは 400 で理由を返す
+    // 入力検証・運用ガード違反は 400 で理由コードを返す（フロントが日本語化）
     jo_error('bad_request', 400, ['detail' => $e->getMessage()]);
+} catch (JoConflictException $e) {
+    // 整合性の衝突（参照あり削除・重複紐付け）は 409 で内訳付きで返す
+    jo_error('conflict', 409, array_merge(['detail' => $e->getMessage()], $e->info));
+} catch (PDOException $e) {
+    // 事前チェックを潜り抜けたDB制約違反（FK/UNIQUE 等）の保険。本番では内部詳細を出さない。
+    if ($e->getCode() === '23000') {
+        jo_error('conflict', 409, array_merge(['detail' => 'constraint_violation'], jo_is_debug() ? ['raw' => $e->getMessage()] : []));
+    }
+    jo_error('server_error', 500, jo_is_debug() ? ['detail' => $e->getMessage()] : []);
 } catch (Throwable $e) {
     $extra = jo_is_debug() ? ['detail' => $e->getMessage()] : [];
     jo_error('server_error', 500, $extra);
