@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J-Office (pro) ｜ 請求書編集</title>
+  <style>
+    :root { --fg:#1f2937; --muted:#6b7280; --line:#e5e7eb; --accent:#0f766e; --accent-dark:#0b5d57; --bg:#f8fafc; --danger:#b91c1c; --warn:#b45309; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; color:var(--fg); background:var(--bg); }
+    .topbar { display:flex; justify-content:space-between; align-items:flex-start; padding:18px 24px; border-bottom:1px solid var(--line); background:#fff; }
+    .eyebrow { color:var(--muted); font-size:12px; margin:0; } h1 { font-size:19px; margin:2px 0 0; }
+    .top-actions { display:flex; gap:10px; align-items:center; }
+    .btn { padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--fg); font-size:13px; cursor:pointer; text-decoration:none; }
+    .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .btn.issue { background:var(--accent-dark); color:#fff; border-color:var(--accent-dark); }
+    .btn.danger { color:var(--danger); border-color:#fecaca; }
+    main { max-width:980px; margin:22px auto; padding:0 20px; }
+    .panel { background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:16px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px,1fr)); gap:12px; }
+    label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+    input, select, textarea { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:#fff; }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th, td { padding:7px 8px; border-bottom:1px solid var(--line); text-align:left; }
+    th { color:var(--muted); font-weight:600; font-size:12px; }
+    td.num, th.num { text-align:right; }
+    .lines input, .lines select { padding:6px 8px; }
+    .lines .c-code { width:120px; } .lines .c-qty { width:70px; text-align:right; } .lines .c-unit { width:110px; text-align:right; } .lines .c-rate { width:70px; text-align:right; }
+    .totals { margin-top:14px; margin-left:auto; width:280px; }
+    .totals .row { display:flex; justify-content:space-between; padding:4px 0; font-variant-numeric:tabular-nums; }
+    .totals .row.total { border-top:2px solid var(--line); margin-top:6px; padding-top:8px; font-weight:800; font-size:16px; }
+    .warn { color:var(--warn); font-size:12px; margin-top:6px; display:none; }
+    .warn.show { display:block; }
+    .actions { display:flex; gap:10px; margin-top:8px; }
+    .msg { margin-top:12px; font-size:13px; white-space:pre-wrap; padding:9px 12px; border-radius:8px; display:none; }
+    .msg.err { background:#fef2f2; color:var(--danger); display:block; } .msg.ok { background:#f0fdf4; color:#15803d; display:block; }
+    .hint { color:var(--muted); font-size:12px; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div><p class="eyebrow">J-Office (pro)・請求書発行</p><h1 id="title">請求書 新規作成</h1></div>
+    <div class="top-actions">
+      <span id="whoami" style="color:var(--muted);font-size:13px;"></span>
+      <a class="btn" href="invoice-list.html">一覧へ戻る</a>
+      <button id="logout" class="btn" type="button">ログアウト</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="grid">
+        <div><label>顧客</label><select id="f_customer"></select><div id="payWarn" class="warn">この顧客は「口座振替」です。請求書払い（自前発行）対象か確認してください（二重計上注意）。</div></div>
+        <div><label>請求対象月（YYYY-MM）</label><input id="f_billingMonth" type="text" placeholder="例 2026-06"></div>
+        <div><label>発行日</label><input id="f_issueDate" type="date"></div>
+        <div><label>支払期限の算出方式</label><select id="f_dueRule">
+          <option value="net30">発行日＋30日</option>
+          <option value="issueNextMonthEnd">発行月の翌月末</option>
+          <option value="billingNextMonthEnd">請求対象月の翌月末</option>
+        </select></div>
+        <div><label>支払期限（自動・編集可）</label><input id="f_dueDate" type="date"></div>
+      </div>
+      <div class="grid" style="margin-top:12px">
+        <div><label>宛名</label><input id="f_billToName" type="text"></div>
+        <div><label>敬称</label><input id="f_billToHonorific" type="text" placeholder="御中"></div>
+        <div style="grid-column:1 / -1"><label>宛先住所（スナップショット・編集可）</label><input id="f_billToAddress" type="text"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 style="font-size:15px;margin:0 0 10px">明細</h2>
+      <table class="lines">
+        <thead><tr><th>業務コード</th><th>品名</th><th class="num">数量</th><th class="num">単価</th><th class="num">金額(税抜)</th><th class="num">税率%</th><th></th></tr></thead>
+        <tbody id="lines"></tbody>
+      </table>
+      <div style="margin-top:10px"><button id="addLine" class="btn" type="button">＋ 明細を追加</button></div>
+      <div class="totals">
+        <div class="row"><span>税抜計</span><span id="t_sub">0</span></div>
+        <div class="row"><span>消費税（10%・切捨）</span><span id="t_tax">0</span></div>
+        <div class="row total"><span>税込合計</span><span id="t_total">0</span></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <label>メモ（社内用・PDFには出しません）</label>
+      <textarea id="f_memo" rows="2"></textarea>
+      <div class="actions">
+        <button id="btnSave" class="btn primary" type="button">下書き保存</button>
+        <button id="btnIssue" class="btn issue" type="button">確定発行</button>
+        <span id="curNo" class="hint" style="align-self:center"></span>
+      </div>
+      <div id="msg" class="msg"></div>
+    </section>
+  </main>
+
+  <script src="backend.js?v=20260626-1"></script>
+  <script>
+    var $ = function (id) { return document.getElementById(id); };
+    var customers = [], tasks = [], settings = {}, lines = [], curNo = '';
+    function esc(v) { return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function yen(n) { return Number(n || 0).toLocaleString('ja-JP'); }
+    function msg(t, ok) { var m = $('msg'); m.textContent = t; m.className = 'msg ' + (ok ? 'ok' : 'err'); }
+    function qnum(v){ var n = Number(v); return isFinite(n) ? n : 0; }
+    function param(n){ return new URLSearchParams(location.search).get(n) || ''; }
+
+    $('logout').addEventListener('click', function () { joLogout().then(function(){ location.replace('login.html'); }).catch(function(){ location.replace('login.html'); }); });
+
+    function taskOptions(sel) {
+      return '<option value="">（コード）</option>' + tasks.slice().sort(function(a,b){ return String(a.code).localeCompare(String(b.code),'ja'); })
+        .map(function (t){ return '<option value="' + esc(t.code) + '"' + (t.code === sel ? ' selected' : '') + '>' + esc(t.code + ' ' + t.name) + '</option>'; }).join('');
+    }
+    function renderLines() {
+      $('lines').innerHTML = lines.map(function (ln, i) {
+        return '<tr data-i="' + i + '">'
+          + '<td><select class="c-code" data-f="taskCode">' + taskOptions(ln.taskCode) + '</select></td>'
+          + '<td><input data-f="itemName" value="' + esc(ln.itemName) + '"></td>'
+          + '<td class="num"><input class="c-qty" data-f="quantity" type="number" step="0.01" value="' + esc(ln.quantity) + '"></td>'
+          + '<td class="num"><input class="c-unit" data-f="unitPrice" type="number" step="1" value="' + esc(ln.unitPrice) + '"></td>'
+          + '<td class="num">' + yen(Math.round(qnum(ln.quantity) * qnum(ln.unitPrice))) + '</td>'
+          + '<td class="num"><input class="c-rate" data-f="taxRate" type="number" step="0.1" value="' + esc(ln.taxRate) + '"></td>'
+          + '<td><button class="btn danger" data-del="' + i + '" type="button">×</button></td>'
+          + '</tr>';
+      }).join('');
+      recalc();
+    }
+    function recalc() {
+      var sub = 0, byRate = {};
+      lines.forEach(function (ln) { var amt = Math.round(qnum(ln.quantity) * qnum(ln.unitPrice)); sub += amt; var r = qnum(ln.taxRate); byRate[r] = (byRate[r] || 0) + amt; });
+      var tax = 0; Object.keys(byRate).forEach(function (r) { tax += Math.floor(byRate[r] * Number(r) / 100); });
+      $('t_sub').textContent = yen(sub); $('t_tax').textContent = yen(tax); $('t_total').textContent = yen(sub + tax);
+    }
+    $('lines').addEventListener('input', function (ev) {
+      var tr = ev.target.closest('tr[data-i]'); if (!tr) return; var i = +tr.dataset.i; var f = ev.target.getAttribute('data-f'); if (!f) return;
+      lines[i][f] = ev.target.value;
+      if (f === 'taskCode') { var t = tasks.find(function(x){ return x.code === ev.target.value; }); if (t && !lines[i].itemName) { lines[i].itemName = t.name; } renderLines(); return; }
+      if (f === 'quantity' || f === 'unitPrice') { tr.querySelector('td:nth-child(5)').textContent = yen(Math.round(qnum(lines[i].quantity) * qnum(lines[i].unitPrice))); }
+      recalc();
+    });
+    $('lines').addEventListener('click', function (ev) { var d = ev.target.getAttribute('data-del'); if (d != null) { lines.splice(+d, 1); renderLines(); } });
+    $('addLine').addEventListener('click', function () { lines.push({ taskCode:'', itemName:'', quantity:1, unitPrice:0, taxRate:10 }); renderLines(); });
+
+    function lastOfMonthAfter(baseY, baseM, addMonths) { var d = new Date(baseY, (baseM - 1) + addMonths + 1, 0); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+    function computeDue() {
+      var rule = $('f_dueRule').value, iss = $('f_issueDate').value, bm = $('f_billingMonth').value.trim();
+      if (!iss) return '';
+      if (rule === 'net30') { var d = new Date(iss); d.setDate(d.getDate() + 30); return d.toISOString().slice(0,10); }
+      if (rule === 'issueNextMonthEnd') { var p = iss.split('-'); return lastOfMonthAfter(+p[0], +p[1], 1); }
+      if (rule === 'billingNextMonthEnd') { var b = (/^\d{4}-\d{2}$/.test(bm) ? bm : iss.slice(0,7)).split('-'); return lastOfMonthAfter(+b[0], +b[1], 1); }
+      return '';
+    }
+    function refreshDue() { $('f_dueDate').value = computeDue(); }
+    ['f_dueRule','f_issueDate','f_billingMonth'].forEach(function (id){ $(id).addEventListener('change', refreshDue); });
+
+    function applyCustomer() {
+      var c = customers.find(function (x){ return x.code === $('f_customer').value; });
+      $('payWarn').className = 'warn' + (c && c.paymentMethod === 'transfer' ? ' show' : '');
+      if (c) {
+        if (!$('f_billToName').value) $('f_billToName').value = c.name || '';
+        $('f_billToHonorific').value = $('f_billToHonorific').value || c.honorific || '御中';
+        if (!$('f_billToAddress').value) { var a = [c.postalCode ? '〒' + c.postalCode : '', c.address1 || '', c.address2 || ''].filter(Boolean).join(' '); $('f_billToAddress').value = a; }
+      }
+    }
+    $('f_customer').addEventListener('change', function () { $('f_billToName').value=''; $('f_billToAddress').value=''; applyCustomer(); });
+
+    function collect() {
+      return {
+        invoiceNo: curNo || '',
+        customerCode: $('f_customer').value,
+        billingMonth: $('f_billingMonth').value.trim(),
+        issueDate: $('f_issueDate').value,
+        dueRule: $('f_dueRule').value,
+        dueDate: $('f_dueDate').value,
+        billToName: $('f_billToName').value.trim(),
+        billToHonorific: $('f_billToHonorific').value.trim() || '御中',
+        billToAddress: $('f_billToAddress').value.trim(),
+        memo: $('f_memo').value,
+        lines: lines.map(function (ln){ return { taskCode: ln.taskCode, itemName: ln.itemName, quantity: qnum(ln.quantity), unitPrice: qnum(ln.unitPrice), taxRate: qnum(ln.taxRate) }; })
+      };
+    }
+    function validate() {
+      if (!$('f_customer').value) { msg('顧客を選択してください。', false); return false; }
+      if (!/^\d{4}-\d{2}$/.test($('f_billingMonth').value.trim())) { msg('請求対象月を YYYY-MM で入力してください。', false); return false; }
+      if (!lines.length || !lines.some(function(l){ return qnum(l.unitPrice) !== 0 || qnum(l.quantity) !== 0; })) { msg('明細を1行以上入力してください。', false); return false; }
+      return true;
+    }
+    async function saveDraft() {
+      if (!validate()) return null;
+      var r = await joSaveInvoiceDraft(collect());
+      curNo = r.invoiceNo; $('curNo').textContent = '下書き保存済み';
+      history.replaceState(null, '', 'invoice-edit.html?no=' + encodeURIComponent(curNo));
+      return r;
+    }
+    $('btnSave').addEventListener('click', async function () {
+      try { var r = await saveDraft(); if (r) msg('下書きを保存しました（税込 ' + yen(r.total) + ' 円）。', true); }
+      catch (e) { msg('保存失敗: ' + ((e.data && e.data.detail) || e.message || e), false); }
+    });
+    $('btnIssue').addEventListener('click', async function () {
+      try {
+        var r = await saveDraft(); if (!r) return;
+        if (!confirm('確定発行します。番号採番・請求データへの反映が行われ、以後は編集できません。よろしいですか？')) return;
+        var iss = await joIssueInvoice(curNo);
+        alert('発行しました：' + iss.invoiceNo);
+        location.href = 'invoice-print.html?no=' + encodeURIComponent(iss.invoiceNo);
+      } catch (e) { msg('発行失敗: ' + ((e.data && e.data.detail) || e.message || e), false); }
+    });
+
+    function loadExisting(h, ls) {
+      curNo = h.invoiceNo; $('curNo').textContent = '下書き編集中';
+      $('title').textContent = '請求書 編集（下書き）';
+      $('f_customer').value = h.customerCode;
+      $('f_billingMonth').value = h.billingMonth;
+      $('f_issueDate').value = (h.issueDate || '').slice(0,10);
+      $('f_dueRule').value = h.dueRule || 'net30';
+      $('f_dueDate').value = (h.dueDate || '').slice(0,10);
+      $('f_billToName').value = h.billToName || '';
+      $('f_billToHonorific').value = h.billToHonorific || '御中';
+      $('f_billToAddress').value = h.billToAddress || '';
+      $('f_memo').value = h.memo || '';
+      lines = (ls || []).map(function (l){ return { taskCode: l.taskCode, itemName: l.itemName, quantity: l.quantity, unitPrice: l.unitPrice, taxRate: l.taxRate }; });
+      if (!lines.length) lines = [{ taskCode:'', itemName:'', quantity:1, unitPrice:0, taxRate:10 }];
+      renderLines();
+      applyCustomer();
+    }
+
+    joMe().then(async function (u) {
+      if (u.mustChangePassword) { location.replace('change-password.html'); return; }
+      if (u.role !== 'admin') { location.replace('index.html'); return; }
+      var boot = await joBootstrap();
+      customers = boot.customers || []; tasks = boot.tasks || []; settings = boot.settings || {};
+      $('f_customer').innerHTML = '<option value="">（顧客を選択）</option>' + customers.map(function (c){ return '<option value="' + esc(c.code) + '">' + esc(c.code + ' ' + c.name) + (c.paymentMethod === 'invoice' ? '（請求書払い）' : '') + '</option>'; }).join('');
+      var no = param('no');
+      if (no) {
+        var inv = await joGetInvoice(no);
+        if (inv.header.status !== 'draft') { alert('発行済み／取消の請求書は編集できません。複製してください。'); location.replace('invoice-list.html'); return; }
+        loadExisting(inv.header, inv.lines);
+      } else {
+        $('f_issueDate').value = new Date().toISOString().slice(0,10);
+        $('f_dueRule').value = settings['invoice.dueRuleDefault'] || 'net30';
+        lines = [{ taskCode:'', itemName:'', quantity:1, unitPrice:0, taxRate:10 }];
+        renderLines(); refreshDue();
+      }
+    }).catch(function () { location.replace('login.html'); });
+  </script>
+</body>
+</html>

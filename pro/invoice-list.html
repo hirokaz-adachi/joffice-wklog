@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J-Office (pro) ｜ 請求書発行</title>
+  <style>
+    :root { --fg:#1f2937; --muted:#6b7280; --line:#e5e7eb; --accent:#0f766e; --accent-dark:#0b5d57; --bg:#f8fafc; --danger:#b91c1c; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; color:var(--fg); background:var(--bg); }
+    .topbar { display:flex; justify-content:space-between; align-items:flex-start; padding:18px 24px; border-bottom:1px solid var(--line); background:#fff; }
+    .eyebrow { color:var(--muted); font-size:12px; margin:0; } h1 { font-size:19px; margin:2px 0 0; }
+    .top-actions { display:flex; gap:10px; align-items:center; }
+    .btn { padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--fg); font-size:13px; cursor:pointer; text-decoration:none; }
+    .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .btn.danger { color:var(--danger); border-color:#fecaca; }
+    main { max-width:1080px; margin:22px auto; padding:0 20px; }
+    .panel { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:16px; }
+    .filters { display:flex; gap:12px; align-items:end; flex-wrap:wrap; }
+    label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+    input, select { padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:#fff; }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+    th { color:var(--muted); font-weight:600; font-size:12px; }
+    td.num { text-align:right; font-variant-numeric:tabular-nums; }
+    .tag { font-size:11px; border-radius:999px; padding:1px 8px; background:#e5e7eb; color:#374151; }
+    .tag.draft { background:#fef9c3; color:#854d0e; } .tag.issued { background:#d1fae5; color:#065f46; } .tag.void { background:#fee2e2; color:#991b1b; }
+    .ops { white-space:nowrap; text-align:right; }
+    .ops .btn { padding:5px 9px; font-size:12px; margin-left:4px; }
+    .msg { margin-top:12px; font-size:13px; white-space:pre-wrap; padding:9px 12px; border-radius:8px; display:none; }
+    .msg.err { background:#fef2f2; color:var(--danger); display:block; } .msg.ok { background:#f0fdf4; color:#15803d; display:block; }
+    .spacer { flex:1; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div><p class="eyebrow">J-Office (pro)</p><h1>請求書発行</h1></div>
+    <div class="top-actions">
+      <span id="whoami" class="whoami" style="color:var(--muted);font-size:13px;"></span>
+      <a class="btn" href="invoice-settings.html">発行者設定</a>
+      <a class="btn" href="index.html">メニュー</a>
+      <button id="logout" class="btn" type="button">ログアウト</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="filters">
+        <div><label>請求月（YYYY-MM）</label><input id="f_month" type="text" placeholder="例 2026-06" style="width:130px"></div>
+        <div><label>顧客</label><select id="f_customer"></select></div>
+        <div><label>状態</label><select id="f_status">
+          <option value="">すべて</option><option value="draft">下書き</option><option value="issued">発行済</option><option value="void">取消</option>
+        </select></div>
+        <button id="btnFilter" class="btn" type="button">絞込</button>
+        <div class="spacer"></div>
+        <a class="btn primary" href="invoice-edit.html">＋ 新規作成</a>
+      </div>
+      <div id="msg" class="msg"></div>
+    </section>
+
+    <section class="panel">
+      <table>
+        <thead><tr><th>請求番号</th><th>顧客</th><th>請求月</th><th>発行日</th><th>支払期限</th><th class="num">税込</th><th>状態</th><th class="ops">操作</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="backend.js?v=20260626-1"></script>
+  <script>
+    var $ = function (id) { return document.getElementById(id); };
+    var rows = [], customers = [];
+    function msg(t, ok) { var m = $('msg'); m.textContent = t; m.className = 'msg ' + (ok ? 'ok' : 'err'); }
+    function esc(v) { return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function yen(n) { return Number(n || 0).toLocaleString('ja-JP'); }
+    function custName(code) { var c = customers.find(function (x){ return x.code === code; }); return c ? c.name : code; }
+
+    $('logout').addEventListener('click', function () { joLogout().then(function(){ location.replace('login.html'); }).catch(function(){ location.replace('login.html'); }); });
+    $('btnFilter').addEventListener('click', load);
+
+    function statusTag(s) {
+      var label = s === 'draft' ? '下書き' : s === 'issued' ? '発行済' : s === 'void' ? '取消' : s;
+      return '<span class="tag ' + esc(s) + '">' + label + '</span>';
+    }
+
+    function render() {
+      $('tbody').innerHTML = rows.map(function (r) {
+        var no = r.isDraft ? '<span class="tag draft">下書き</span>' : esc(r.invoiceNo);
+        var ops = '';
+        if (r.status === 'draft') {
+          ops += '<a class="btn" href="invoice-edit.html?no=' + encodeURIComponent(r.invoiceNo) + '">編集</a>';
+          ops += '<button class="btn primary" data-issue="' + esc(r.invoiceNo) + '">確定発行</button>';
+          ops += '<button class="btn danger" data-del="' + esc(r.invoiceNo) + '">削除</button>';
+        } else if (r.status === 'issued') {
+          ops += '<a class="btn" href="invoice-print.html?no=' + encodeURIComponent(r.invoiceNo) + '" target="_blank">印刷/PDF</a>';
+          ops += '<button class="btn" data-dup="' + esc(r.invoiceNo) + '">複製</button>';
+          ops += '<button class="btn danger" data-void="' + esc(r.invoiceNo) + '">取消</button>';
+        } else { // void
+          ops += '<button class="btn" data-dup="' + esc(r.invoiceNo) + '">再作成（複製）</button>';
+        }
+        return '<tr>'
+          + '<td>' + no + '</td>'
+          + '<td>' + esc(r.customer || custName(r.customerCode)) + '</td>'
+          + '<td>' + esc(r.billingMonth) + '</td>'
+          + '<td>' + esc(r.issueDate || '—') + '</td>'
+          + '<td>' + esc(r.dueDate || '—') + '</td>'
+          + '<td class="num">' + yen(r.total) + '</td>'
+          + '<td>' + statusTag(r.status) + '</td>'
+          + '<td class="ops">' + ops + '</td>'
+          + '</tr>';
+      }).join('') || '<tr><td colspan="8" style="color:var(--muted)">請求書がありません。「新規作成」から作成してください。</td></tr>';
+    }
+
+    async function load() {
+      try {
+        rows = await joListInvoices({ billingMonth: $('f_month').value.trim(), customerCode: $('f_customer').value, status: $('f_status').value });
+        render(); msg('', true); $('msg').className = 'msg';
+      } catch (e) { msg('読み込み失敗: ' + (e.message || e), false); }
+    }
+
+    $('tbody').addEventListener('click', async function (ev) {
+      var t = ev.target;
+      var issue = t.getAttribute('data-issue'), del = t.getAttribute('data-del'), vd = t.getAttribute('data-void'), dup = t.getAttribute('data-dup');
+      try {
+        if (issue) { if (!confirm('この下書きを確定発行します。番号採番・請求データへの反映が行われます。よろしいですか？')) return; var r = await joIssueInvoice(issue); msg('発行しました：' + r.invoiceNo, true); await load(); }
+        else if (del) { if (!confirm('この下書きを削除しますか？')) return; await joDeleteInvoiceDraft(del); msg('削除しました。', true); await load(); }
+        else if (vd) { if (!confirm('発行済み請求書を取消します。請求データへの反映も取り消されます（請求書は取消として保持）。よろしいですか？')) return; await joVoidInvoice(vd); msg('取消しました。', true); await load(); }
+        else if (dup) { var d = await joDuplicateInvoice(dup, {}); location.href = 'invoice-edit.html?no=' + encodeURIComponent(d.invoiceNo); }
+      } catch (e) {
+        var m = (e.data && e.data.detail) || e.message || e;
+        msg('操作失敗: ' + m, false);
+      }
+    });
+
+    joMe().then(async function (u) {
+      if (u.mustChangePassword) { location.replace('change-password.html'); return; }
+      if (u.role !== 'admin') { location.replace('index.html'); return; }
+      var boot = await joBootstrap();
+      customers = boot.customers || [];
+      $('f_customer').innerHTML = '<option value="">すべて</option>' + customers.map(function (c){ return '<option value="' + esc(c.code) + '">' + esc(c.code + ' ' + c.name) + '</option>'; }).join('');
+      await load();
+    }).catch(function () { location.replace('login.html'); });
+  </script>
+</body>
+</html>

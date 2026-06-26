@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>請求書</title>
+  <style>
+    :root { --ink:#1f2937; --muted:#6b7280; --line:#cbd5e1; --accent:#0f766e; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; color:var(--ink); background:#eef2f3; }
+    .toolbar { position:sticky; top:0; display:flex; gap:10px; justify-content:flex-end; padding:12px 18px; background:#fff; border-bottom:1px solid var(--line); }
+    .btn { padding:8px 14px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; font-size:13px; text-decoration:none; color:var(--ink); }
+    .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .sheet { background:#fff; width:210mm; min-height:280mm; margin:18px auto; padding:18mm 16mm; box-shadow:0 8px 30px rgba(0,0,0,.12); }
+    .doc-title { text-align:center; font-size:26px; letter-spacing:.4em; margin:0 0 18px; font-weight:800; }
+    .head { display:flex; justify-content:space-between; gap:24px; }
+    .bill-to { flex:1; } .bill-to .name { font-size:18px; font-weight:800; border-bottom:2px solid var(--ink); padding-bottom:4px; display:inline-block; min-width:55%; }
+    .bill-to .addr { color:var(--muted); font-size:13px; margin-top:8px; white-space:pre-wrap; }
+    .meta { text-align:right; font-size:13px; color:var(--muted); }
+    .meta .no { font-size:15px; color:var(--ink); font-weight:700; }
+    .issuer { text-align:left; font-size:13px; margin-top:14px; line-height:1.7; }
+    .issuer .iname { font-size:15px; font-weight:800; color:var(--ink); }
+    .summary { margin:22px 0 10px; }
+    .total-box { display:inline-block; border:2px solid var(--ink); border-radius:6px; padding:10px 18px; font-size:20px; font-weight:800; }
+    .total-box .lbl { font-size:12px; color:var(--muted); font-weight:600; margin-right:10px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; margin-top:14px; }
+    th, td { border:1px solid var(--line); padding:8px 10px; }
+    th { background:#f1f5f9; color:#334155; font-weight:700; text-align:center; }
+    td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+    .tax-summary { width:46%; margin-left:auto; margin-top:14px; }
+    .tax-summary td { padding:6px 10px; }
+    .pay { margin-top:18px; font-size:13px; line-height:1.8; }
+    .pay .box { border:1px solid var(--line); border-radius:6px; padding:10px 14px; display:inline-block; }
+    .note { color:var(--muted); font-size:11px; margin-top:18px; }
+    .warn { color:#b45309; }
+    @media print { body { background:#fff; } .toolbar { display:none; } .sheet { box-shadow:none; margin:0; width:auto; } }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <a class="btn" href="invoice-list.html">一覧へ</a>
+    <button class="btn primary" onclick="window.print()">印刷 / PDF保存</button>
+  </div>
+  <div id="sheet" class="sheet"><p style="color:#6b7280">読み込み中…</p></div>
+
+  <script src="backend.js?v=20260626-1"></script>
+  <script>
+    function esc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function yen(n){ return Number(n||0).toLocaleString('ja-JP'); }
+    function param(n){ return new URLSearchParams(location.search).get(n) || ''; }
+
+    function render(h, lines, s) {
+      var regNo = h.issuerRegNo || s['issuer.regNo'] || '';
+      var byRate = {};
+      lines.forEach(function (l){ var r = Number(l.taxRate||10); byRate[r] = (byRate[r]||0) + Number(l.amount||0); });
+      var taxRows = Object.keys(byRate).sort().map(function (r){ var sub = byRate[r]; var tax = Math.floor(sub * Number(r)/100); return '<tr><td>' + r + '% 対象</td><td class="num">' + yen(sub) + '</td><td class="num">' + yen(tax) + '</td></tr>'; }).join('');
+      var lineRows = lines.map(function (l){
+        return '<tr><td style="text-align:center">' + esc(l.taskCode||'') + '</td><td>' + esc(l.itemName) + '</td>'
+          + '<td class="num">' + (Number(l.quantity)||0) + '</td><td class="num">' + yen(l.unitPrice) + '</td>'
+          + '<td class="num">' + yen(l.amount) + '</td><td class="num">' + (Number(l.taxRate)||0) + '%</td></tr>';
+      }).join('');
+      var issuerLines = [
+        s['issuer.address'] ? esc(s['issuer.address']) : '',
+        s['issuer.tel'] ? 'TEL: ' + esc(s['issuer.tel']) : '',
+        regNo ? '登録番号: ' + esc(regNo) : '<span class="warn">登録番号: （未設定）</span>'
+      ].filter(Boolean).join('<br>');
+      var bank = s['issuer.bank'] ? esc(s['issuer.bank']) : '<span class="warn">（振込先 未設定）</span>';
+
+      document.getElementById('sheet').innerHTML =
+        '<h1 class="doc-title">請求書</h1>'
+        + '<div class="head">'
+        +   '<div class="bill-to">'
+        +     '<div class="name">' + esc(h.billToName) + '　' + esc(h.billToHonorific || '御中') + '</div>'
+        +     (h.billToAddress ? '<div class="addr">' + esc(h.billToAddress) + '</div>' : '')
+        +     '<div class="summary" style="margin-top:20px"><div class="total-box"><span class="lbl">ご請求金額（税込）</span>¥' + yen(h.total) + '</div></div>'
+        +   '</div>'
+        +   '<div class="meta">'
+        +     '<div class="no">No. ' + esc(h.invoiceNo) + '</div>'
+        +     '<div>発行日: ' + esc((h.issueDate||'').slice(0,10)) + '</div>'
+        +     '<div>請求対象月: ' + esc(h.billingMonth) + '</div>'
+        +     '<div class="issuer">'
+        +       '<div class="iname">' + (s['issuer.name'] ? esc(s['issuer.name']) : '<span class="warn">（発行者名 未設定）</span>') + '</div>'
+        +       issuerLines
+        +     '</div>'
+        +   '</div>'
+        + '</div>'
+        + '<table><thead><tr><th style="width:14%">業務コード</th><th>品名・摘要</th><th class="num" style="width:10%">数量</th><th class="num" style="width:14%">単価</th><th class="num" style="width:16%">金額(税抜)</th><th class="num" style="width:10%">税率</th></tr></thead><tbody>' + lineRows + '</tbody></table>'
+        + '<table class="tax-summary"><tbody>'
+        +   '<tr><th>区分</th><th class="num">税抜対価合計</th><th class="num">消費税額</th></tr>'
+        +   taxRows
+        +   '<tr><td><b>合計</b></td><td class="num"><b>' + yen(h.subtotal) + '</b></td><td class="num"><b>' + yen(h.tax) + '</b></td></tr>'
+        +   '<tr><td><b>税込合計</b></td><td class="num" colspan="2"><b>¥' + yen(h.total) + '</b></td></tr>'
+        + '</tbody></table>'
+        + '<div class="pay"><div class="box"><b>お支払期限：</b>' + esc((h.dueDate||'').slice(0,10) || '—') + '<br><b>お振込先：</b>' + bank + '</div></div>'
+        + '<div class="note">本請求書は適格請求書（インボイス）として発行しています。' + (regNo ? '' : '※登録番号は発行者設定で登録してください。') + '</div>';
+      document.title = '請求書 ' + h.invoiceNo;
+    }
+
+    joMe().then(async function (u) {
+      if (u.role !== 'admin') { location.replace('index.html'); return; }
+      var no = param('no');
+      if (!no) { document.getElementById('sheet').innerHTML = '<p>請求書番号が指定されていません。</p>'; return; }
+      var boot = await joBootstrap();
+      var inv = await joGetInvoice(no);
+      render(inv.header, inv.lines, boot.settings || {});
+    }).catch(function () { location.replace('login.html'); });
+  </script>
+</body>
+</html>

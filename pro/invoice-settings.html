@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J-Office (pro) ｜ 発行者設定</title>
+  <style>
+    :root { --fg:#1f2937; --muted:#6b7280; --line:#e5e7eb; --accent:#0f766e; --danger:#b91c1c; --warn:#b45309; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; color:var(--fg); background:#f8fafc; }
+    .topbar { display:flex; justify-content:space-between; align-items:flex-start; padding:18px 24px; border-bottom:1px solid var(--line); background:#fff; }
+    .eyebrow { color:var(--muted); font-size:12px; margin:0; } h1 { font-size:19px; margin:2px 0 0; }
+    .top-actions { display:flex; gap:10px; align-items:center; }
+    .btn { padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--fg); font-size:13px; cursor:pointer; text-decoration:none; }
+    .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    main { max-width:720px; margin:22px auto; padding:0 20px; }
+    .panel { background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:16px; }
+    label { display:block; font-size:12px; color:var(--muted); margin:12px 0 4px; }
+    input, select, textarea { width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:#fff; }
+    .hint { color:var(--muted); font-size:12px; margin-top:4px; } .hint.warn { color:var(--warn); }
+    .actions { margin-top:18px; display:flex; gap:10px; }
+    .msg { margin-top:12px; font-size:13px; padding:9px 12px; border-radius:8px; display:none; }
+    .msg.err { background:#fef2f2; color:var(--danger); display:block; } .msg.ok { background:#f0fdf4; color:#15803d; display:block; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div><p class="eyebrow">J-Office (pro)・請求書発行</p><h1>発行者設定（適格請求書）</h1></div>
+    <div class="top-actions">
+      <span id="whoami" style="color:var(--muted);font-size:13px;"></span>
+      <a class="btn" href="invoice-list.html">請求書一覧</a>
+      <a class="btn" href="index.html">メニュー</a>
+      <button id="logout" class="btn" type="button">ログアウト</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <p class="hint">請求書PDFに記載する発行者情報です。<b>未確定の項目は暫定値で構いません</b>（確定後にここで差し替えれば、以後の発行に反映されます。発行済みの請求書は当時の登録番号を保持します）。</p>
+      <label>発行者名称（自社名）</label>
+      <input id="issuer_name" type="text" placeholder="例）社会保険労務士法人 人事オフィス">
+      <label>適格請求書発行事業者 登録番号（T＋13桁）</label>
+      <input id="issuer_regNo" type="text" placeholder="例）T1234567890123">
+      <div id="regHint" class="hint">「T」＋数字13桁。<b>所長確認待ちの場合は空欄のままで可</b>（PDFには「未設定」と表示されます）。</div>
+      <label>住所</label>
+      <input id="issuer_address" type="text" placeholder="例）東京都〇〇区〇〇 1-2-3">
+      <label>電話番号</label>
+      <input id="issuer_tel" type="text" placeholder="例）03-0000-0000">
+      <label>振込先（銀行・支店・種別・番号・名義）</label>
+      <textarea id="issuer_bank" rows="2" placeholder="例）〇〇銀行 〇〇支店 普通 1234567 シャ）ジンジオフィス"></textarea>
+    </section>
+
+    <section class="panel">
+      <label>支払期限の既定方式</label>
+      <select id="invoice_dueRuleDefault">
+        <option value="net30">発行日＋30日</option>
+        <option value="issueNextMonthEnd">発行月の翌月末</option>
+        <option value="billingNextMonthEnd">請求対象月の翌月末</option>
+      </select>
+      <label>消費税の端数処理</label>
+      <select id="invoice_taxRoundMode">
+        <option value="floor">切り捨て（推奨・確定）</option>
+        <option value="round">四捨五入</option>
+      </select>
+      <div class="actions">
+        <button id="btnSave" class="btn primary" type="button">保存</button>
+      </div>
+      <div id="msg" class="msg"></div>
+    </section>
+  </main>
+
+  <script src="backend.js?v=20260626-1"></script>
+  <script>
+    var $ = function (id){ return document.getElementById(id); };
+    var KEYS = {
+      'issuer.name':'issuer_name','issuer.regNo':'issuer_regNo','issuer.address':'issuer_address','issuer.tel':'issuer_tel','issuer.bank':'issuer_bank',
+      'invoice.dueRuleDefault':'invoice_dueRuleDefault','invoice.taxRoundMode':'invoice_taxRoundMode'
+    };
+    function msg(t, ok){ var m=$('msg'); m.textContent=t; m.className='msg '+(ok?'ok':'err'); }
+    $('logout').addEventListener('click', function(){ joLogout().then(function(){location.replace('login.html');}).catch(function(){location.replace('login.html');}); });
+
+    $('issuer_regNo').addEventListener('input', function(){
+      var v = this.value.trim();
+      var ok = v === '' || /^T\d{13}$/.test(v);
+      $('regHint').className = 'hint' + (ok ? '' : ' warn');
+      $('regHint').innerHTML = ok ? '「T」＋数字13桁。<b>所長確認待ちの場合は空欄のままで可</b>（PDFには「未設定」と表示されます）。' : '形式が不正です（T＋数字13桁）。';
+    });
+
+    $('btnSave').addEventListener('click', async function () {
+      var reg = $('issuer_regNo').value.trim();
+      if (reg !== '' && !/^T\d{13}$/.test(reg)) { msg('登録番号は「T＋数字13桁」で入力してください（空欄も可）。', false); return; }
+      try {
+        for (var key in KEYS) { await joSaveSetting(key, $(KEYS[key]).value.trim ? $(KEYS[key]).value.trim() : $(KEYS[key]).value); }
+        msg('保存しました。', true);
+      } catch (e) { msg('保存失敗: ' + ((e.data && e.data.detail) || e.message || e), false); }
+    });
+
+    joMe().then(async function (u) {
+      if (u.mustChangePassword) { location.replace('change-password.html'); return; }
+      if (u.role !== 'admin') { location.replace('index.html'); return; }
+      var boot = await joBootstrap();
+      var s = boot.settings || {};
+      for (var key in KEYS) { if (s[key] != null) $(KEYS[key]).value = s[key]; }
+    }).catch(function () { location.replace('login.html'); });
+  </script>
+</body>
+</html>

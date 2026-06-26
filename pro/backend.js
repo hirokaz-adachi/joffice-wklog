@@ -95,6 +95,15 @@ const joSaveUser = (user) => joWrite('saveUser', { user });
 const joDeleteUser = (id) => joWrite('deleteUser', { id });
 const joChangePassword = (current, next) => joWrite('changePassword', { current, next });
 
+// 請求書発行（admin）
+const joListInvoices = (filters = {}) => joCall('listInvoices', filters).then((r) => r.data);
+const joGetInvoice = (invoiceNo) => joCall('getInvoice', { invoiceNo }).then((r) => r.data);
+const joSaveInvoiceDraft = (invoice) => joWrite('saveInvoiceDraft', { invoice });
+const joIssueInvoice = (invoiceNo) => joWrite('issueInvoice', { invoiceNo });
+const joVoidInvoice = (invoiceNo) => joWrite('voidInvoice', { invoiceNo });
+const joDuplicateInvoice = (invoiceNo, overrides = {}) => joWrite('duplicateInvoice', { invoiceNo, overrides });
+const joDeleteInvoiceDraft = (invoiceNo) => joWrite('deleteInvoiceDraft', { invoiceNo });
+
 // ---- 旧 WorklogBackend 互換シム ----
 // 既存画面（master.js 等）はインクルード差し替えのみで再利用するため、
 // GAS版 backend.js と同じ window.WorklogBackend API を fetch 実装で提供する。

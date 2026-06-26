@@ -9,6 +9,7 @@ require_once __DIR__ . '/lib/auth.php';
 require_once __DIR__ . '/lib/handlers.php';
 require_once __DIR__ . '/lib/mutations.php';
 require_once __DIR__ . '/lib/users.php';
+require_once __DIR__ . '/lib/invoices.php';
 
 // 管理者以外（manager/staff）は自分の工数のみ操作可
 function jo_assert_entry_owner(array $user, $entry): void
@@ -219,6 +220,50 @@ try {
             $r = jo_change_password($user, (string) ($in['current'] ?? ''), (string) ($in['next'] ?? ''));
             $_SESSION['user']['mustChangePassword'] = 0;
             jo_json(['ok' => true, 'data' => $r]);
+            break;
+
+        // --- 請求書発行（JOfficeInvoice・admin）---
+        case 'listInvoices':
+            jo_require_role(['admin']);
+            jo_json(['ok' => true, 'data' => jo_list_invoices([
+                'billingMonth' => $in['billingMonth'] ?? '',
+                'customerCode' => $in['customerCode'] ?? '',
+                'status'       => $in['status'] ?? '',
+            ])]);
+            break;
+        case 'getInvoice':
+            jo_require_role(['admin']);
+            $inv = jo_get_invoice((string) ($in['invoiceNo'] ?? ''));
+            if ($inv === null) {
+                jo_error('invoice_not_found', 404);
+            }
+            jo_json(['ok' => true, 'data' => $inv]);
+            break;
+        case 'saveInvoiceDraft':
+            $u = jo_require_role(['admin']);
+            jo_check_csrf($in);
+            jo_json(['ok' => true, 'data' => jo_save_invoice_draft($in['invoice'] ?? [], $u)]);
+            break;
+        case 'issueInvoice':
+            $u = jo_require_role(['admin']);
+            jo_check_csrf($in);
+            jo_json(['ok' => true, 'data' => jo_issue_invoice((string) ($in['invoiceNo'] ?? ''), $u)]);
+            break;
+        case 'voidInvoice':
+            $u = jo_require_role(['admin']);
+            jo_check_csrf($in);
+            jo_json(['ok' => true, 'data' => jo_void_invoice((string) ($in['invoiceNo'] ?? ''), $u)]);
+            break;
+        case 'duplicateInvoice':
+            $u = jo_require_role(['admin']);
+            jo_check_csrf($in);
+            jo_json(['ok' => true, 'data' => jo_duplicate_invoice((string) ($in['invoiceNo'] ?? ''), $in['overrides'] ?? [], $u)]);
+            break;
+        case 'deleteInvoiceDraft':
+            jo_require_role(['admin']);
+            jo_check_csrf($in);
+            jo_delete_invoice_draft((string) ($in['invoiceNo'] ?? ''));
+            jo_json(['ok' => true, 'data' => ['invoiceNo' => (string) ($in['invoiceNo'] ?? '')]]);
             break;
 
         default:
