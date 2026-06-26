@@ -110,5 +110,14 @@
 
 ## 14. 更新履歴
 
+### 2026-06-26（MVP第1弾 実装）
+- `pro/lib/invoices.php`＋API（listInvoices/getInvoice/saveInvoiceDraft/issueInvoice/voidInvoice/duplicateInvoice/deleteInvoiceDraft・admin専用・更新系CSRF）を実装。画面 invoice-list/edit/print/settings ＋ index 導線。
+- **下書きモデル**：採番はスキーマ上 invoiceNo がPKのため、下書きは暫定 `draft_{uniqid}` で保持し、**確定発行時に実番号 `YYYYMM-NNN` の新規行を作成→明細コピー→射影→下書き行を削除**（PK変更・FK ON UPDATE を回避）。採番は `jo_invoice_seq` を `INSERT IGNORE`＋`SELECT … FOR UPDATE`＋`UPDATE` で原子的。
+- **射影**：§7どおり `inv_{invoiceNo}_{taskCode}`（業務コードごとに集約）＋ 税 `inv_{invoiceNo}_080`（netAmount=税額・taxAmount=0）・`source='invoice'`・`paymentMethod='請求書払い'`。取消は同接頭辞を削除し status=void 保持。
+- **PDF**：当面は**印刷用HTMLビュー**（invoice-print.html・適格様式：発行者名/登録番号T+13桁/取引年月日/取引内容/税率ごと対価合計と消費税額/交付先名称）。mPDFサーバ生成は後続（ローカルComposer導入済み＝[[joffice-local-php-env]]）。
+- **発行者情報**：登録番号など未確定は暫定値で運用可（発行時に `issuerRegNo` スナップショット）。
+- **検証**：実機スモークテスト（採番・税切捨・射影3行・source=invoice・採番増分・取消で射影削除＆void保持・後始末）**全19項目PASS**。
+- **残**：請求書払いデモデータ投入（一部顧客を invoice 化）／mPDFサーバ生成／入金管理・送付。RBACは admin専用で確定（manager閲覧は今回見送り）。
+
 ### 2026-06-25（新規作成）
 - JOfficeInvoice 機能設計を新設。確定事項：採番＝年月＋連番（`YYYYMM-NNN`・請求対象月基準・行ロック原子採番）、適格＝前提で枠だけ（登録番号は設定後入力）、PDF＝PHPライブラリ（mPDF）サーバ生成、消費税端数＝切り捨て、支払期限＝3方式を請求ごとに選択（`net30`／`issueNextMonthEnd`／`billingNextMonthEnd`・算出後編集可）、発行済み訂正＝取消→再発行（物理削除しない）。`jo_billings` への射影規約（役務行＋080税行・`source='invoice'`・決定論ID）で配賦エンジン無改修。二重計上防止に `customers.paymentMethod`／`billings.source`。スキーマに `jo_invoice_seq` 追加・`jo_invoices.dueRule` 追加。
