@@ -170,4 +170,23 @@ BASIC認証の本番での位置づけは限定的で、管理画面やステー
 - 実装：`pro/lib/mutations.php`・`pro/lib/users.php`・`pro/lib/helpers.php`（`JoConflictException`）・`pro/api.php`・`pro/master.js`・`pro/users.html`。
 - スキーマ：`db/schema.sql`（`uq_user_staff`）／既存DB適用は `db/migrations/2026-06-26_user_staff_unique.sql`。
 - **soft-delete トグル（2026-06-26 実装）**：マスタUI（`master.html`/`master.js`）の staff/customers タブに **状態列（有効/無効）＋有効化/無効化ボタン**を追加。無効化は `upsertMaster` で `isActive=0` を送る（`{code,name,isActive}` のみ送るため顧客の住所等は upsert 対象外で保持）。tasks は `jo_task_types` に isActive 列が無いため対象外。無効行はグレー表示。
-- **残課題（follow-up）**：無効化したマスタは**現状まだ入力画面の選択肢から除外されない**（`app.js`/`worklog-month.js` の `normalizeMaster` が isActive を保持せず、選択肢を active で絞っていない）。完全な「停止」には、入力セレクタを active のみ＋現在選択値は残す形に絞る横展開が必要（**編集時に過去エントリの無効マスタを表示し続ける扱い**を含む）。工数入力という安全重要画面のため別タスクで慎重に対応する。
+### 9.7 「無効化（isActive=0）」の定義と挙動（2026-06-26 実装・全画面）
+
+無効化＝**“現役から外す（アーカイブ／引退）”フラグ。物理削除ではなく再有効化で復帰可能**。貫く3原則：
+- **① 履歴不変**：過去の工数・請求・目標・分析・帳票・**名称表示**は無効化の影響を受けない（名称は各画面の `masterName`/`getMasterName` が全件参照で解決＝`isActive` 非依存。バックエンドJOINも同様）。
+- **② 新規抑止**：今後の入力・担当割当・目標・請求の**選択肢から除外**。
+- **③ 編集救済**：既存レコードが無効マスタを参照していて編集する場合、その**現在値は選択肢に残す**（`active ∪ {現在選択値}`・ラベルに「（無効）」付与）。
+
+実装範囲（共有JS：state は全件保持＝`isActive` を捨てない／**入力セレクタのみ** active 絞り込み・**閲覧フィルタは全件のまま**）：
+
+| 画面 | ファイル | 無効の扱い |
+|---|---|---|
+| 工数登録（スマホ） | `staff.js` | 顧客候補=active／作業者=自分（active）／編集中の無効顧客は補填 |
+| 工数 照会・訂正 | `app.js` | 作業者・顧客とも新規=active／編集時は現在値を補填 |
+| 工数登録（月間） | `worklog-month.js` | 行追加の顧客=active／スタッフpivotはactive＋現在選択 |
+| 売上目標 | `targets.js` | 行=active＋当月に既存目標がある無効スタッフは表示継続 |
+| 請求 照会・訂正 | `data-edit.js` | 行編集のスタッフ・顧客=active＋現在値補填。**上部の絞り込みドロップダウンは全件（履歴閲覧）** |
+| 顧客担当（時系列） | `master.js` assignees | 行=有効顧客のみ／担当候補=active＋現在割当（既存割当データ・配賦は維持） |
+| 経営DB・詳細分析 | `dashboard.js`/`analysis.js` | 変更なし＝全件集計（履歴・論点C） |
+
+補足：**B**＝スタッフ無効化時、紐付く有効ログインユーザーがあれば確認ダイアログで件数・loginIdを注意表示（アカウント停止は連動せずユーザー管理で別途）。**D**＝業務区分(tasks)は `jo_task_types` に isActive 列が無く今回対象外。**E**＝無効化操作自体はブロックしない（非破壊）。

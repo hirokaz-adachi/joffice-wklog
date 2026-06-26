@@ -216,7 +216,9 @@
       const isInternal = !entry.customerCode && !entry.taskCode;
       el.editingId.value = entry.id;
       el.workDate.value = entry.date;
-      el.staff.value = entry.staffCode || findMasterCodeByName("staff", entry.staff);
+      const editStaffCode = entry.staffCode || findMasterCodeByName("staff", entry.staff);
+      ensureSelectHasCode(el.staff, "staff", editStaffCode);  // 無効スタッフの過去エントリも編集可能に
+      el.staff.value = editStaffCode;
       el.taskType.value = isInternal ? INTERNAL_VALUE : (normCode(entry.taskCode) || INTERNAL_VALUE);
       el.customer.value = entry.customerCode || findMasterCodeByName("customers", entry.customer);
       syncCustomerForTask();
@@ -424,7 +426,8 @@
       ? window.JOfficeAllocation.resolveAssignees(state.customerStaff || [], m).roleByCustomerStaff
       : new Map();
     const pre = [], rev = [], other = [];
-    (state.customers || []).forEach((c) => {
+    // 入力候補は有効顧客のみ（無効顧客は新規入力させない。編集中の値は隠しinputで保持）。
+    (state.customers || []).filter((c) => c.isActive !== 0).forEach((c) => {
       const role = (roleMap.get(String(c.code)) || {})[String(staffCode)] || "";
       if (role === "PRE") pre.push(c);
       else if (role === "REV") rev.push(c);
@@ -724,10 +727,22 @@
     if (preserveValue && values.includes(current)) select.value = current;
   }
 
+  // 入力用セレクトは有効(active)のみ。ただし現在の選択値(編集中の無効マスタ等)は残す＝編集救済。
   function fillMasterSelect(select, values, preserveValue) {
     const current = preserveValue ? select.value : "";
-    select.innerHTML = values.map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.code)} ${escapeHtml(item.name)}</option>`).join("");
-    if (preserveValue && values.some((item) => item.code === current)) select.value = current;
+    const list = values.filter((item) => item.isActive !== 0 || item.code === current);
+    select.innerHTML = list.map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.code)} ${escapeHtml(item.name)}${item.isActive === 0 ? "（無効）" : ""}</option>`).join("");
+    if (preserveValue && list.some((item) => item.code === current)) select.value = current;
+  }
+
+  // 編集対象が無効マスタを参照している場合、その値をセレクトの選択肢へ補填する（編集救済）。
+  function ensureSelectHasCode(select, type, code) {
+    if (!code || Array.from(select.options).some((o) => o.value === code)) return;
+    const item = (state[type] || []).find((x) => String(x.code) === String(code));
+    const opt = document.createElement("option");
+    opt.value = code;
+    opt.textContent = item ? `${item.code} ${item.name}（無効）` : code;
+    select.appendChild(opt);
   }
 
   function fillFilterStaffSelect(select, preserveValue) {
@@ -869,8 +884,9 @@
   function normalizeMaster(items, prefix) {
     const source = Array.isArray(items) ? items : [];
     return source.map((item, index) => {
-      if (typeof item === "string") return { code: `${prefix}${String(index + 1).padStart(3, "0")}`, name: item };
-      return { code: normalizeName(item.code), name: normalizeName(item.name) };
+      if (typeof item === "string") return { code: `${prefix}${String(index + 1).padStart(3, "0")}`, name: item, isActive: 1 };
+      const isActive = (item.isActive === 0 || item.isActive === false || item.isActive === "0") ? 0 : 1;
+      return { code: normalizeName(item.code), name: normalizeName(item.name), isActive };
     }).filter((item) => item.code && item.name);
   }
 

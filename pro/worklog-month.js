@@ -173,7 +173,9 @@
 
   // ---- セレクト初期化 ----
   function fillStaffSelect() {
-    el.staffSelect.innerHTML = state.staff.map((s) => `<option value="${esc(s.code)}">${esc(s.code)} ${esc(s.name)}</option>`).join("");
+    // 有効スタッフのみ。現在選択中(無効スタッフの過去月閲覧/訂正)は残す＝編集救済。
+    const list = state.staff.filter((s) => s.isActive !== 0 || s.code === staffCode);
+    el.staffSelect.innerHTML = list.map((s) => `<option value="${esc(s.code)}">${esc(s.code)} ${esc(s.name)}${s.isActive === 0 ? "（無効）" : ""}</option>`).join("");
     if (window.JO_USER && window.JO_USER.role !== "admin" && window.JO_USER.staffCode) el.staffSelect.disabled = true;
   }
   function fillAddTask() {
@@ -642,7 +644,8 @@
       ? window.JOfficeAllocation.resolveAssignees(state.customerStaff || [], m || "").roleByCustomerStaff
       : new Map();
     const pre = [], rev = [], other = [];
-    (state.customers || []).forEach((c) => {
+    // 行追加の候補は有効顧客のみ（既存行は masterName で名称解決され影響なし）。
+    (state.customers || []).filter((c) => c.isActive !== 0).forEach((c) => {
       const role = (roleMap.get(String(c.code)) || {})[String(sCode)] || "";
       if (role === "PRE") pre.push(c);
       else if (role === "REV") rev.push(c);
@@ -697,8 +700,9 @@
   function normMaster(items, prefix) {
     const src = Array.isArray(items) ? items : [];
     return src.map((item, i) => {
-      if (typeof item === "string") return { code: `${prefix}${String(i + 1).padStart(3, "0")}`, name: item };
-      return { code: String(item.code || "").trim(), name: String(item.name || "").trim() };
+      if (typeof item === "string") return { code: `${prefix}${String(i + 1).padStart(3, "0")}`, name: item, isActive: 1 };
+      const isActive = (item.isActive === 0 || item.isActive === false || item.isActive === "0") ? 0 : 1;
+      return { code: String(item.code || "").trim(), name: String(item.name || "").trim(), isActive };
     }).filter((x) => x.code && x.name);
   }
   function normEntries(items) {

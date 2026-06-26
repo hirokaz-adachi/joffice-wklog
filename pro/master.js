@@ -316,11 +316,13 @@
       </div>`;
     el.head.innerHTML = `<tr><th class="col-key">顧客番号</th><th>顧客名</th><th>Prepare担当</th><th>Review担当</th><th class="ops">操作</th></tr>`;
     const q = el.search.value.trim().toLowerCase();
-    const rows = state.customers.filter((c) => !q || (c.code + " " + c.name).toLowerCase().includes(q))
+    // 担当編集の対象は有効顧客のみ（無効顧客の既存割当データは jo_customer_staff に残り、配賦は維持）。
+    const rows = state.customers.filter((c) => c.isActive !== 0).filter((c) => !q || (c.code + " " + c.name).toLowerCase().includes(q))
       .slice().sort((a, b) => a.code.localeCompare(b.code, "ja"));
-    const opts = (sel) => `<option value="">—（担当なし）</option>` + state.staff.slice()
+    // 担当候補は有効スタッフのみ。ただし現在割当中(sel)が無効スタッフなら残す＝表示救済。
+    const opts = (sel) => `<option value="">—（担当なし）</option>` + state.staff.filter((s) => s.isActive !== 0 || s.code === sel).slice()
       .sort((a, b) => a.code.localeCompare(b.code, "ja"))
-      .map((s) => `<option value="${esc(s.code)}"${s.code === sel ? " selected" : ""}>${esc(s.code)} ${esc(s.name)}</option>`).join("");
+      .map((s) => `<option value="${esc(s.code)}"${s.code === sel ? " selected" : ""}>${esc(s.code)} ${esc(s.name)}${s.isActive === 0 ? "（無効）" : ""}</option>`).join("");
     const cell = (c, role) => {
       const val = resolvedStaff(c.code, role, month);
       const tag = thisMonthRow(c.code, role, month) ? `<span class="eff-tag eff-this">この月〜</span>`
@@ -411,7 +413,19 @@
     if (!item) return;
     const next = item.isActive !== 0 ? 0 : 1;
     const verb = next ? "有効化" : "無効化";
-    if (!window.confirm(`${item.code} ${item.name} を${verb}しますか？`)) return;
+    // B: スタッフ無効化時、紐付く有効ログインユーザーがあれば注意表示（停止はユーザー管理で別途）。
+    let note = "";
+    if (active === "staff" && next === 0) {
+      try {
+        const users = await joListUsers();
+        const linked = (users || []).filter((u) => String(u.staffCode || "") === String(item.code) && Number(u.isActive) === 1);
+        if (linked.length) {
+          note = `\n\n※このスタッフに紐付く有効なログインユーザーが ${linked.length} 件あります（${linked.map((u) => u.loginId).join(", ")}）。`
+            + `\nアカウントを止める場合はユーザー管理で別途無効化してください（自動連動はしません）。`;
+        }
+      } catch (e) { /* 取得失敗時は注意表示なしで継続 */ }
+    }
+    if (!window.confirm(`${item.code} ${item.name} を${verb}しますか？${note}`)) return;
     try {
       // code は不変。name/isActive のみ更新（顧客の住所等は upsert 対象外なので保持される）。
       await window.WorklogBackend.upsertMaster(active, { code: item.code, name: item.name, isActive: next }, "");

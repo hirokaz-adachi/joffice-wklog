@@ -41,7 +41,7 @@
       try {
         const db = await window.WorklogBackend.loadDashboard(true);
         if (db) {
-          state.staff = (db.staff || []).map((s) => ({ code: String(s.code || "").trim(), name: String(s.name || "").trim() })).filter((s) => s.code);
+          state.staff = (db.staff || []).map((s) => ({ code: String(s.code || "").trim(), name: String(s.name || "").trim(), isActive: (s.isActive === 0 || s.isActive === false || s.isActive === "0") ? 0 : 1 })).filter((s) => s.code);
           state.targets = (db.targets || []).map((t) => ({
             targetMonth: String(t.targetMonth || "").slice(0, 7),
             staffCode: String(t.staffCode || ""),
@@ -89,12 +89,14 @@
       updateDirtyInfo();
       return;
     }
-    const rows = state.staff.slice().sort((a, b) => String(a.code).localeCompare(String(b.code), "ja"));
+    // 有効スタッフのみ。ただし当月に既に目標がある無効スタッフは表示し続ける＝編集救済。
+    const rows = state.staff.filter((s) => s.isActive !== 0 || amountFor(month, s.code) != null)
+      .slice().sort((a, b) => String(a.code).localeCompare(String(b.code), "ja"));
     el.body.innerHTML = rows.map((s) => {
       const amt = amountFor(month, s.code);
       loaded[s.code] = amt;
-      return `<tr data-staff="${esc(s.code)}">
-        <td class="col-staff">${esc(s.code)} ${esc(s.name)}</td>
+      return `<tr data-staff="${esc(s.code)}"${s.isActive === 0 ? ' class="is-inactive"' : ""}>
+        <td class="col-staff">${esc(s.code)} ${esc(s.name)}${s.isActive === 0 ? "（無効）" : ""}</td>
         <td class="num"><input class="cell-num" type="number" min="0" step="1000" inputmode="numeric" data-staff="${esc(s.code)}" value="${amt == null ? "" : amt}"></td>
       </tr>`;
     }).join("");

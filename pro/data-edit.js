@@ -137,7 +137,7 @@
 
   function normMaster(items) {
     return (Array.isArray(items) ? items : [])
-      .map((it) => ({ code: String(it.code || "").trim(), name: String(it.name || "").trim() }))
+      .map((it) => ({ code: String(it.code || "").trim(), name: String(it.name || "").trim(), isActive: (it.isActive === 0 || it.isActive === false || it.isActive === "0") ? 0 : 1 }))
       .filter((it) => it.code && it.name);
   }
 
@@ -293,8 +293,10 @@
 
   function staffSelect(code) {
     const opts = [`<option value="">（選択）</option>`].concat(
-      state.staff.map((s) => opt(s.code, `${s.code} ${s.name}`, s.code === code))
+      state.staff.filter((s) => s.isActive !== 0 || s.code === code)
+        .map((s) => opt(s.code, `${s.code} ${s.name}${s.isActive === 0 ? "（無効）" : ""}`, s.code === code))
     );
+    // 現在値が無効/未登録なら補填＝編集救済。
     if (code && !state.staff.some((s) => s.code === code)) opts.push(opt(code, code, true));
     return `<select data-f="staffCode">${opts.join("")}</select>`;
   }
@@ -310,7 +312,8 @@
       ? window.JOfficeAllocation.resolveAssignees(state.customerStaff || [], month || "").roleByCustomerStaff
       : new Map();
     const pre = [], rev = [], other = [];
-    state.customers.forEach((c) => {
+    // 行編集の候補は有効顧客のみ（現在値が無効/未登録の場合は customerSelect 側で補填）。
+    state.customers.filter((c) => c.isActive !== 0).forEach((c) => {
       const role = (roleMap.get(String(c.code)) || {})[String(staffCode)] || "";
       if (role === "PRE") pre.push(c);
       else if (role === "REV") rev.push(c);
@@ -335,9 +338,14 @@
         body += `<optgroup label="その他">` + g.other.map((c) => opt(c.code, label(c, ""), c.code === code)).join("") + `</optgroup>`;
       }
     } else {
-      body += state.customers.map((c) => opt(c.code, `${c.code} ${c.name}`, c.code === code)).join("");
+      body += state.customers.filter((c) => c.isActive !== 0 || c.code === code)
+        .map((c) => opt(c.code, `${c.code} ${c.name}${c.isActive === 0 ? "（無効）" : ""}`, c.code === code)).join("");
     }
-    if (code && !state.customers.some((c) => c.code === code)) body += opt(code, code, true);
+    // 現在値が無効顧客 or 未登録の場合は選択肢へ補填＝編集救済（過去請求の編集を妨げない）。
+    if (code && !state.customers.some((c) => c.code === code && c.isActive !== 0)) {
+      const cc = state.customers.find((c) => c.code === code);
+      body += opt(code, cc ? `${cc.code} ${cc.name}（無効）` : code, true);
+    }
     return `<select data-f="customerCode">${body}</select>`;
   }
 

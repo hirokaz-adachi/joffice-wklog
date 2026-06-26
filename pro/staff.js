@@ -253,7 +253,9 @@
   }
 
   function fillMasterSelect(select, values) {
-    select.innerHTML = values.map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.code)} ${escapeHtml(item.name)}</option>`).join("");
+    const current = select.value;
+    const list = values.filter((item) => item.isActive !== 0 || item.code === current);
+    select.innerHTML = list.map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.code)} ${escapeHtml(item.name)}${item.isActive === 0 ? "（無効）" : ""}</option>`).join("");
   }
 
   // 顧客を選択スタッフの役割でグループ化（①Prepare担当 ②Review担当 ③担当外、各コード昇順）。作業月時点で解決。
@@ -263,7 +265,8 @@
       ? window.JOfficeAllocation.resolveAssignees(state.customerStaff || [], m).roleByCustomerStaff
       : new Map();
     const pre = [], rev = [], other = [];
-    (state.customers || []).forEach((c) => {
+    // 入力候補は有効顧客のみ（編集中の現在値は fillCustomerSelect 側で補填）。
+    (state.customers || []).filter((c) => c.isActive !== 0).forEach((c) => {
       const role = (roleMap.get(String(c.code)) || {})[String(staffCode)] || "";
       if (role === "PRE") pre.push(c);
       else if (role === "REV") rev.push(c);
@@ -286,6 +289,11 @@
     }
     if (g.other.length) {
       html += `<optgroup label="その他">` + g.other.map((c) => opt(c, "")).join("") + `</optgroup>`;
+    }
+    // 現在値(編集中の無効顧客)が候補に無ければ補填＝編集救済。
+    if (cur && !(state.customers || []).some((c) => c.code === cur && c.isActive !== 0)) {
+      const c = (state.customers || []).find((x) => x.code === cur);
+      html += `<option value="${escapeHtml(cur)}">${c ? `${escapeHtml(c.code)} ${escapeHtml(c.name)}（無効）` : escapeHtml(cur)}</option>`;
     }
     select.innerHTML = html;
     if (cur) select.value = cur;
@@ -417,8 +425,9 @@
   function normalizeMaster(items, prefix) {
     const source = Array.isArray(items) ? items : [];
     return source.map((item, index) => {
-      if (typeof item === "string") return { code: `${prefix}${String(index + 1).padStart(3, "0")}`, name: item };
-      return { code: normalizeName(item.code), name: normalizeName(item.name) };
+      if (typeof item === "string") return { code: `${prefix}${String(index + 1).padStart(3, "0")}`, name: item, isActive: 1 };
+      const isActive = (item.isActive === 0 || item.isActive === false || item.isActive === "0") ? 0 : 1;
+      return { code: normalizeName(item.code), name: normalizeName(item.name), isActive };
     }).filter((item) => item.code && item.name);
   }
 
