@@ -131,6 +131,23 @@ window.WorklogBackend = {
   saveSetting: joSaveSetting,
 };
 
+// 全画面共通：アプリ別のファビコン／apple-touch-icon を付与する。
+// Invoice 系画面＝請求書アイコン／メニュー・ログイン＝総合／その他（Insight）＝分析アイコン。
+(function () {
+  var p = (location.pathname || '').toLowerCase();
+  var name = /invoice/.test(p) ? 'j-office-invoice'
+    : (/login|change-password/.test(p) || /\/index\.html$/.test(p) || /\/joffice-pro\/?$/.test(p) || p === '/' || /\/$/.test(p)) ? 'j-office'
+    : 'j-office-insight';
+  function addLink(rel, size) {
+    var l = document.createElement('link');
+    l.rel = rel; l.type = 'image/png'; if (size) l.setAttribute('sizes', size + 'x' + size);
+    l.href = 'assets/icons/' + name + '-' + (size || 32) + '.png';
+    document.head.appendChild(l);
+  }
+  addLink('icon', 32);
+  addLink('apple-touch-icon', 180);
+})();
+
 // 全画面共通：ヘッダにログインユーザー（ID・名称・役割）を表示する。
 (function () {
   function badge(u) {

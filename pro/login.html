@@ -29,8 +29,11 @@
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>J-Office Insight / Invoice</h1>
-      <p class="sub">本番相当（pro・PHP＋MySQL）ログイン</p>
+      <div style="text-align:center; margin-bottom:10px;">
+        <img src="assets/icons/j-office-96.png" alt="J-Office" width="76" height="76" style="border-radius:17px; box-shadow:0 6px 16px rgba(23,32,38,.18);">
+      </div>
+      <h1 style="text-align:center;">J-Office Insight / Invoice</h1>
+      <p class="sub" style="text-align:center;">本番相当（pro・PHP＋MySQL）ログイン</p>
 
       <div id="loginBox">
         <label for="loginId">社員番号 / ログインID</label>
@@ -60,7 +63,7 @@
     </div>
   </div>
 
-  <script src="backend.js?v=20260626-1"></script>
+  <script src="backend.js?v=20260626-2"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     const msg = (text, ok) => { const m = $('msg'); m.textContent = text; m.className = 'msg ' + (ok ? 'ok' : 'err'); };

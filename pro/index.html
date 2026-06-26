@@ -43,6 +43,7 @@
     .cat-card:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(23,32,38,.14); }
     .cat-card .cat-badge { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px;
       border-radius: 13px; font-weight: 800; font-size: 22px; margin-bottom: 14px; }
+    .cat-card .cat-icon { width: 60px; height: 60px; border-radius: 14px; display: block; margin-bottom: 14px; box-shadow: 0 4px 12px rgba(23,32,38,.14); }
     .cat-card h2 { margin: 0 0 8px; font-size: 21px; }
     .cat-card p { margin: 0 0 4px; color: var(--muted); font-size: 13px; line-height: 1.6; }
     .cat-card .go { margin-top: 14px; font-size: 13px; font-weight: 700; }
@@ -84,21 +85,21 @@
       <div class="cat-cards">
         <a class="cat-card cat-insight" data-roles="admin,manager,staff" href="#insight">
           <span class="accent-bar"></span>
-          <span class="cat-badge">In</span>
+          <img class="cat-icon" src="assets/icons/j-office-insight-96.png" alt="" width="60" height="60">
           <h2>J-Office Insight</h2>
           <p>日々の工数を登録し、売上×工数の生産性を分析。照会・訂正や売上目標の管理も。</p>
           <div class="go">工数登録・分析・運用 →</div>
         </a>
         <a class="cat-card cat-invoice" data-roles="admin" href="#invoice">
           <span class="accent-bar"></span>
-          <span class="cat-badge">Iv</span>
+          <img class="cat-icon" src="assets/icons/j-office-invoice-96.png" alt="" width="60" height="60">
           <h2>J-Office Invoice</h2>
           <p>請求書払い分の請求書を作成・発行（適格様式・採番・印刷/PDF）し、請求データへ連携。</p>
           <div class="go">請求書発行・発行者設定 →</div>
         </a>
         <a class="cat-card cat-admin" data-roles="admin" href="#admin">
           <span class="accent-bar"></span>
-          <span class="cat-badge">Sy</span>
+          <img class="cat-icon" src="assets/icons/j-office-96.png" alt="" width="60" height="60">
           <h2>システム管理</h2>
           <p>スタッフ・顧客・業務区分などのマスタ、ログインユーザー・権限の管理。</p>
           <div class="go">マスタ・ユーザー →</div>
@@ -200,7 +201,7 @@
     </section>
   </main>
 
-  <script src="backend.js?v=20260626-1"></script>
+  <script src="backend.js?v=20260626-2"></script>
   <script>
     document.getElementById('logout').addEventListener('click', function () {
       joLogout().then(function () { location.replace('login.html'); }).catch(function () { location.replace('login.html'); });
