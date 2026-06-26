@@ -73,12 +73,16 @@ function jo_save_user(array $in, array $sessionUser = []): array
     }
 
     if ($id > 0) {
-        // 既存ユーザーの現状を取得（自己防止・最後のadmin保護の判定用）
-        $cur = $db->prepare('SELECT role, isActive FROM jo_users WHERE id = ?');
+        // 既存ユーザーの現状を取得（ログインID固定・自己防止・最後のadmin保護の判定用）
+        $cur = $db->prepare('SELECT loginId, role, isActive FROM jo_users WHERE id = ?');
         $cur->execute([$id]);
         $before = $cur->fetch();
         if (!$before) {
             throw new InvalidArgumentException('user_not_found');
+        }
+        // ログインID（社員番号）は編集時に変更不可。訂正は削除→再作成で対応。
+        if ((string) $before['loginId'] !== $loginId) {
+            throw new InvalidArgumentException('loginId_immutable');
         }
         $wasAdmin = ((string) $before['role'] === 'admin');
 

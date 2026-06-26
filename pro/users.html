@@ -54,7 +54,7 @@
   <main>
     <section class="panel">
       <div class="form-grid">
-        <div><label>ログインID（社員番号）</label><input id="f_loginId" type="text" autocomplete="off"></div>
+        <div><label>ログインID（社員番号）<span id="loginHint" style="color:var(--muted)"></span></label><input id="f_loginId" type="text" autocomplete="off"></div>
         <div><label>表示名</label><input id="f_displayName" type="text" autocomplete="off"></div>
         <div><label>役割</label><select id="f_role"><option value="staff">staff（一般）</option><option value="manager">manager（マネージャ）</option><option value="admin">admin（管理者）</option></select></div>
         <div><label>スタッフ紐付け</label><select id="f_staffCode"></select></div>
@@ -113,7 +113,7 @@
       $('f_loginId').value = ''; $('f_displayName').value = ''; $('f_role').value = 'staff';
       $('f_staffCode').value = ''; $('f_password').value = '';
       $('f_isActive').checked = true; $('f_must').checked = true;
-      $('f_loginId').disabled = false;
+      $('f_loginId').disabled = false; $('loginHint').textContent = '';
       $('btnSave').textContent = '追加'; $('btnCancel').style.display = 'none';
       $('editingTag').style.display = 'none'; $('pwHint').textContent = '';
       msg('', true); $('msg').className = 'msg';
@@ -124,6 +124,7 @@
       if (!u) return;
       editingId = id;
       $('f_loginId').value = u.loginId; $('f_displayName').value = u.displayName;
+      $('f_loginId').disabled = true; $('loginHint').textContent = '（変更不可）';  // 編集時はログインID固定
       $('f_role').value = u.role; $('f_staffCode').value = u.staffCode || '';
       $('f_password').value = ''; $('f_isActive').checked = !!u.isActive; $('f_must').checked = !!u.mustChangePassword;
       $('btnSave').textContent = '更新'; $('btnCancel').style.display = '';
@@ -158,6 +159,7 @@
         else if (d === 'password_required_min8') d = '新規はパスワード（8文字以上）が必須です。';
         else if (d === 'password_too_short') d = 'パスワードは8文字以上にしてください。';
         else if (d === 'loginId_required') d = 'ログインIDを入力してください。';
+        else if (d === 'loginId_immutable') d = 'ログインID（社員番号）は変更できません。訂正が必要な場合は削除→再作成してください。';
         else if (d === 'staffCode_in_use') d = 'このスタッフは既に別のユーザーに紐付いています' + ((e.data && e.data.otherLoginId) ? '（' + e.data.otherLoginId + '）' : '') + '。';
         else if (d === 'cannot_deactivate_self') d = 'ログイン中の自分自身は無効化できません。';
         else if (d === 'cannot_demote_self') d = 'ログイン中の自分自身の管理者権限は外せません。';
