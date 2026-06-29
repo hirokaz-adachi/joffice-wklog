@@ -93,9 +93,11 @@
       <textarea id="f_memo" rows="2"></textarea>
       <div class="actions">
         <button id="btnSave" class="btn primary" type="button">下書き保存</button>
+        <button id="btnPreview" class="btn" type="button">PDFプレビュー</button>
         <button id="btnIssue" class="btn issue" type="button">確定発行</button>
         <span id="curNo" class="hint" style="align-self:center"></span>
       </div>
+      <div class="hint" style="margin-top:6px">※「PDFプレビュー」は現在の内容を下書き保存し、別タブで印刷イメージを表示します（印刷ダイアログでPDF保存できます）。</div>
       <div id="msg" class="msg"></div>
     </section>
   </main>
@@ -202,6 +204,17 @@
     $('btnSave').addEventListener('click', async function () {
       try { var r = await saveDraft(); if (r) msg('下書きを保存しました（税込 ' + yen(r.total) + ' 円）。', true); }
       catch (e) { msg('保存失敗: ' + ((e.data && e.data.detail) || e.message || e), false); }
+    });
+    $('btnPreview').addEventListener('click', async function () {
+      if (!validate()) return;
+      var w = window.open('about:blank', '_blank'); // 同期で開きポップアップブロックを回避
+      try {
+        var r = await saveDraft();
+        if (!r) { if (w) w.close(); return; }
+        var url = 'invoice-print.html?no=' + encodeURIComponent(curNo);
+        if (w) { w.location = url; } else { location.href = url; } // ブロック時は同一タブで遷移
+        msg('現在の内容を下書き保存し、PDFプレビューを開きました。', true);
+      } catch (e) { if (w) w.close(); msg('プレビュー失敗: ' + ((e.data && e.data.detail) || e.message || e), false); }
     });
     $('btnIssue').addEventListener('click', async function () {
       try {

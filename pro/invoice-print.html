@@ -97,6 +97,7 @@
 
     function render(h, lines, s) {
       var regNo = h.issuerRegNo || s['issuer.regNo'] || '';
+      var noDisp = /^draft_/.test(String(h.invoiceNo || '')) ? '（下書き・未採番）' : h.invoiceNo;
 
       // 税率ごと集計（税抜・税額）
       var byRate = {};
@@ -136,7 +137,7 @@
       document.getElementById('sheet').innerHTML =
         '<div class="head-top">'
         +   '<div class="doc-title">御請求書</div>'
-        +   '<div class="doc-meta">請求日：<b>' + jdate(h.issueDate) + '</b><br>請求番号：<b>' + esc(h.invoiceNo) + '</b></div>'
+        +   '<div class="doc-meta">請求日：<b>' + jdate(h.issueDate) + '</b><br>請求番号：<b>' + esc(noDisp) + '</b></div>'
         + '</div>'
         + '<div class="parties">'
         +   '<div class="bill-to">'
@@ -162,7 +163,7 @@
         + '<div class="remarks"><div class="lbl">備考</div><div class="box">' + (h.remarks ? esc(h.remarks) : '') + '</div></div>'
         + '<div class="foot-note">本請求書は適格請求書（インボイス）として発行しています。' + (regNo ? '' : '※登録番号は発行者設定で登録してください。') + '</div>';
 
-      document.title = '請求書 ' + h.invoiceNo;
+      document.title = '請求書 ' + noDisp;
     }
 
     joMe().then(async function (u) {
