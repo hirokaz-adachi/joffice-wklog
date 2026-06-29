@@ -461,7 +461,11 @@
   function renderRanking() {
     el.rankTitle.textContent = `${measureLabel()}ランキング・構成比（${AXES[state.mainAxis]}別）`;
     let ranked = periodAgg();
+    // 顧客別ランキングからは「社内 / その他（非生産工数）」を除外（売上時は元々現れない）。
+    if (state.mainAxis === "customer") ranked = ranked.filter((cat) => cat.key !== INTERNAL_KEY);
     if (isRevenue()) ranked = ranked.filter((cat) => cat.value > 0);
+    // 帰属売上×スタッフ別のときだけ「期間売上の5%額」列を右端に追加。
+    const showFive = isRevenue() && state.mainAxis === "staff";
     const grand = sum(ranked.map((cat) => cat.value));
     const colorMap = buildColorMap(ranked);
     const monthCount = Math.max(1, monthsInRange().length);
@@ -473,7 +477,7 @@
     el.rankList.innerHTML = ranked.map((cat, index) => {
       const share = grand ? cat.value / grand : 0;
       return `
-        <div class="rank-row">
+        <div class="rank-row${showFive ? " has-five" : ""}">
           <span class="rank-no">${index + 1}</span>
           <span class="rank-swatch" style="background:${colorMap.get(cat.key)}"></span>
           <span class="rank-name">${escapeHtml(cat.label)}</span>
@@ -482,6 +486,7 @@
           <span class="rank-share">${formatPercent(share)}</span>
           <span class="rank-avg">月平均 ${fmtVal(cat.value / monthCount)}</span>
           <span class="rank-rate">${cat.rate != null ? `${formatCurrency(cat.rate)}/h` : "—"}</span>
+          ${showFive ? `<span class="rank-five">5%額 ${formatCurrency(Math.round(cat.value * 0.05))}</span>` : ""}
         </div>
       `;
     }).join("");

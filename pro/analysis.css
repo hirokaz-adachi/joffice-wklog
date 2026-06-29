@@ -213,6 +213,18 @@
   border-bottom: none;
 }
 
+/* 帰属売上×スタッフ別のみ：右端に「5%額」列を足した9カラム版 */
+.rank-row.has-five {
+  grid-template-columns: 26px 14px minmax(100px, 1.2fr) minmax(70px, 1.6fr) 78px 50px 96px 92px 104px;
+}
+
+.rank-five {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
 .rank-no {
   color: var(--muted);
   font-size: 12px;

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>J-Office Insight ｜ 詳細分析</title>
   <link rel="stylesheet" href="dashboard.css?v=20260624-1">
-  <link rel="stylesheet" href="analysis.css?v=20260629-1">
+  <link rel="stylesheet" href="analysis.css?v=20260629-2">
   <link rel="stylesheet" href="header.css?v=20260626-1">
 </head>
 <body>
@@ -166,7 +166,7 @@
       if (u.mustChangePassword) { location.replace('change-password.html'); return; }
       if (u.role !== 'admin' && u.role !== 'manager') { location.replace('index.html'); return; }
       var s = document.createElement('script');
-      s.src = 'analysis.js?v=20260629-1';
+      s.src = 'analysis.js?v=20260629-2';
       document.body.appendChild(s);
     }).catch(function () { location.replace('login.html'); });
   </script>
