@@ -1,0 +1,39 @@
+/* =====================================================================
+   J-Office 共通ヘッダー（全画面共通・大型・アプリアイコン・ソフトティールのピル）
+   ・新規クラス jo-* で実装し、各ページ既存CSSと競合しない。
+   ・操作領域は既存 .top-actions を再利用（backend.js の whoami 注入と互換）。
+   ・読み込みは各HTMLの <head> 末尾（他CSSの後）。スマホ工数(staff)・ログインは対象外。
+   ===================================================================== */
+.jo-topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  min-height: 104px; padding: 20px clamp(18px, 4vw, 44px);
+  background: #fff; border-bottom: 1px solid #d9e0e4; box-sizing: border-box;
+}
+.jo-brand { display: flex; align-items: center; gap: 15px; min-width: 0; }
+.jo-icon { width: 50px; height: 50px; border-radius: 12px; flex: 0 0 auto;
+  box-shadow: 0 3px 10px rgba(23, 32, 38, .14); }
+.jo-brand-text { min-width: 0; }
+.jo-eyebrow { margin: 0 0 3px; color: #0b5d57; font-size: 12px; font-weight: 800; letter-spacing: .04em; }
+.jo-title { margin: 0; font-size: clamp(24px, 3.6vw, 36px); line-height: 1.12; color: #172026; font-weight: 700; letter-spacing: 0; }
+
+.jo-topbar .top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.jo-topbar #whoami { color: #60707c; font-size: 12.5px; white-space: nowrap; }
+
+.jo-nav {
+  min-height: 38px; border: 1px solid #dff3ef; border-radius: 8px; padding: 0 13px;
+  display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13.5px; font-weight: 600;
+  color: #0b5d57; background: #dff3ef; cursor: pointer; text-decoration: none; white-space: nowrap;
+}
+.jo-nav:hover { background: #0f766e; color: #fff; border-color: #0f766e; }
+.jo-nav.jo-home { background: #0f766e; color: #fff; border-color: #0f766e; }
+.jo-nav.jo-home:hover { background: #0b5d57; border-color: #0b5d57; }
+.jo-nav.jo-danger { color: #b91c1c; background: #fff; border-color: #fecaca; }
+.jo-nav.jo-danger:hover { background: #fef2f2; border-color: #fca5a5; }
+.jo-nav input { display: none; } /* file-button 用 */
+
+@media (max-width: 680px) {
+  .jo-topbar { flex-wrap: wrap; min-height: 0; padding: 14px 16px; gap: 12px; }
+  .jo-title { font-size: 21px; }
+  .jo-icon { width: 40px; height: 40px; }
+  .jo-topbar .top-actions { justify-content: flex-start; }
+}

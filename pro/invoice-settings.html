@@ -22,15 +22,19 @@
     .msg { margin-top:12px; font-size:13px; padding:9px 12px; border-radius:8px; display:none; }
     .msg.err { background:#fef2f2; color:var(--danger); display:block; } .msg.ok { background:#f0fdf4; color:#15803d; display:block; }
   </style>
+  <link rel="stylesheet" href="header.css?v=20260626-1">
 </head>
 <body>
-  <header class="topbar">
-    <div><p class="eyebrow">J-Office (pro)・請求書発行</p><h1>発行者設定（適格請求書）</h1></div>
+  <header class="jo-topbar">
+    <div class="jo-brand">
+      <img class="jo-icon" src="assets/icons/j-office-invoice-96.png" alt="">
+      <div class="jo-brand-text"><p class="jo-eyebrow">J-Office Invoice</p><h1 class="jo-title">発行者設定</h1></div>
+    </div>
     <div class="top-actions">
-      <span id="whoami" style="color:var(--muted);font-size:13px;"></span>
-      <a class="btn" href="invoice-list.html">請求書一覧</a>
-      <a class="btn" href="index.html">メニュー</a>
-      <button id="logout" class="btn" type="button">ログアウト</button>
+      <span id="whoami"></span>
+      <a class="jo-nav" href="invoice-list.html">請求書一覧</a>
+      <a class="jo-nav jo-home" href="index.html">メニュー</a>
+      <button id="logout" class="jo-nav" type="button">ログアウト</button>
     </div>
   </header>
 

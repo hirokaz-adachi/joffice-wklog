@@ -37,17 +37,18 @@
     .msg.err { background:#fef2f2; color:var(--danger); display:block; }
     .msg.ok  { background:#f0fdf4; color:#15803d; display:block; }
   </style>
+  <link rel="stylesheet" href="header.css?v=20260626-1">
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <p class="eyebrow">J-Office (pro)</p>
-      <h1>ユーザー管理</h1>
+  <header class="jo-topbar">
+    <div class="jo-brand">
+      <img class="jo-icon" src="assets/icons/j-office-96.png" alt="">
+      <div class="jo-brand-text"><p class="jo-eyebrow">J-Office</p><h1 class="jo-title">ユーザー管理</h1></div>
     </div>
     <div class="top-actions">
-      <span id="whoami" class="whoami"></span>
-      <a class="btn" href="index.html">メニュー</a>
-      <button id="logout" class="btn" type="button">ログアウト</button>
+      <span id="whoami"></span>
+      <a class="jo-nav jo-home" href="index.html">メニュー</a>
+      <button id="logout" class="jo-nav" type="button">ログアウト</button>
     </div>
   </header>
 

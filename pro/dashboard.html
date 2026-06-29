@@ -5,17 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>J-Office Insight ｜ 経営ダッシュボード</title>
   <link rel="stylesheet" href="dashboard.css?v=20260624-1">
+  <link rel="stylesheet" href="header.css?v=20260626-1">
 </head>
 <body>
-  <header class="dashboard-header">
-    <div>
-      <p class="eyebrow">J-Office Insight</p>
-      <h1>経営ダッシュボード</h1>
+  <header class="jo-topbar">
+    <div class="jo-brand">
+      <img class="jo-icon" src="assets/icons/j-office-insight-96.png" alt="">
+      <div class="jo-brand-text"><p class="jo-eyebrow">J-Office Insight</p><h1 class="jo-title">経営ダッシュボード</h1></div>
     </div>
-    <nav class="header-nav" aria-label="画面移動">
-      <a class="nav-home" href="index.html">メニュー</a>
-      <a href="analysis.html">詳細分析</a>
-    </nav>
+    <div class="top-actions">
+      <span id="whoami"></span>
+      <a class="jo-nav jo-home" href="index.html">メニュー</a>
+      <a class="jo-nav" href="analysis.html">詳細分析</a>
+    </div>
   </header>
 
   <main class="dashboard-shell">

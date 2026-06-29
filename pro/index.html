@@ -66,15 +66,17 @@
     .view-eyebrow { margin: 0; color: var(--muted); font-size: 12px; font-weight: 700; }
     [data-view] { display: none; }
   </style>
+  <link rel="stylesheet" href="header.css?v=20260626-1">
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <p class="eyebrow">J-Office (pro)・本番相当（PHP＋MySQL）</p>
-      <h1>メニュー</h1>
+  <header class="jo-topbar">
+    <div class="jo-brand">
+      <img class="jo-icon" src="assets/icons/j-office-96.png" alt="">
+      <div class="jo-brand-text"><p class="jo-eyebrow">J-Office (pro)</p><h1 class="jo-title">メニュー</h1></div>
     </div>
     <div class="top-actions">
-      <button id="logout" class="logout-btn" type="button">ログアウト</button>
+      <span id="whoami"></span>
+      <button id="logout" class="jo-nav" type="button">ログアウト</button>
     </div>
   </header>
 
