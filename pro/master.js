@@ -8,7 +8,13 @@
   const ALLOC_LABELS = { service: "役務", excluded: "配賦対象外", tax: "消費税" };
   const GENERIC = {
     staff: { label: "スタッフ", key: "code", fields: [{ k: "code", label: "社員番号" }, { k: "name", label: "氏名" }], hint: "工数入力で使うスタッフ（社員番号・氏名）を管理します。" },
-    customers: { label: "顧客", key: "code", fields: [{ k: "code", label: "顧客番号" }, { k: "name", label: "顧客名" }], hint: "顧問先（顧客番号・顧客名）を管理します。" }
+    customers: { label: "顧客", key: "code", fields: [
+      { k: "code", label: "顧客番号" },
+      { k: "name", label: "顧客名" },
+      { k: "postalCode", label: "郵便番号", opt: true, list: false },
+      { k: "address1", label: "住所", opt: true, list: false },
+      { k: "address2", label: "住所（建物名・階等）", opt: true, list: false }
+    ], hint: "顧問先を管理します。郵便番号・住所は任意（請求書の宛先住所プリセットに使用。未設定ならプリセットなし）。" }
   };
 
   const state = { staff: [], customers: [], tasks: [], taskPhases: [], customerStaff: [], settings: {} };
@@ -78,6 +84,7 @@
   function normPair(items) {
     return (Array.isArray(items) ? items : [])
       .map((it) => ({
+        ...it,
         code: String(it.code || "").trim(),
         name: String(it.name || "").trim(),
         isActive: (it.isActive === 0 || it.isActive === false || it.isActive === "0") ? 0 : 1,
@@ -140,12 +147,14 @@
     el.form.className = "master-edit-form" + (editing ? " is-editing" : "");
     el.form.innerHTML = def.fields.map((f) => {
       const ro = (editing && f.k === def.key);  // 編集時はコード（PK）を変更不可
-      return `<label>${esc(f.label)}${ro ? "（変更不可）" : ""}<input type="text" data-f="${esc(f.k)}" id="mf_${esc(f.k)}"${ro ? " readonly" : ""}></label>`;
+      const tag = ro ? "（変更不可）" : (f.opt ? "（任意）" : "");
+      return `<label>${esc(f.label)}${tag}<input type="text" data-f="${esc(f.k)}" id="mf_${esc(f.k)}"${ro ? " readonly" : ""}></label>`;
     }).join("")
       + `<div class="form-buttons"><button type="submit" class="primary">${editing ? "更新" : "追加"}</button>${editing ? '<button type="button" class="secondary" id="mfCancel">取消</button>' : ""}</div>`;
     const cancel = document.getElementById("mfCancel");
     if (cancel) cancel.addEventListener("click", resetForm);
-    el.head.innerHTML = `<tr>${def.fields.map((f, i) => `<th class="${i === 0 ? "col-key" : ""}">${esc(f.label)}</th>`).join("")}<th>状態</th><th class="ops">操作</th></tr>`;
+    const listFields = def.fields.filter((f) => f.list !== false);
+    el.head.innerHTML = `<tr>${listFields.map((f, i) => `<th class="${i === 0 ? "col-key" : ""}">${esc(f.label)}</th>`).join("")}<th>状態</th><th class="ops">操作</th></tr>`;
     renderList();
     if (editingKey) {
       const item = state[active].find((r) => String(r[def.key]) === String(editingKey));
@@ -160,11 +169,12 @@
     const all = state[active];
     const rows = all.filter((r) => !q || def.fields.some((f) => String(r[f.k] || "").toLowerCase().includes(q)))
       .slice().sort((a, b) => String(a[def.key]).localeCompare(String(b[def.key]), "ja"));
+    const listFields = def.fields.filter((f) => f.list !== false);
     if (!rows.length) {
-      el.body.innerHTML = `<tr><td class="grid-empty" colspan="${def.fields.length + 2}">${all.length ? "該当するデータがありません。" : "登録がありません。"}</td></tr>`;
+      el.body.innerHTML = `<tr><td class="grid-empty" colspan="${listFields.length + 2}">${all.length ? "該当するデータがありません。" : "登録がありません。"}</td></tr>`;
     } else {
       el.body.innerHTML = rows.map((r) => {
-        const cells = def.fields.map((f, i) => `<td class="${i === 0 ? "col-key" : ""}">${esc(r[f.k] || "")}</td>`).join("");
+        const cells = listFields.map((f, i) => `<td class="${i === 0 ? "col-key" : ""}">${esc(r[f.k] || "")}</td>`).join("");
         const active0 = r.isActive !== 0;
         const status = active0 ? `<span class="status-on">有効</span>` : `<span class="status-off">無効</span>`;
         const toggle = active0 ? "無効化" : "有効化";
@@ -447,7 +457,7 @@
     const item = {};
     for (const f of def.fields) {
       item[f.k] = clean((document.getElementById("mf_" + f.k) || {}).value || "");
-      if (!item[f.k]) { showToast(`${f.label}を入力してください`); return; }
+      if (!item[f.k] && !f.opt) { showToast(`${f.label}を入力してください`); return; }
     }
     if (state[active].some((r) => String(r[def.key]) === item[def.key] && String(r[def.key]) !== String(editingKey))) {
       showToast(`${def.fields[0].label}が重複しています`); return;
