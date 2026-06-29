@@ -88,8 +88,9 @@ function jo_list_invoices(array $f = []): array
     if (!empty($f['customerCode'])) { $where[] = 'i.customerCode = ?'; $params[] = (string) $f['customerCode']; }
     if (!empty($f['status']))       { $where[] = 'i.status = ?';       $params[] = (string) $f['status']; }
     $sql = 'SELECT i.invoiceNo, i.customerCode, c.name AS customer, i.billingMonth, i.issueDate, i.dueDate,'
-         . ' i.subtotal, i.tax, i.total, i.status, i.createdAt, i.updatedAt'
+         . ' i.subtotal, i.tax, i.total, i.status, i.createdBy, u.displayName AS createdByName, i.createdAt, i.updatedAt'
          . ' FROM jo_invoices i LEFT JOIN jo_customers c ON c.code = i.customerCode'
+         . ' LEFT JOIN jo_users u ON u.loginId = i.createdBy'
          . ($where ? (' WHERE ' . implode(' AND ', $where)) : '')
          . ' ORDER BY (i.status = "draft") DESC, i.billingMonth DESC, i.invoiceNo DESC';
     $st = jo_db()->prepare($sql);
@@ -107,6 +108,8 @@ function jo_list_invoices(array $f = []): array
             'total'        => (int) $r['total'],
             'status'       => (string) $r['status'],
             'isDraft'      => $r['status'] === 'draft' ? 1 : 0,
+            'createdBy'    => (string) ($r['createdBy'] ?? ''),
+            'createdByName'=> (string) ($r['createdByName'] ?? ''),
             'updatedAt'    => $r['updatedAt'],
         ];
     }, $st->fetchAll());

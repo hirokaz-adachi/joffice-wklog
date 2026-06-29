@@ -287,6 +287,8 @@
         loadExisting(inv.header, inv.lines);
         if (inv.header.status !== 'draft') { enterReadonly(inv.header); }
       } else {
+        var today = new Date();
+        $('f_billingMonth').value = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
         $('f_issueDate').value = new Date().toISOString().slice(0,10);
         $('f_dueRule').value = settings['invoice.dueRuleDefault'] || 'net30';
         lines = [{ taskCode:'', itemName:'', quantity:1, unitPrice:0, taxRate:10 }];

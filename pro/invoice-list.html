@@ -64,7 +64,7 @@
 
     <section class="panel">
       <table>
-        <thead><tr><th>請求番号</th><th>顧客</th><th>請求月</th><th>発行日</th><th>支払期限</th><th class="num">税込</th><th>状態</th><th class="ops">操作</th></tr></thead>
+        <thead><tr><th>請求番号</th><th>顧客</th><th>請求月</th><th>発行日</th><th>支払期限</th><th class="num">税込</th><th>状態</th><th>発行者</th><th class="ops">操作</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </section>
@@ -112,9 +112,10 @@
           + '<td>' + esc(r.dueDate || '—') + '</td>'
           + '<td class="num">' + yen(r.total) + '</td>'
           + '<td>' + statusTag(r.status) + '</td>'
+          + '<td>' + (r.isDraft ? '<span style="color:var(--muted)">—</span>' : esc(r.createdByName || r.createdBy || '—')) + '</td>'
           + '<td class="ops">' + ops + '</td>'
           + '</tr>';
-      }).join('') || '<tr><td colspan="8" style="color:var(--muted)">請求書がありません。「新規作成」から作成してください。</td></tr>';
+      }).join('') || '<tr><td colspan="9" style="color:var(--muted)">請求書がありません。「新規作成」から作成してください。</td></tr>';
     }
 
     async function load() {
