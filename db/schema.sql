@@ -162,6 +162,7 @@ CREATE TABLE jo_invoices (                    -- 請求書ヘッダ
   billToName      VARCHAR(200) NOT NULL,      -- 宛名 snapshot
   billToHonorific VARCHAR(10) NOT NULL DEFAULT '御中',
   billToAddress   VARCHAR(255) NULL,
+  subject         VARCHAR(120) NULL,          -- 件名(請求書表題・例「DX推進サポート（YYYY年M月分）」)
   subtotal        DECIMAL(13,0) NOT NULL DEFAULT 0,  -- 税抜計
   tax             DECIMAL(13,0) NOT NULL DEFAULT 0,  -- 消費税(税率ごと切り捨て)
   total           DECIMAL(13,0) NOT NULL DEFAULT 0,  -- 税込計

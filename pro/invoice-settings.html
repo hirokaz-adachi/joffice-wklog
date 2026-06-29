@@ -52,6 +52,9 @@
       <input id="issuer_tel" type="text" placeholder="例）03-0000-0000">
       <label>振込先（銀行・支店・種別・番号・名義）</label>
       <textarea id="issuer_bank" rows="2" placeholder="例）〇〇銀行 〇〇支店 普通 1234567 シャ）ジンジオフィス"></textarea>
+      <label>角印（社判）画像のパス（任意）</label>
+      <input id="issuer_seal" type="text" placeholder="例）assets/issuer-seal.png">
+      <div class="hint">請求書の発行者欄に表示する角印画像のパス（pro/ からの相対）。<b>空欄なら既定の <code>assets/issuer-seal.png</code> を使用</b>します。画像が無い場合は何も表示しません。</div>
     </section>
 
     <section class="panel">
@@ -77,7 +80,7 @@
   <script>
     var $ = function (id){ return document.getElementById(id); };
     var KEYS = {
-      'issuer.name':'issuer_name','issuer.regNo':'issuer_regNo','issuer.address':'issuer_address','issuer.tel':'issuer_tel','issuer.bank':'issuer_bank',
+      'issuer.name':'issuer_name','issuer.regNo':'issuer_regNo','issuer.address':'issuer_address','issuer.tel':'issuer_tel','issuer.bank':'issuer_bank','issuer.sealImage':'issuer_seal',
       'invoice.dueRuleDefault':'invoice_dueRuleDefault','invoice.taxRoundMode':'invoice_taxRoundMode'
     };
     function msg(t, ok){ var m=$('msg'); m.textContent=t; m.className='msg '+(ok?'ok':'err'); }

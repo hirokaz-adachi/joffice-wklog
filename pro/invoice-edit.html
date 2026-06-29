@@ -68,6 +68,7 @@
         <div><label>宛名</label><input id="f_billToName" type="text"></div>
         <div><label>敬称</label><input id="f_billToHonorific" type="text" placeholder="御中"></div>
         <div style="grid-column:1 / -1"><label>宛先住所（スナップショット・編集可）</label><input id="f_billToAddress" type="text"></div>
+        <div style="grid-column:1 / -1"><label>件名（請求書に表示・例「DX推進サポートサービス（2026年3月分）」）</label><input id="f_subject" type="text" placeholder="例）顧問業務（2026年6月分）"></div>
       </div>
     </section>
 
@@ -177,6 +178,7 @@
         billToName: $('f_billToName').value.trim(),
         billToHonorific: $('f_billToHonorific').value.trim() || '御中',
         billToAddress: $('f_billToAddress').value.trim(),
+        subject: $('f_subject').value.trim(),
         memo: $('f_memo').value,
         lines: lines.map(function (ln){ return { taskCode: ln.taskCode, itemName: ln.itemName, quantity: qnum(ln.quantity), unitPrice: qnum(ln.unitPrice), taxRate: qnum(ln.taxRate) }; })
       };
@@ -219,6 +221,7 @@
       $('f_billToName').value = h.billToName || '';
       $('f_billToHonorific').value = h.billToHonorific || '御中';
       $('f_billToAddress').value = h.billToAddress || '';
+      $('f_subject').value = h.subject || '';
       $('f_memo').value = h.memo || '';
       lines = (ls || []).map(function (l){ return { taskCode: l.taskCode, itemName: l.itemName, quantity: l.quantity, unitPrice: l.unitPrice, taxRate: l.taxRate }; });
       if (!lines.length) lines = [{ taskCode:'', itemName:'', quantity:1, unitPrice:0, taxRate:10 }];
