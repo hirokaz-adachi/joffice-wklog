@@ -115,7 +115,7 @@ function jo_list_invoices(array $f = []): array
 // ---- 取得（ヘッダ＋明細） ----
 function jo_get_invoice(string $invoiceNo): ?array
 {
-    $st = jo_db()->prepare('SELECT * FROM jo_invoices WHERE invoiceNo = ?');
+    $st = jo_db()->prepare('SELECT i.*, u.displayName AS createdByName FROM jo_invoices i LEFT JOIN jo_users u ON u.loginId = i.createdBy WHERE i.invoiceNo = ?');
     $st->execute([$invoiceNo]);
     $h = $st->fetch();
     if (!$h) {

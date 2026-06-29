@@ -96,10 +96,12 @@
           ops += '<button class="btn primary" data-issue="' + esc(r.invoiceNo) + '">確定発行</button>';
           ops += '<button class="btn danger" data-del="' + esc(r.invoiceNo) + '">削除</button>';
         } else if (r.status === 'issued') {
+          ops += '<a class="btn" href="invoice-edit.html?no=' + encodeURIComponent(r.invoiceNo) + '">表示</a>';
           ops += '<a class="btn" href="invoice-print.html?no=' + encodeURIComponent(r.invoiceNo) + '" target="_blank">印刷/PDF</a>';
           ops += '<button class="btn" data-dup="' + esc(r.invoiceNo) + '">複製</button>';
           ops += '<button class="btn danger" data-void="' + esc(r.invoiceNo) + '">取消</button>';
         } else { // void
+          ops += '<a class="btn" href="invoice-edit.html?no=' + encodeURIComponent(r.invoiceNo) + '">表示</a>';
           ops += '<button class="btn" data-dup="' + esc(r.invoiceNo) + '">再作成（複製）</button>';
         }
         return '<tr>'

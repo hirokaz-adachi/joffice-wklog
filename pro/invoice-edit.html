@@ -35,6 +35,10 @@
     .msg { margin-top:12px; font-size:13px; white-space:pre-wrap; padding:9px 12px; border-radius:8px; display:none; }
     .msg.err { background:#fef2f2; color:var(--danger); display:block; } .msg.ok { background:#f0fdf4; color:#15803d; display:block; }
     .hint { color:var(--muted); font-size:12px; }
+    .ro-banner { background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; border-radius:10px; padding:12px 16px; margin-bottom:14px; font-size:13px; line-height:1.7; }
+    .ro-banner .ro-hint { color:#475569; }
+    /* 閲覧専用時：disabled でも文字を読みやすく */
+    body.readonly input:disabled, body.readonly select:disabled, body.readonly textarea:disabled { background:#f8fafc; color:#374151; opacity:1; -webkit-text-fill-color:#374151; cursor:default; }
   </style>
   <link rel="stylesheet" href="header.css?v=20260626-1">
 </head>
@@ -52,6 +56,7 @@
   </header>
 
   <main>
+    <div id="roBanner" class="ro-banner" style="display:none"></div>
     <section class="panel">
       <div class="grid">
         <div><label>顧客</label><select id="f_customer"></select><div id="payWarn" class="warn">この顧客は「口座振替」です。請求書払い（自前発行）対象か確認してください（二重計上注意）。</div></div>
@@ -97,7 +102,7 @@
         <button id="btnIssue" class="btn issue" type="button">確定発行</button>
         <span id="curNo" class="hint" style="align-self:center"></span>
       </div>
-      <div class="hint" style="margin-top:6px">※「PDFプレビュー」は現在の内容を下書き保存し、別タブで印刷イメージを表示します（印刷ダイアログでPDF保存できます）。</div>
+      <div id="previewHint" class="hint" style="margin-top:6px">※「PDFプレビュー」は現在の内容を下書き保存し、別タブで印刷イメージを表示します（印刷ダイアログでPDF保存できます）。</div>
       <div id="msg" class="msg"></div>
     </section>
   </main>
@@ -105,7 +110,7 @@
   <script src="backend.js?v=20260626-2"></script>
   <script>
     var $ = function (id) { return document.getElementById(id); };
-    var customers = [], tasks = [], settings = {}, lines = [], curNo = '';
+    var customers = [], tasks = [], settings = {}, lines = [], curNo = '', READONLY = false;
     function esc(v) { return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function yen(n) { return Number(n || 0).toLocaleString('ja-JP'); }
     function msg(t, ok) { var m = $('msg'); m.textContent = t; m.className = 'msg ' + (ok ? 'ok' : 'err'); }
@@ -206,6 +211,7 @@
       catch (e) { msg('保存失敗: ' + ((e.data && e.data.detail) || e.message || e), false); }
     });
     $('btnPreview').addEventListener('click', async function () {
+      if (READONLY) { window.open('invoice-print.html?no=' + encodeURIComponent(curNo), '_blank'); return; }
       if (!validate()) return;
       var w = window.open('about:blank', '_blank'); // 同期で開きポップアップブロックを回避
       try {
@@ -246,6 +252,29 @@
       applyCustomer();
     }
 
+    function enterReadonly(h) {
+      READONLY = true;
+      document.body.classList.add('readonly');
+      $('title').textContent = (h.status === 'void' ? '請求書 閲覧（取消）' : '請求書 閲覧（発行済み）');
+      // 全入力を無効化
+      document.querySelectorAll('main input, main select, main textarea').forEach(function (el) { el.disabled = true; });
+      // 編集系の操作を隠す
+      ['btnSave', 'btnIssue', 'addLine'].forEach(function (id) { var b = $(id); if (b) b.style.display = 'none'; });
+      document.querySelectorAll('#lines [data-del]').forEach(function (b) { b.style.display = 'none'; });
+      var ph = $('previewHint'); if (ph) ph.style.display = 'none';
+      $('btnPreview').textContent = '印刷 / PDF を開く';
+      $('curNo').textContent = '';
+      // 発行者・発行日時バナー
+      var statusLabel = h.status === 'void' ? '取消' : h.status === 'paid' ? '入金済み' : h.status === 'sent' ? '送付済み' : '発行済み';
+      var issuer = esc(h.createdBy || '—') + (h.createdByName ? '（' + esc(h.createdByName) + '）' : '');
+      var at = h.createdAt ? esc(String(h.createdAt).slice(0, 16).replace('T', ' ')) : '—';
+      var b = $('roBanner');
+      b.style.display = 'block';
+      b.innerHTML = '<b>この請求書は「' + statusLabel + '」のため閲覧のみ</b>（編集はできません）。'
+        + '　発行者：<b>' + issuer + '</b>　発行日時：' + at
+        + '<br><span class="ro-hint">内容を変更したい場合は、一覧の「複製」から新規下書きを作成してください。</span>';
+    }
+
     joMe().then(async function (u) {
       if (u.mustChangePassword) { location.replace('change-password.html'); return; }
       if (u.role !== 'admin') { location.replace('index.html'); return; }
@@ -255,8 +284,8 @@
       var no = param('no');
       if (no) {
         var inv = await joGetInvoice(no);
-        if (inv.header.status !== 'draft') { alert('発行済み／取消の請求書は編集できません。複製してください。'); location.replace('invoice-list.html'); return; }
         loadExisting(inv.header, inv.lines);
+        if (inv.header.status !== 'draft') { enterReadonly(inv.header); }
       } else {
         $('f_issueDate').value = new Date().toISOString().slice(0,10);
         $('f_dueRule').value = settings['invoice.dueRuleDefault'] || 'net30';
