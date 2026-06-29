@@ -11,10 +11,13 @@
     customers: { label: "顧客", key: "code", fields: [
       { k: "code", label: "顧客番号" },
       { k: "name", label: "顧客名" },
+      { k: "paymentMethod", label: "請求区分", opt: true, list: false, type: "select", options: [{ v: "", t: "（未設定）" }, { v: "transfer", t: "口座振替" }, { v: "invoice", t: "請求書払い" }] },
+      { k: "honorific", label: "敬称", opt: true, list: false, type: "select", options: [{ v: "御中", t: "御中" }, { v: "様", t: "様" }] },
       { k: "postalCode", label: "郵便番号", opt: true, list: false },
       { k: "address1", label: "住所", opt: true, list: false },
-      { k: "address2", label: "住所（建物名・階等）", opt: true, list: false }
-    ], hint: "顧問先を管理します。郵便番号・住所は任意（請求書の宛先住所プリセットに使用。未設定ならプリセットなし）。" }
+      { k: "address2", label: "住所（建物名・階等）", opt: true, list: false },
+      { k: "contactName", label: "ご担当者名", opt: true, list: false }
+    ], hint: "顧問先を管理します。請求区分・敬称・郵便番号・住所・ご担当者名は任意で、請求書作成時の既定値に使われます。" }
   };
 
   const state = { staff: [], customers: [], tasks: [], taskPhases: [], customerStaff: [], settings: {} };
@@ -148,7 +151,14 @@
     el.form.innerHTML = def.fields.map((f) => {
       const ro = (editing && f.k === def.key);  // 編集時はコード（PK）を変更不可
       const tag = ro ? "（変更不可）" : (f.opt ? "（任意）" : "");
-      return `<label>${esc(f.label)}${tag}<input type="text" data-f="${esc(f.k)}" id="mf_${esc(f.k)}"${ro ? " readonly" : ""}></label>`;
+      let control;
+      if (f.type === "select") {
+        const opts = (f.options || []).map((o) => `<option value="${esc(o.v)}">${esc(o.t)}</option>`).join("");
+        control = `<select data-f="${esc(f.k)}" id="mf_${esc(f.k)}">${opts}</select>`;
+      } else {
+        control = `<input type="text" data-f="${esc(f.k)}" id="mf_${esc(f.k)}"${ro ? " readonly" : ""}>`;
+      }
+      return `<label>${esc(f.label)}${tag}${control}</label>`;
     }).join("")
       + `<div class="form-buttons"><button type="submit" class="primary">${editing ? "更新" : "追加"}</button>${editing ? '<button type="button" class="secondary" id="mfCancel">取消</button>' : ""}</div>`;
     const cancel = document.getElementById("mfCancel");

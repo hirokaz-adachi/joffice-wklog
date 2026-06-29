@@ -71,7 +71,7 @@
       if (u.mustChangePassword) { location.replace('change-password.html'); return; }
       if (u.role !== 'admin') { location.replace('index.html'); return; }
       var s = document.createElement('script');
-      s.src = 'master.js?v=20260629-1';
+      s.src = 'master.js?v=20260629-2';
       document.body.appendChild(s);
     }).catch(function () {
       location.replace('login.html');
