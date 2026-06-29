@@ -38,10 +38,13 @@
     measure: "hours", // hours | attributed（帰属売上）
     includeInternal: true,
     pivotRow: "staff",
-    pivotCol: "taskType"
+    pivotCol: "taskType",
+    hiddenSeries: new Set(), // 推移グラフで非表示にした系列キー
+    legendFilter: ""          // 凡例の絞り込み文字列
   };
 
   const ENGINE = window.JOfficeAllocation;
+  let trendRanked = []; // renderTrend が直近に算出した系列（凡例の再描画・トグル用）
 
   const el = {
     startMonth: document.getElementById("startMonth"),
@@ -64,6 +67,10 @@
     sumAvgRate: document.getElementById("sumAvgRate"),
     trendTitle: document.getElementById("trendTitle"),
     trendLegend: document.getElementById("trendLegend"),
+    trendLegendList: document.getElementById("trendLegendList"),
+    legendFilter: document.getElementById("legendFilter"),
+    legendShowAll: document.getElementById("legendShowAll"),
+    legendHideAll: document.getElementById("legendHideAll"),
     trendChart: document.getElementById("trendChart"),
     rankTitle: document.getElementById("rankTitle"),
     rankList: document.getElementById("rankList"),
@@ -97,6 +104,10 @@
     });
     el.mainAxis.addEventListener("change", () => {
       state.mainAxis = el.mainAxis.value;
+      // 軸が変わると系列キーが別物になるため、非表示・絞り込みをリセット
+      state.hiddenSeries.clear();
+      state.legendFilter = "";
+      if (el.legendFilter) el.legendFilter.value = "";
       render();
     });
     el.measure.addEventListener("change", () => {
@@ -116,6 +127,20 @@
       renderPivot(periodEntries());
     });
     el.reloadData.addEventListener("click", () => loadData(true));
+
+    // 凡例の操作（推移グラフ）：クリックで表示/非表示、すべて表示/非表示、絞り込み
+    if (el.trendLegendList) {
+      el.trendLegendList.addEventListener("click", (ev) => {
+        const btn = ev.target.closest("[data-key]");
+        if (!btn) return;
+        const key = btn.getAttribute("data-key");
+        if (state.hiddenSeries.has(key)) state.hiddenSeries.delete(key); else state.hiddenSeries.add(key);
+        renderTrend();
+      });
+    }
+    if (el.legendShowAll) el.legendShowAll.addEventListener("click", () => { state.hiddenSeries.clear(); renderTrend(); });
+    if (el.legendHideAll) el.legendHideAll.addEventListener("click", () => { trendRanked.forEach((c) => state.hiddenSeries.add(c.key)); renderTrend(); });
+    if (el.legendFilter) el.legendFilter.addEventListener("input", () => { state.legendFilter = el.legendFilter.value; renderLegendList(); });
   }
 
   async function loadData(forceServerRefresh) {
@@ -271,12 +296,21 @@
   }
 
   // 上位 TOP_SERIES を個別色、それ以外は「その他」に集約するためのカラーマップを作る。
+  // ※ ランキング・構成比（renderRanking）用。推移グラフ（renderTrend）は colorFor で全系列に個別色を割当。
   function buildColorMap(rankedCategories) {
     const map = new Map();
     rankedCategories.forEach((cat, index) => {
       map.set(cat.key, index < TOP_SERIES ? PALETTE[index] : OTHER_COLOR);
     });
     return map;
+  }
+
+  // 系列番号→色。パレット8色を超えた分は黄金角ベースのHSLで個別色を自動生成。
+  function colorFor(index) {
+    if (index < PALETTE.length) return PALETTE[index];
+    const hue = (index * 137.508) % 360;
+    const lum = 40 + (index % 3) * 7;
+    return `hsl(${hue.toFixed(1)}, 58%, ${lum}%)`;
   }
 
   function isRevenue() { return state.measure === "attributed"; }
@@ -353,34 +387,33 @@
     el.trendTitle.textContent = `月次${measureLabel()}推移（${AXES[state.mainAxis]}別）`;
     const months = monthsInRange();
     if (!months.length) {
-      el.trendLegend.innerHTML = "";
+      trendRanked = [];
+      el.trendLegendList.innerHTML = "";
       el.trendChart.innerHTML = `<p class="empty-row">集計期間が選択されていません</p>`;
+      updateLegendFilterVisibility();
       return;
     }
+    // 全系列を個別表示（「その他」集約なし）。色は colorFor で系列ごとに割当。
     const ranked = periodAgg().filter((cat) => cat.value > 0 || !isRevenue());
-    const topKeys = ranked.slice(0, TOP_SERIES).map((cat) => cat.key);
-    const topKeySet = new Set(topKeys);
-    const hasOther = ranked.length > TOP_SERIES;
+    trendRanked = ranked;
+    const orderKeys = ranked.map((c) => c.key);
+    const colorByKey = new Map();
+    ranked.forEach((c, i) => colorByKey.set(c.key, colorFor(i)));
 
-    const legendItems = ranked.slice(0, TOP_SERIES).map((cat, index) => legendItem(PALETTE[index], cat.label));
-    if (hasOther) legendItems.push(legendItem(OTHER_COLOR, `その他（${ranked.length - TOP_SERIES}件）`));
-    el.trendLegend.innerHTML = legendItems.join("");
+    renderLegendList();
+    updateLegendFilterVisibility();
 
     const perMonth = months.map((month) => {
       const mv = monthValues(month);
       const segMap = new Map();
       let total = 0;
       mv.forEach((o, key) => {
-        const bucketKey = topKeySet.has(key) ? key : "__other__";
-        const seg = segMap.get(bucketKey) || {
-          label: bucketKey === "__other__" ? "その他" : o.label,
-          color: bucketKey === "__other__" ? OTHER_COLOR : PALETTE[topKeys.indexOf(key)],
-          value: 0
-        };
-        seg.value += o.value; total += o.value; segMap.set(bucketKey, seg);
+        if (state.hiddenSeries.has(key)) return; // 非表示系列は棒からも除外（縦軸スケールも表示中で再計算）
+        total += o.value;
+        const seg = segMap.get(key) || { label: o.label, color: colorByKey.get(key) || OTHER_COLOR, value: 0 };
+        seg.value += o.value; segMap.set(key, seg);
       });
-      const order = [...topKeys, "__other__"];
-      const segments = order.map((k) => segMap.get(k)).filter(Boolean).filter((s) => s.value > 0);
+      const segments = orderKeys.map((k) => segMap.get(k)).filter(Boolean).filter((s) => s.value > 0);
       return { month, total, segments };
     });
 
@@ -407,6 +440,22 @@
 
   function legendItem(color, label) {
     return `<span class="legend-item"><span class="legend-swatch" style="background:${color}"></span>${escapeHtml(label)}</span>`;
+  }
+
+  // 凡例リスト（全系列・クリックで表示/非表示・絞り込み反映）。バーは再計算しないので絞り込み入力のフォーカスを保てる。
+  function renderLegendList() {
+    const filter = (state.legendFilter || "").trim().toLowerCase();
+    const html = trendRanked.map((c, i) => {
+      if (filter && !String(c.label).toLowerCase().includes(filter) && !String(c.key).toLowerCase().includes(filter)) return "";
+      const hidden = state.hiddenSeries.has(c.key);
+      return `<button type="button" class="legend-item${hidden ? " is-off" : ""}" data-key="${escapeHtml(c.key)}" title="${escapeHtml(c.label)}（クリックで表示/非表示）"><span class="legend-swatch" style="background:${colorFor(i)}"></span>${escapeHtml(c.label)}</button>`;
+    }).join("");
+    el.trendLegendList.innerHTML = html || `<span class="legend-item" style="opacity:.6">該当なし</span>`;
+  }
+
+  // 系列が多い軸（顧客など）でのみ凡例の絞り込み入力を表示。
+  function updateLegendFilterVisibility() {
+    if (el.legendFilter) el.legendFilter.style.display = trendRanked.length > 12 ? "" : "none";
   }
 
   function renderRanking() {
