@@ -47,16 +47,18 @@
     table.items td.num, table.items th.num { text-align:right; font-variant-numeric:tabular-nums; }
     table.items tr.blank td { height:30px; }
 
-    /* 税サマリ */
-    .tax-wrap { display:flex; justify-content:flex-end; margin-top:10px; }
-    table.tax { border-collapse:collapse; font-size:12px; width:48%; }
+    /* 支払情報(左)＋税サマリ(右)を1行に併置 */
+    .summary-row { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; margin-top:12px; }
+    .summary-row .pay { flex:1; }
+    .summary-row .tax-box { width:48%; flex:none; }
+    table.tax { border-collapse:collapse; font-size:12px; width:100%; }
     table.tax td { border:1px solid var(--line); padding:7px 12px; }
     table.tax td.k { background:#f8fafc; color:#334155; }
     table.tax td.v { text-align:right; font-variant-numeric:tabular-nums; }
     table.tax tr.grand td { font-weight:800; font-size:13px; background:#eef2f3; }
 
     /* 支払・備考 */
-    .pay { margin-top:18px; font-size:12px; line-height:1.9; }
+    .pay { font-size:12px; line-height:1.9; }
     .pay table { border-collapse:collapse; }
     .pay td.k { color:var(--muted); padding:2px 18px 2px 0; vertical-align:top; white-space:nowrap; }
     .pay td.v { padding:2px 0; white-space:pre-wrap; }
@@ -152,14 +154,16 @@
         + '<table class="items"><thead><tr>'
         +   '<th class="name">品名</th><th class="num" style="width:18%">単価（税抜）</th><th class="num" style="width:12%">数量</th><th class="num" style="width:20%">金額（税抜）</th>'
         + '</tr></thead><tbody>' + rowsHtml + '</tbody></table>'
-        + '<div class="tax-wrap"><table class="tax"><tbody>'
-        +   taxRows
-        +   '<tr class="grand"><td class="k">合計（税込）</td><td class="v">¥' + yen(h.total) + '</td></tr>'
-        + '</tbody></table></div>'
-        + '<div class="pay"><table><tbody>'
-        +   '<tr><td class="k">支払期限</td><td class="v">' + jdate(h.dueDate) + '</td></tr>'
-        +   '<tr><td class="k">振込先</td><td class="v">' + bank + '</td></tr>'
-        + '</tbody></table></div>'
+        + '<div class="summary-row">'
+        +   '<div class="pay"><table><tbody>'
+        +     '<tr><td class="k">支払期限</td><td class="v">' + jdate(h.dueDate) + '</td></tr>'
+        +     '<tr><td class="k">振込先</td><td class="v">' + bank + '</td></tr>'
+        +   '</tbody></table></div>'
+        +   '<div class="tax-box"><table class="tax"><tbody>'
+        +     taxRows
+        +     '<tr class="grand"><td class="k">合計（税込）</td><td class="v">¥' + yen(h.total) + '</td></tr>'
+        +   '</tbody></table></div>'
+        + '</div>'
         + '<div class="remarks"><div class="lbl">備考</div><div class="box">' + (h.remarks ? esc(h.remarks) : '') + '</div></div>'
         + '<div class="foot-note">本請求書は適格請求書（インボイス）として発行しています。' + (regNo ? '' : '※登録番号は発行者設定で登録してください。') + '</div>';
 
