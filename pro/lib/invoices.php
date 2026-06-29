@@ -197,6 +197,7 @@ function jo_save_invoice_draft(array $in, array $user): array
         'total'           => $totals['total'],
         'status'          => 'draft',
         'memo'            => (string) ($in['memo'] ?? ''),
+        'remarks'         => (string) ($in['remarks'] ?? ''),
         'updatedAt'       => $now,
     ];
     if ($isNew) {
@@ -250,12 +251,12 @@ function jo_issue_invoice(string $no, array $user): array
         $now = jo_now();
         $issuerRegNo = (string) ($settings['issuer.regNo'] ?? '');
         // ヘッダを実番号でINSERT（status=issued・登録番号スナップショット）
-        $db->prepare('INSERT INTO jo_invoices (invoiceNo, customerCode, billingMonth, issueDate, dueDate, dueRule, billToName, billToHonorific, billToAddress, subject, subtotal, tax, total, issuerRegNo, status, memo, createdBy, createdAt, updatedAt)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        $db->prepare('INSERT INTO jo_invoices (invoiceNo, customerCode, billingMonth, issueDate, dueDate, dueRule, billToName, billToHonorific, billToAddress, subject, subtotal, tax, total, issuerRegNo, status, memo, remarks, createdBy, createdAt, updatedAt)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
            ->execute([
                $invoiceNo, $inv['customerCode'], $inv['billingMonth'], $inv['issueDate'], $inv['dueDate'], $inv['dueRule'],
                $inv['billToName'], $inv['billToHonorific'], $inv['billToAddress'], ($inv['subject'] ?? ''),
-               $inv['subtotal'], $inv['tax'], $inv['total'], $issuerRegNo, 'issued', $inv['memo'],
+               $inv['subtotal'], $inv['tax'], $inv['total'], $issuerRegNo, 'issued', $inv['memo'], ($inv['remarks'] ?? ''),
                (string) ($user['loginId'] ?? ''), $now, $now,
            ]);
         // 明細を実番号へコピー
@@ -364,6 +365,7 @@ function jo_duplicate_invoice(string $srcNo, array $in, array $user): array
         'billToAddress'   => $h['billToAddress'],
         'subject'         => $h['subject'] ?? '',
         'memo'            => $h['memo'],
+        'remarks'         => $h['remarks'] ?? '',
         'lines'           => array_map(static function ($l) {
             return ['taskCode' => $l['taskCode'], 'itemName' => $l['itemName'], 'quantity' => $l['quantity'], 'unitPrice' => $l['unitPrice'], 'amount' => $l['amount'], 'taxRate' => $l['taxRate'], 'sortOrder' => $l['sortOrder']];
         }, $src['lines']),

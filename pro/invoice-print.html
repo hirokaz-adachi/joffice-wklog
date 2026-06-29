@@ -159,7 +159,7 @@
         +   '<tr><td class="k">支払期限</td><td class="v">' + jdate(h.dueDate) + '</td></tr>'
         +   '<tr><td class="k">振込先</td><td class="v">' + bank + '</td></tr>'
         + '</tbody></table></div>'
-        + '<div class="remarks"><div class="lbl">備考</div><div class="box">' + (h.memo ? esc(h.memo) : '') + '</div></div>'
+        + '<div class="remarks"><div class="lbl">備考</div><div class="box">' + (h.remarks ? esc(h.remarks) : '') + '</div></div>'
         + '<div class="foot-note">本請求書は適格請求書（インボイス）として発行しています。' + (regNo ? '' : '※登録番号は発行者設定で登録してください。') + '</div>';
 
       document.title = '請求書 ' + h.invoiceNo;

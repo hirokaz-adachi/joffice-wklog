@@ -87,7 +87,9 @@
     </section>
 
     <section class="panel">
-      <label>メモ（社内用・PDFには出しません）</label>
+      <label>備考（請求書に表示されます）</label>
+      <textarea id="f_remarks" rows="2" placeholder="例）恐れ入りますが振込手数料は貴社にてご負担ください。"></textarea>
+      <label style="margin-top:12px">社内メモ（PDFには出しません）</label>
       <textarea id="f_memo" rows="2"></textarea>
       <div class="actions">
         <button id="btnSave" class="btn primary" type="button">下書き保存</button>
@@ -179,6 +181,7 @@
         billToHonorific: $('f_billToHonorific').value.trim() || '御中',
         billToAddress: $('f_billToAddress').value.trim(),
         subject: $('f_subject').value.trim(),
+        remarks: $('f_remarks').value,
         memo: $('f_memo').value,
         lines: lines.map(function (ln){ return { taskCode: ln.taskCode, itemName: ln.itemName, quantity: qnum(ln.quantity), unitPrice: qnum(ln.unitPrice), taxRate: qnum(ln.taxRate) }; })
       };
@@ -222,6 +225,7 @@
       $('f_billToHonorific').value = h.billToHonorific || '御中';
       $('f_billToAddress').value = h.billToAddress || '';
       $('f_subject').value = h.subject || '';
+      $('f_remarks').value = h.remarks || '';
       $('f_memo').value = h.memo || '';
       lines = (ls || []).map(function (l){ return { taskCode: l.taskCode, itemName: l.itemName, quantity: l.quantity, unitPrice: l.unitPrice, taxRate: l.taxRate }; });
       if (!lines.length) lines = [{ taskCode:'', itemName:'', quantity:1, unitPrice:0, taxRate:10 }];

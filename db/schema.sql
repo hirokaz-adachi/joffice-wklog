@@ -169,7 +169,8 @@ CREATE TABLE jo_invoices (                    -- 請求書ヘッダ
   issuerRegNo     VARCHAR(20) NULL,           -- 適格 登録番号 T+13桁(発行時スナップショット)
   status          ENUM('draft','issued','sent','paid','void') NOT NULL DEFAULT 'draft',
   pdfPath         VARCHAR(255) NULL,
-  memo            TEXT NULL,
+  memo            TEXT NULL,                  -- 社内メモ(PDF非表示)
+  remarks         TEXT NULL,                  -- 備考(請求書PDFに表示)
   createdBy       VARCHAR(50) NULL,
   createdAt       DATETIME NULL,
   updatedAt       DATETIME NULL,
