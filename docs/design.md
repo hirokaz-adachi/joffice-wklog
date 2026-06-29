@@ -504,6 +504,9 @@ sharoshi-worklog-mvp/
 
 ## 13. 更新履歴
 
+### 2026-06-29（顧客マスタ編集UIの項目拡充）
+顧客マスタ（`master.html`/`master.js` 顧客タブ）の編集項目を拡充。従来は顧客番号・顧客名のみ編集可だったが、**住所（郵便番号・住所・建物名）・請求区分（口座振替/請求書払い・select）・敬称（御中/様・select）・ご担当者名** を追加（いずれも任意・一覧列には非表示）。これらは `jo_customers` の既存カラム（`postalCode`/`address1`/`address2`/`paymentMethod`/`honorific`/`contactName`）で、ブートストラップ・upsert許可列とも対応済みのため **DB変更なし**。汎用エディタを「任意フィールド(`opt`)・一覧非表示(`list:false`)・select型(`type:select`)」に拡張。あわせて `normPair` が code/name/isActive/sortOrder 以外の列を落としていた不具合を修正（編集時に住所等が復元されない問題）。これにより請求書発行（`invoice-edit`）が顧客選択時に宛先住所・敬称既定・請求区分（二重計上警告）をプリセット（→[invoice-feature-design.md](./invoice-feature-design.md)）。未編集の列＝`sortOrder`（並び順・システム管理）。
+
 ### 2026-06-25（顧客マスタ正本化・デモを実顧客40社へ全面リビルド）
 受領 `【DM】顧客マスタ.xlsx`「設計時確定顧客マスタ」（関与先コード `0001`形式・55社）を顧客マスタの正本化。デモ顧客を旧C001〜C022（ギリシャ文字22社）から**請求CSV出現の実顧客40社（0001形式・実名）**へ全面差し替え。
 - `gas/DemoSeed.gs` `DEMO.customers`（40社）・`scripts/demo-dataset.mjs` `CUSTOMERS`（同期）・売上目標を 8名×¥480,000 に。月間税抜売上 約360〜440万。

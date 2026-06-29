@@ -16,7 +16,7 @@
 
 `jo_invoices`（ヘッダ）／`jo_invoice_lines`（明細）を正式採用。採番のため `jo_invoice_seq` を追加し、ヘッダに `dueRule` を追加（DDLは [../db/schema.sql](../db/schema.sql) が正本）。
 
-- `jo_invoices`：`invoiceNo`(PK・採番)／`customerCode`／`billingMonth`(請求対象月)／`issueDate`／`dueDate`／**`dueRule`**(支払期限の算出方式)／`billToName`/`billToHonorific`/`billToAddress`(宛名スナップショット)／`subtotal`(税抜計)/`tax`(消費税)/`total`(税込計)／`issuerRegNo`(適格登録番号スナップショット)／`status`／`pdfPath`／`memo`／`createdBy`。
+- `jo_invoices`：`invoiceNo`(PK・採番)／`customerCode`／`billingMonth`(請求対象月)／`issueDate`／`dueDate`／**`dueRule`**(支払期限の算出方式)／`billToName`/`billToHonorific`/`billToAddress`(宛名スナップショット)／**`subject`(件名・請求書に表示／2026-06-29追加)**／`subtotal`(税抜計)/`tax`(消費税)/`total`(税込計)／`issuerRegNo`(適格登録番号スナップショット)／`status`／`pdfPath`／**`remarks`(備考・請求書PDFに表示／2026-06-29追加)**／**`memo`(社内メモ・PDF非表示)**／`createdBy`(=**発行者**＝確定発行を行ったユーザの loginId・発行日時は `createdAt`)。
 - `jo_invoice_lines`：`invoiceNo`／`lineNo`／`taskCode`(業務コード=恒等マッチング)／`itemName`／`quantity`／`unitPrice`／`amount`(税抜)／`taxRate`(%)／`sortOrder`。
 - `jo_invoice_seq`：`periodKey`(CHAR6 'YYYYMM')／`lastSeq`。発行時に行ロックで一意採番。
 
@@ -28,6 +28,7 @@
 | `issuer.regNo` | 適格登録番号 T+13桁（**未確認→後入力**） |
 | `issuer.address` / `issuer.tel` | 発行者 住所・電話 |
 | `issuer.bank` | 振込先（銀行・支店・種別・番号・名義） |
+| `issuer.sealImage` | 角印（社判）画像のパス（pro/ からの相対・既定 `assets/issuer-seal.png`／2026-06-29追加） |
 | `invoice.dueRuleDefault` | 支払期限の既定方式（請求ごとに変更可） |
 | `invoice.taxRoundMode` | 消費税端数処理（`floor`＝切り捨て・確定） |
 
@@ -84,8 +85,10 @@
 
 ## 9. 画面（新規・PHP＋fetch）
 
-- **請求書一覧**（`invoice-list`）：請求月／顧客／ステータスで絞込、新規作成・複製・PDF・取消。
-- **請求書編集**（`invoice-edit`）：顧客選択（共有マスタ）→宛名/住所を自動補完（編集可・スナップショット）→明細行（業務コードを `jo_task_types` から選択＋品名・数量・単価→金額自動）→税自動計算→支払期限方式選択→**下書き保存／確定発行**。
+- **請求書一覧**（`invoice-list`）：請求月／顧客／ステータスで絞込。**発行者列**（確定処理ユーザの表示名・下書きは「—」／2026-06-29）。操作は状態別＝下書き:編集/確定発行/削除、発行済:**表示**/印刷PDF/複製/取消、取消:**表示**/再作成。
+- **請求書編集**（`invoice-edit`）：顧客選択（共有マスタ）→**宛名・敬称・宛先住所を顧客マスタから自動プリセット**（編集可・スナップショット。住所・敬称・請求区分は顧客マスタの登録値由来。`paymentMethod='transfer'` 顧客は二重計上警告）→**件名**→明細行（業務コードを `jo_task_types` から選択＋品名・数量・単価→金額自動）→税自動計算→支払期限方式選択→**備考（PDF表示）／社内メモ（PDF非表示）**→**下書き保存／PDFプレビュー／確定発行**。新規時は**請求対象月を当月でプリセット**（2026-06-29）。**発行済み/取消は同画面を閲覧専用で開く**（全入力 disabled・編集系ボタン非表示・上部に発行者/発行日時バナー・「印刷/PDFを開く」ボタン／2026-06-29）。
+- **PDFプレビュー**（`invoice-edit` のボタン）：現在の内容を下書き保存し、別タブで印刷ビューを開く。未採番の下書きは請求番号を「（下書き・未採番）」と表示。
+- **印刷ビュー**（`invoice-print`）：適格様式のレイアウト。御請求書（グレー帯）／請求日・請求番号／宛名+敬称・件名・挨拶文／発行者名・登録番号・住所+**角印**／ご請求金額（税込）枠／明細4列（品名/単価税抜/数量/金額税抜・空行で高さ確保）／税サマリ（税率ごと税抜・消費税＋税込合計）と**支払期限・振込先を左右併置**／備考枠／適格請求書フッター。印刷CSSで**A4 1ページに収める**（`@page` 余白・`min-height` 解除・右罫線見切れ防止）。
 - メニュー（index）に「請求書発行」を追加。**前月複製**で定常請求を効率化（簡易の定期請求テンプレ代替）。
 
 ## 10. API（PHP・新規）
@@ -94,7 +97,8 @@
 
 ## 11. PDF生成
 
-- **PHPライブラリ（mPDF 推奨）でサーバ生成**（SSH＋composer で導入・お名前/X-Server 両対応）。日本語フォント埋め込み、適格様式テンプレート。発行時に生成し `pdfPath` 保持。**保存先は公開フォルダ外＋認証経由ダウンロード**（production-auth-db-memo §7）。
+- **現状（2026-06-29）：印刷用HTMLビュー（`invoice-print`）＋ブラウザ印刷でPDF保存**。レイアウトはサンプル（invox生成の適格請求書）準拠で確定済み（§9・角印/件名/備考/4列明細/支払・税サマリ併置/A4 1ページ）。**制約**：ブラウザが自動付与するヘッダ/フッタ（日付・URL・ページ番号）はCSSで消せないため、当面は印刷ダイアログで「ヘッダーとフッター」をオフにして運用。
+- **本命（未実装）：PHPライブラリ（mPDF）でサーバ生成**（composer で導入・お名前/X-Server 両対応）。日本語フォント埋め込み、上記レイアウトを mPDF互換CSS（flexは不可→テーブル化）へ移植。発行時/ダウンロード時に生成し `pdfPath` 保持。**保存先は公開フォルダ外＋認証経由ダウンロード**（production-auth-db-memo §7）。これによりブラウザのヘッダ/フッタ問題と改ページを恒久解決。
 
 ## 12. MVPスコープ
 
@@ -105,10 +109,19 @@
 
 - **適格請求書発行事業者か／登録番号 T+13桁**（櫻井所長に要確認。未確認のため様式は適格前提で枠だけ・`issuer.regNo` で後入力）。
 - **発行者情報の実値**（自社名・住所・電話・振込先口座）。設定投入時に確定。
-- **X-Server / お名前での PDFライブラリ（mPDF）導入確認**（composer・日本語フォント同梱可否）。
-- **請求書様式（レイアウト）の確定**（ロゴ・押印欄・項目配置）。
+- **X-Server / お名前での PDFライブラリ（mPDF）導入確認**（composer・日本語フォント同梱可否）。ローカルComposerは導入済み。
+- ~~請求書様式（レイアウト）の確定~~ → **2026-06-29 確定済み**（サンプル準拠・角印/件名/備考/4列明細/A4 1ページ・§9）。残るはmPDF移植時の体裁微調整のみ。
 
 ## 14. 更新履歴
+
+### 2026-06-29（レイアウト刷新・項目拡充・閲覧/プレビュー）
+- **件名 `subject`／備考 `remarks` 新設**（`jo_invoices`・migration 適用済）。`memo` は社内メモ（PDF非表示）に確定し、`remarks` を請求書PDFの備考欄に表示（従来 memo を流用していた不整合を是正）。
+- **印刷ビュー全面刷新**（`invoice-print`）：サンプル（invox 適格請求書）準拠。御請求書帯・請求日/番号・宛名+敬称・件名・挨拶文・発行者+**角印**（`issuer.sealImage`・既定 `pro/assets/issuer-seal.png`）・ご請求金額枠・**4列明細**（品名/単価/数量/金額）+空行・税サマリと**支払期限/振込先を左右併置**・備考枠。日付は和式。invox宣伝フッター無し。印刷CSSで **A4 1ページ**（`@page` 余白・`min-height`解除・右罫線見切れ防止）。**ブラウザ自動付与のヘッダ/フッタはHTML印刷では消せず、当面は印刷ダイアログでオフ運用**（恒久解決は mPDF・§11）。
+- **発行者表示**：一覧に発行者列、発行済み/取消の閲覧専用画面に発行者（`createdBy`＋`jo_users.displayName`）と発行日時。`jo_get_invoice`/`jo_list_invoices` で `jo_users` を結合。発行者は社内情報のため**PDFには非表示**。
+- **発行済み/取消の閲覧専用表示**：一覧の「表示」から `invoice-edit` を閲覧専用で開く（全入力 disabled・編集系ボタン非表示・「印刷/PDFを開く」）。
+- **PDFプレビュー**ボタン（`invoice-edit`）：現内容を下書き保存→別タブで印刷ビュー（下書きは「下書き・未採番」表示）。
+- **入力補助**：新規時に請求対象月を当月プリセット。件名欄ラベルの不適切な例示を削除。
+- **顧客マスタ連携**：`jo_customers` の住所（`postalCode`/`address1`/`address2`）・`paymentMethod`・`honorific`・`contactName` を顧客マスタ編集UIで登録可能化（[design.md](./design.md) 参照）。`invoice-edit` は顧客選択時に宛先住所・敬称既定・二重計上警告をこれらからプリセット（未設定ならプリセットなし）。**いずれも既存カラムで DB変更なし**。
 
 ### 2026-06-26（MVP第1弾 実装）
 - `pro/lib/invoices.php`＋API（listInvoices/getInvoice/saveInvoiceDraft/issueInvoice/voidInvoice/duplicateInvoice/deleteInvoiceDraft・admin専用・更新系CSRF）を実装。画面 invoice-list/edit/print/settings ＋ index 導線。
