@@ -25,6 +25,15 @@
     td.num { text-align:right; font-variant-numeric:tabular-nums; }
     .tag { font-size:11px; border-radius:999px; padding:1px 8px; background:#e5e7eb; color:#374151; }
     .tag.draft { background:#fef9c3; color:#854d0e; } .tag.issued { background:#d1fae5; color:#065f46; } .tag.void { background:#fee2e2; color:#991b1b; }
+    .tag.paid { background:#0f766e; color:#fff; } .tag.overdue { background:#fee2e2; color:#991b1b; } .tag.unpaid { background:#f3f4f6; color:#6b7280; }
+    .tag.clickable { cursor:pointer; } .tag.clickable:hover { filter:brightness(0.96); text-decoration:underline; }
+    details.menu { position:relative; display:inline-block; margin-left:4px; }
+    details.menu > summary { list-style:none; cursor:pointer; padding:5px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; font-size:13px; color:var(--muted); }
+    details.menu > summary::-webkit-details-marker { display:none; }
+    details.menu[open] > summary { background:#f3f4f6; }
+    .menu-pop { position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 8px 22px rgba(0,0,0,.14); min-width:132px; z-index:20; padding:4px; }
+    .menu-pop button { display:block; width:100%; text-align:left; padding:8px 10px; border:0; background:none; font-size:13px; cursor:pointer; border-radius:6px; color:var(--fg); }
+    .menu-pop button:hover { background:#f3f4f6; } .menu-pop button.danger { color:var(--danger); }
     .ops { white-space:nowrap; text-align:right; }
     .ops .btn { padding:5px 9px; font-size:12px; margin-left:4px; }
     .msg { margin-top:12px; font-size:13px; white-space:pre-wrap; padding:9px 12px; border-radius:8px; display:none; }
@@ -50,12 +59,15 @@
   <main>
     <section class="panel">
       <div class="filters">
-        <div><label>請求月（YYYY-MM）</label><input id="f_month" type="text" placeholder="例 2026-06" style="width:130px"></div>
+        <div><label>請求月</label><input id="f_month" type="month" style="width:150px"></div>
         <div><label>顧客</label><select id="f_customer"></select></div>
         <div><label>状態</label><select id="f_status">
           <option value="">すべて</option><option value="draft">下書き</option><option value="issued">発行済</option><option value="void">取消</option>
         </select></div>
-        <button id="btnFilter" class="btn" type="button">絞込</button>
+        <div><label>入金</label><select id="f_pay">
+          <option value="">すべて</option><option value="unpaid">未入金</option><option value="overdue">期限超過</option><option value="paid">入金済</option>
+        </select></div>
+        <button id="btnClear" class="btn" type="button">クリア</button>
         <div class="spacer"></div>
         <a class="btn primary" href="invoice-edit.html">＋ 新規作成</a>
       </div>
@@ -64,13 +76,13 @@
 
     <section class="panel">
       <table>
-        <thead><tr><th>請求番号</th><th>顧客</th><th>請求月</th><th>発行日</th><th>支払期限</th><th class="num">税込</th><th>状態</th><th>発行者</th><th class="ops">操作</th></tr></thead>
+        <thead><tr><th>請求番号</th><th>顧客</th><th>請求月</th><th>発行日</th><th>支払期限</th><th class="num">税込</th><th>状態</th><th>入金状況</th><th>発行者</th><th class="ops">操作</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </section>
   </main>
 
-  <script src="backend.js?v=20260630-pdf"></script>
+  <script src="backend.js?v=20260701-pay"></script>
   <script>
     var $ = function (id) { return document.getElementById(id); };
     var rows = [], customers = [];
@@ -80,29 +92,69 @@
     function custName(code) { var c = customers.find(function (x){ return x.code === code; }); return c ? c.name : code; }
 
     $('logout').addEventListener('click', function () { joLogout().then(function(){ location.replace('login.html'); }).catch(function(){ location.replace('login.html'); }); });
-    $('btnFilter').addEventListener('click', load);
+    // 全フィルタをクライアント側で即時絞り込み（絞込ボタン廃止・挙動統一）
+    ['f_month', 'f_customer', 'f_status', 'f_pay'].forEach(function (id) { $(id).addEventListener('change', render); });
+    $('btnClear').addEventListener('click', function () { $('f_month').value = ''; $('f_customer').value = ''; $('f_status').value = ''; $('f_pay').value = ''; render(); });
+    // 「⋯」メニュー：外側クリックで閉じる
+    document.addEventListener('click', function (ev) {
+      document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(ev.target)) d.removeAttribute('open'); });
+    });
 
     function statusTag(s) {
       var label = s === 'draft' ? '下書き' : s === 'issued' ? '発行済' : s === 'void' ? '取消' : s;
       return '<span class="tag ' + esc(s) + '">' + label + '</span>';
     }
 
+    function todayStr() {
+      var d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    // 入金状況（発行済みのみ派生表示・タグクリックで消込/取消）: paid/overdue/unpaid、下書き/取消は na
+    function payInfo(r) {
+      if (r.status !== 'issued') return { key: 'na', html: '<span style="color:var(--muted)">—</span>' };
+      if (r.paidDate) {
+        var by = r.paidByName || r.paidBy || '';
+        // 入金済タグは表示専用（取消は誤操作防止のため⋯メニューから）
+        return { key: 'paid', html: '<span class="tag paid" title="入金確認者: ' + esc(by) + '">入金済</span> <span style="color:var(--muted);font-size:12px">' + esc(String(r.paidDate).slice(0, 10)) + '</span>' };
+      }
+      if (r.dueDate && String(r.dueDate).slice(0, 10) < todayStr()) return { key: 'overdue', html: '<span class="tag overdue clickable" data-paid="' + esc(r.invoiceNo) + '" title="クリックで入金済にする">期限超過</span>' };
+      return { key: 'unpaid', html: '<span class="tag unpaid clickable" data-paid="' + esc(r.invoiceNo) + '" title="クリックで入金済にする">未入金</span>' };
+    }
+    // 「⋯」オーバーフローメニュー（低頻度・破壊的操作を格納）
+    function menu(items, no) {
+      var body = items.map(function (it) {
+        return '<button ' + it.d + '="' + esc(no) + '"' + (it.danger ? ' class="danger"' : '') + '>' + esc(it.t) + '</button>';
+      }).join('');
+      return '<details class="menu"><summary>⋯</summary><div class="menu-pop">' + body + '</div></details>';
+    }
+
     function render() {
-      $('tbody').innerHTML = rows.map(function (r) {
+      var mf = $('f_month').value, cf = $('f_customer').value, sf = $('f_status').value, pf = $('f_pay').value;
+      var list = rows.filter(function (r) {
+        if (mf && r.billingMonth !== mf) return false;
+        if (cf && r.customerCode !== cf) return false;
+        if (sf && r.status !== sf) return false;
+        if (pf && payInfo(r).key !== pf) return false;
+        return true;
+      });
+      $('tbody').innerHTML = list.map(function (r) {
         var no = r.isDraft ? '<span class="tag draft">下書き</span>' : esc(r.invoiceNo);
+        var view = '<a class="btn" href="invoice-edit.html?no=' + encodeURIComponent(r.invoiceNo) + '">' + (r.status === 'draft' ? '編集' : '表示') + '</a>';
         var ops = '';
         if (r.status === 'draft') {
-          ops += '<a class="btn" href="invoice-edit.html?no=' + encodeURIComponent(r.invoiceNo) + '">編集</a>';
+          ops += view;
           ops += '<button class="btn primary" data-issue="' + esc(r.invoiceNo) + '">確定発行</button>';
-          ops += '<button class="btn danger" data-del="' + esc(r.invoiceNo) + '">削除</button>';
+          ops += menu([{ t: '削除', d: 'data-del', danger: true }], r.invoiceNo);
         } else if (r.status === 'issued') {
-          ops += '<a class="btn" href="invoice-edit.html?no=' + encodeURIComponent(r.invoiceNo) + '">表示</a>';
-          ops += '<a class="btn" href="' + joInvoicePdfUrl(r.invoiceNo) + '" target="_blank">印刷/PDF</a>';
-          ops += '<button class="btn" data-dup="' + esc(r.invoiceNo) + '">複製</button>';
-          ops += '<button class="btn danger" data-void="' + esc(r.invoiceNo) + '">取消</button>';
+          ops += view;
+          ops += '<a class="btn" href="' + joInvoicePdfUrl(r.invoiceNo) + '" target="_blank">PDF</a>';
+          var items = [{ t: '複製', d: 'data-dup' }];
+          if (r.paidDate) items.push({ t: '入金取消', d: 'data-unpaid' }); // 入金済は先に入金取消（void不可）
+          else items.push({ t: '取消', d: 'data-void', danger: true });
+          ops += menu(items, r.invoiceNo);
         } else { // void
-          ops += '<a class="btn" href="invoice-edit.html?no=' + encodeURIComponent(r.invoiceNo) + '">表示</a>';
-          ops += '<button class="btn" data-dup="' + esc(r.invoiceNo) + '">再作成（複製）</button>';
+          ops += view;
+          ops += menu([{ t: '再作成（複製）', d: 'data-dup' }], r.invoiceNo);
         }
         return '<tr>'
           + '<td>' + no + '</td>'
@@ -112,15 +164,16 @@
           + '<td>' + esc(r.dueDate || '—') + '</td>'
           + '<td class="num">' + yen(r.total) + '</td>'
           + '<td>' + statusTag(r.status) + '</td>'
+          + '<td>' + payInfo(r).html + '</td>'
           + '<td>' + (r.isDraft ? '<span style="color:var(--muted)">—</span>' : esc(r.createdByName || r.createdBy || '—')) + '</td>'
           + '<td class="ops">' + ops + '</td>'
           + '</tr>';
-      }).join('') || '<tr><td colspan="9" style="color:var(--muted)">請求書がありません。「新規作成」から作成してください。</td></tr>';
+      }).join('') || '<tr><td colspan="10" style="color:var(--muted)">該当する請求書がありません。</td></tr>';
     }
 
     async function load() {
       try {
-        rows = await joListInvoices({ billingMonth: $('f_month').value.trim(), customerCode: $('f_customer').value, status: $('f_status').value });
+        rows = await joListInvoices({}); // 全件取得→画面側で絞り込み（挙動統一のため）
         render(); msg('', true); $('msg').className = 'msg';
       } catch (e) { msg('読み込み失敗: ' + (e.message || e), false); }
     }
@@ -128,14 +181,18 @@
     $('tbody').addEventListener('click', async function (ev) {
       var t = ev.target;
       var issue = t.getAttribute('data-issue'), del = t.getAttribute('data-del'), vd = t.getAttribute('data-void'), dup = t.getAttribute('data-dup');
+      var paid = t.getAttribute('data-paid'), unpaid = t.getAttribute('data-unpaid');
       try {
         if (issue) { if (!confirm('この下書きを確定発行します。番号採番・請求データへの反映が行われます。よろしいですか？')) return; var r = await joIssueInvoice(issue); msg('発行しました：' + r.invoiceNo, true); await load(); }
         else if (del) { if (!confirm('この下書きを削除しますか？')) return; await joDeleteInvoiceDraft(del); msg('削除しました。', true); await load(); }
         else if (vd) { if (!confirm('発行済み請求書を取消します。請求データへの反映も取り消されます（請求書は取消として保持）。よろしいですか？')) return; await joVoidInvoice(vd); msg('取消しました。', true); await load(); }
+        else if (paid) { var pd = prompt('入金日を入力してください（YYYY-MM-DD）。', todayStr()); if (pd === null) return; await joMarkInvoicePaid(paid, pd.trim()); msg('入金済にしました：' + paid, true); await load(); }
+        else if (unpaid) { if (!confirm('入金記録を取り消して未入金に戻しますか？')) return; await joUnmarkInvoicePaid(unpaid); msg('入金を取り消しました：' + unpaid, true); await load(); }
         else if (dup) { var d = await joDuplicateInvoice(dup, {}); location.href = 'invoice-edit.html?no=' + encodeURIComponent(d.invoiceNo); }
       } catch (e) {
-        var m = (e.data && e.data.detail) || e.message || e;
-        msg('操作失敗: ' + m, false);
+        var code = (e.data && e.data.detail) || e.message || String(e);
+        var map = { paid_cannot_void: '入金済みのため取消できません。先に「入金取消」を行ってください。' };
+        msg('操作失敗: ' + (map[code] || code), false);
       }
     });
 

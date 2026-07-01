@@ -101,6 +101,8 @@ const joGetInvoice = (invoiceNo) => joCall('getInvoice', { invoiceNo }).then((r)
 const joSaveInvoiceDraft = (invoice) => joWrite('saveInvoiceDraft', { invoice });
 const joIssueInvoice = (invoiceNo) => joWrite('issueInvoice', { invoiceNo });
 const joVoidInvoice = (invoiceNo) => joWrite('voidInvoice', { invoiceNo });
+const joMarkInvoicePaid = (invoiceNo, paidDate = '') => joWrite('markInvoicePaid', { invoiceNo, paidDate });
+const joUnmarkInvoicePaid = (invoiceNo) => joWrite('unmarkInvoicePaid', { invoiceNo });
 const joDuplicateInvoice = (invoiceNo, overrides = {}) => joWrite('duplicateInvoice', { invoiceNo, overrides });
 const joDeleteInvoiceDraft = (invoiceNo) => joWrite('deleteInvoiceDraft', { invoiceNo });
 // 請求書 PDF（mPDF サーバ生成）の URL。新規タブ表示用。dl=true で添付ダウンロード。

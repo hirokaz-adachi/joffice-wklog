@@ -88,9 +88,11 @@ function jo_list_invoices(array $f = []): array
     if (!empty($f['customerCode'])) { $where[] = 'i.customerCode = ?'; $params[] = (string) $f['customerCode']; }
     if (!empty($f['status']))       { $where[] = 'i.status = ?';       $params[] = (string) $f['status']; }
     $sql = 'SELECT i.invoiceNo, i.customerCode, c.name AS customer, i.billingMonth, i.issueDate, i.dueDate,'
-         . ' i.subtotal, i.tax, i.total, i.status, i.createdBy, u.displayName AS createdByName, i.createdAt, i.updatedAt'
+         . ' i.subtotal, i.tax, i.total, i.status, i.paidDate, i.paidBy, pu.displayName AS paidByName,'
+         . ' i.createdBy, u.displayName AS createdByName, i.createdAt, i.updatedAt'
          . ' FROM jo_invoices i LEFT JOIN jo_customers c ON c.code = i.customerCode'
          . ' LEFT JOIN jo_users u ON u.loginId = i.createdBy'
+         . ' LEFT JOIN jo_users pu ON pu.loginId = i.paidBy'
          . ($where ? (' WHERE ' . implode(' AND ', $where)) : '')
          . ' ORDER BY (i.status = "draft") DESC, i.billingMonth DESC, i.invoiceNo DESC';
     $st = jo_db()->prepare($sql);
@@ -108,6 +110,9 @@ function jo_list_invoices(array $f = []): array
             'total'        => (int) $r['total'],
             'status'       => (string) $r['status'],
             'isDraft'      => $r['status'] === 'draft' ? 1 : 0,
+            'paidDate'     => $r['paidDate'],
+            'paidBy'       => (string) ($r['paidBy'] ?? ''),
+            'paidByName'   => (string) ($r['paidByName'] ?? ''),
             'createdBy'    => (string) ($r['createdBy'] ?? ''),
             'createdByName'=> (string) ($r['createdByName'] ?? ''),
             'updatedAt'    => $r['updatedAt'],
@@ -115,10 +120,43 @@ function jo_list_invoices(array $f = []): array
     }, $st->fetchAll());
 }
 
+/** 入金消込：発行済み請求書に入金日を記録（手動）。status とは独立。 */
+function jo_mark_invoice_paid(string $invoiceNo, array $user, string $paidDate = ''): array
+{
+    $db = jo_db();
+    $st = $db->prepare('SELECT status FROM jo_invoices WHERE invoiceNo = ?');
+    $st->execute([$invoiceNo]);
+    $row = $st->fetch();
+    if (!$row) {
+        throw new InvalidArgumentException('invoice_not_found');
+    }
+    if ($row['status'] !== 'issued') {
+        throw new InvalidArgumentException('not_issued'); // 下書き/取消は消込不可
+    }
+    $pd = (preg_match('/^\d{4}-\d{2}-\d{2}$/', $paidDate)) ? $paidDate : substr(jo_now(), 0, 10);
+    $db->prepare('UPDATE jo_invoices SET paidDate = ?, paidBy = ?, updatedAt = ? WHERE invoiceNo = ?')
+       ->execute([$pd, (string) ($user['loginId'] ?? ''), jo_now(), $invoiceNo]);
+    return ['invoiceNo' => $invoiceNo, 'paidDate' => $pd];
+}
+
+/** 入金取消：入金記録をクリア（未入金へ戻す）。 */
+function jo_unmark_invoice_paid(string $invoiceNo): array
+{
+    $db = jo_db();
+    $st = $db->prepare('SELECT status FROM jo_invoices WHERE invoiceNo = ?');
+    $st->execute([$invoiceNo]);
+    if (!$st->fetch()) {
+        throw new InvalidArgumentException('invoice_not_found');
+    }
+    $db->prepare('UPDATE jo_invoices SET paidDate = NULL, paidBy = NULL, updatedAt = ? WHERE invoiceNo = ?')
+       ->execute([jo_now(), $invoiceNo]);
+    return ['invoiceNo' => $invoiceNo, 'paidDate' => null];
+}
+
 // ---- 取得（ヘッダ＋明細） ----
 function jo_get_invoice(string $invoiceNo): ?array
 {
-    $st = jo_db()->prepare('SELECT i.*, u.displayName AS createdByName FROM jo_invoices i LEFT JOIN jo_users u ON u.loginId = i.createdBy WHERE i.invoiceNo = ?');
+    $st = jo_db()->prepare('SELECT i.*, u.displayName AS createdByName, pu.displayName AS paidByName FROM jo_invoices i LEFT JOIN jo_users u ON u.loginId = i.createdBy LEFT JOIN jo_users pu ON pu.loginId = i.paidBy WHERE i.invoiceNo = ?');
     $st->execute([$invoiceNo]);
     $h = $st->fetch();
     if (!$h) {
@@ -328,7 +366,7 @@ function jo_void_invoice(string $invoiceNo, array $user): array
     $db = jo_db();
     $db->beginTransaction();
     try {
-        $st = $db->prepare('SELECT status FROM jo_invoices WHERE invoiceNo = ? FOR UPDATE');
+        $st = $db->prepare('SELECT status, paidDate FROM jo_invoices WHERE invoiceNo = ? FOR UPDATE');
         $st->execute([$invoiceNo]);
         $row = $st->fetch();
         if (!$row) {
@@ -339,6 +377,10 @@ function jo_void_invoice(string $invoiceNo, array $user): array
         }
         if ($row['status'] === 'void') {
             throw new InvalidArgumentException('already_void');
+        }
+        if (!empty($row['paidDate'])) {
+            // 入金済みのまま void すると「void なのに入金済」の不整合になる。先に入金取消が必要。
+            throw new InvalidArgumentException('paid_cannot_void');
         }
         // 射影削除（同 invoiceNo 接頭辞）
         $db->prepare("DELETE FROM jo_billings WHERE invoiceId LIKE ?")->execute(['inv_' . $invoiceNo . '_%']);

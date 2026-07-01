@@ -254,6 +254,16 @@ try {
             jo_check_csrf($in);
             jo_json(['ok' => true, 'data' => jo_void_invoice((string) ($in['invoiceNo'] ?? ''), $u)]);
             break;
+        case 'markInvoicePaid':
+            $u = jo_require_role(['admin']);
+            jo_check_csrf($in);
+            jo_json(['ok' => true, 'data' => jo_mark_invoice_paid((string) ($in['invoiceNo'] ?? ''), $u, (string) ($in['paidDate'] ?? ''))]);
+            break;
+        case 'unmarkInvoicePaid':
+            jo_require_role(['admin']);
+            jo_check_csrf($in);
+            jo_json(['ok' => true, 'data' => jo_unmark_invoice_paid((string) ($in['invoiceNo'] ?? ''))]);
+            break;
         case 'duplicateInvoice':
             $u = jo_require_role(['admin']);
             jo_check_csrf($in);

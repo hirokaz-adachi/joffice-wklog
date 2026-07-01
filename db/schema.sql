@@ -174,6 +174,8 @@ CREATE TABLE jo_invoices (                    -- 請求書ヘッダ
   memo            TEXT NULL,                  -- 社内メモ(PDF非表示)
   remarks         TEXT NULL,                  -- 備考(請求書PDFに表示)
   verifyToken     VARCHAR(64) NULL,           -- 真正性検証(QR)用の照合鍵(128bit hex・発行時生成)
+  paidDate        DATE NULL,                  -- 入金日(手動消込・NULL=未入金)。status とは独立
+  paidBy          VARCHAR(50) NULL,           -- 消込者(loginId)
   createdBy       VARCHAR(50) NULL,
   createdAt       DATETIME NULL,
   updatedAt       DATETIME NULL,

@@ -32,6 +32,11 @@
     .warn { color:var(--warn); font-size:12px; margin-top:6px; display:none; }
     .warn.show { display:block; }
     .actions { display:flex; gap:10px; margin-top:8px; }
+    .action-bar { position:sticky; top:0; z-index:30; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+      background:#fff; border-bottom:1px solid var(--line); padding:12px 24px; box-shadow:0 2px 8px rgba(0,0,0,.05); }
+    .action-bar .ab-actions { display:flex; gap:10px; align-items:center; }
+    .ab-total-wrap { display:flex; align-items:baseline; gap:8px; }
+    .ab-total { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; }
     .msg { margin-top:12px; font-size:13px; white-space:pre-wrap; padding:9px 12px; border-radius:8px; display:none; }
     .msg.err { background:#fef2f2; color:var(--danger); display:block; } .msg.ok { background:#f0fdf4; color:#15803d; display:block; }
     .hint { color:var(--muted); font-size:12px; }
@@ -55,12 +60,27 @@
     </div>
   </header>
 
+  <div class="action-bar">
+    <div class="ab-actions">
+      <button id="btnSave" class="btn primary" type="button">下書き保存</button>
+      <button id="btnPreview" class="btn" type="button">PDFプレビュー</button>
+      <button id="btnIssue" class="btn issue" type="button">確定発行</button>
+      <span id="curNo" class="hint"></span>
+    </div>
+    <div class="ab-total-wrap">
+      <span class="hint">税込合計</span>
+      <span id="ab_total" class="ab-total">¥0</span>
+    </div>
+  </div>
+
   <main>
     <div id="roBanner" class="ro-banner" style="display:none"></div>
+    <div id="previewHint" class="hint" style="margin-bottom:12px">※「PDFプレビュー」は現在の内容を下書き保存し、別タブで請求書PDF（発行前のイメージ）を表示します。</div>
+    <div id="msg" class="msg" style="margin-top:0"></div>
     <section class="panel">
       <div class="grid">
         <div><label>顧客</label><select id="f_customer"></select><div id="payWarn" class="warn">この顧客は「口座振替」です。請求書払い（自前発行）対象か確認してください（二重計上注意）。</div></div>
-        <div><label>請求対象月（YYYY-MM）</label><input id="f_billingMonth" type="text" placeholder="例 2026-06"></div>
+        <div><label>請求対象月</label><input id="f_billingMonth" type="month"></div>
         <div><label>発行日</label><input id="f_issueDate" type="date"></div>
         <div><label>支払期限の算出方式</label><select id="f_dueRule">
           <option value="net30">発行日＋30日</option>
@@ -96,14 +116,6 @@
       <textarea id="f_remarks" rows="2" placeholder="例）恐れ入りますが振込手数料は貴社にてご負担ください。"></textarea>
       <label style="margin-top:12px">社内メモ（PDFには出しません）</label>
       <textarea id="f_memo" rows="2"></textarea>
-      <div class="actions">
-        <button id="btnSave" class="btn primary" type="button">下書き保存</button>
-        <button id="btnPreview" class="btn" type="button">PDFプレビュー</button>
-        <button id="btnIssue" class="btn issue" type="button">確定発行</button>
-        <span id="curNo" class="hint" style="align-self:center"></span>
-      </div>
-      <div id="previewHint" class="hint" style="margin-top:6px">※「PDFプレビュー」は現在の内容を下書き保存し、別タブで印刷イメージを表示します（印刷ダイアログでPDF保存できます）。</div>
-      <div id="msg" class="msg"></div>
     </section>
   </main>
 
@@ -120,7 +132,9 @@
     $('logout').addEventListener('click', function () { joLogout().then(function(){ location.replace('login.html'); }).catch(function(){ location.replace('login.html'); }); });
 
     function taskOptions(sel) {
-      return '<option value="">（コード）</option>' + tasks.slice().sort(function(a,b){ return String(a.code).localeCompare(String(b.code),'ja'); })
+      // 消費税(allocationType=tax・080)は請求明細の品目として選ばせない（税は自動計算のため）
+      return '<option value="">（コード）</option>' + tasks.slice().filter(function(t){ return t.allocationType !== 'tax'; })
+        .sort(function(a,b){ return String(a.code).localeCompare(String(b.code),'ja'); })
         .map(function (t){ return '<option value="' + esc(t.code) + '"' + (t.code === sel ? ' selected' : '') + '>' + esc(t.code + ' ' + t.name) + '</option>'; }).join('');
     }
     function renderLines() {
@@ -142,6 +156,7 @@
       lines.forEach(function (ln) { var amt = Math.round(qnum(ln.quantity) * qnum(ln.unitPrice)); sub += amt; var r = qnum(ln.taxRate); byRate[r] = (byRate[r] || 0) + amt; });
       var tax = 0; Object.keys(byRate).forEach(function (r) { tax += Math.floor(byRate[r] * Number(r) / 100); });
       $('t_sub').textContent = yen(sub); $('t_tax').textContent = yen(tax); $('t_total').textContent = yen(sub + tax);
+      $('ab_total').textContent = '¥' + yen(sub + tax); // sticky アクションバーの合計も同期
     }
     $('lines').addEventListener('input', function (ev) {
       var tr = ev.target.closest('tr[data-i]'); if (!tr) return; var i = +tr.dataset.i; var f = ev.target.getAttribute('data-f'); if (!f) return;
@@ -269,10 +284,19 @@
       var statusLabel = h.status === 'void' ? '取消' : h.status === 'paid' ? '入金済み' : h.status === 'sent' ? '送付済み' : '発行済み';
       var issuer = esc(h.createdBy || '—') + (h.createdByName ? '（' + esc(h.createdByName) + '）' : '');
       var at = h.createdAt ? esc(String(h.createdAt).slice(0, 16).replace('T', ' ')) : '—';
+      // 入金状況（消込済みなら 入金日・入金確認者 を表示）
+      var payLine = '';
+      if (h.paidDate) {
+        payLine = '<br>入金：<b>入金済</b>（入金日 ' + esc(String(h.paidDate).slice(0, 10)) + '　入金確認者：<b>'
+          + esc(h.paidByName || h.paidBy || '—') + '</b>）';
+      } else if (h.status !== 'void') {
+        payLine = '<br>入金：<b>未入金</b>';
+      }
       var b = $('roBanner');
       b.style.display = 'block';
       b.innerHTML = '<b>この請求書は「' + statusLabel + '」のため閲覧のみ</b>（編集はできません）。'
-        + '　発行者：<b>' + issuer + '</b>　発行日時：' + at
+        + '<br>発行者：<b>' + issuer + '</b>　発行日時：' + at
+        + payLine
         + '<br><span class="ro-hint">内容を変更したい場合は、一覧の「複製」から新規下書きを作成してください。</span>';
     }
 
