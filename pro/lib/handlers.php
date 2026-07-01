@@ -35,10 +35,12 @@ function jo_handle_bootstrap(array $user): array
             'address1'      => $r['address1'],
             'address2'      => $r['address2'],
             'contactName'   => $r['contactName'],
+            'email'         => $r['email'],                  // 請求書送付先(To)
+            'ccEmail'       => $r['ccEmail'],                // 請求書送付CC
             'sortOrder'     => (int) $r['sortOrder'],
             'isActive'      => (int) $r['isActive'],
         ];
-    }, jo_rows('SELECT code, name, paymentMethod, honorific, postalCode, address1, address2, contactName, sortOrder, isActive FROM jo_customers ORDER BY sortOrder, code'));
+    }, jo_rows('SELECT code, name, paymentMethod, honorific, postalCode, address1, address2, contactName, email, ccEmail, sortOrder, isActive FROM jo_customers ORDER BY sortOrder, code'));
 
     $tasks = array_map(static function ($r) {
         return [

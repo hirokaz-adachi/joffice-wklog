@@ -43,6 +43,8 @@ CREATE TABLE jo_customers (
   address1      VARCHAR(200) NULL,
   address2      VARCHAR(200) NULL,
   contactName   VARCHAR(100) NULL,
+  email         VARCHAR(255) NULL,            -- 請求書送付先(To)・任意・カンマ区切りで複数可
+  ccEmail       VARCHAR(255) NULL,            -- 請求書送付CC・任意・カンマ区切りで複数可
   sortOrder     INT NOT NULL DEFAULT 0,
   isActive      TINYINT(1) NOT NULL DEFAULT 1,
   updatedAt     DATETIME NULL,

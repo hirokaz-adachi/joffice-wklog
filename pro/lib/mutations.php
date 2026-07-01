@@ -124,7 +124,7 @@ function jo_master_def(string $type): array
         case 'staff':
             return ['table' => 'jo_staff', 'cols' => ['code', 'name', 'sortOrder', 'isActive']];
         case 'customers':
-            return ['table' => 'jo_customers', 'cols' => ['code', 'name', 'paymentMethod', 'honorific', 'postalCode', 'address1', 'address2', 'contactName', 'sortOrder', 'isActive']];
+            return ['table' => 'jo_customers', 'cols' => ['code', 'name', 'paymentMethod', 'honorific', 'postalCode', 'address1', 'address2', 'contactName', 'email', 'ccEmail', 'sortOrder', 'isActive']];
         case 'tasks':
             return ['table' => 'jo_task_types', 'cols' => ['code', 'name', 'allocationType', 'sortOrder']];
         default:

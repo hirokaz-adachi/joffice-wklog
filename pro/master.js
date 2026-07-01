@@ -16,8 +16,10 @@
       { k: "postalCode", label: "郵便番号", opt: true, list: false },
       { k: "address1", label: "住所", opt: true, list: false },
       { k: "address2", label: "住所（建物名・階等）", opt: true, list: false },
-      { k: "contactName", label: "ご担当者名", opt: true, list: false }
-    ], hint: "顧問先を管理します。請求区分・敬称・郵便番号・住所・ご担当者名は任意で、請求書作成時の既定値に使われます。" }
+      { k: "contactName", label: "ご担当者名", opt: true, list: false },
+      { k: "email", label: "メールアドレス（請求書送付先）", opt: true, list: false },
+      { k: "ccEmail", label: "CCメールアドレス", opt: true, list: false }
+    ], hint: "顧問先を管理します。請求区分・敬称・郵便番号・住所・ご担当者名・メールアドレスは任意です。メールは請求書の送付先（将来のメール送信用）で、複数はカンマ区切りで入力できます。" }
   };
 
   const state = { staff: [], customers: [], tasks: [], taskPhases: [], customerStaff: [], settings: {} };

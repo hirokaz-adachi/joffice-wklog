@@ -134,7 +134,7 @@
 - **バウンス（不達）**は送信元アカウントに戻る → 監視担当が必要。
 
 ### 14.3 実装要素（mPDF 完了後に着手）
-1. **DB**：`jo_customers.email`（＋必要なら `ccEmail`）をマイグレーションで追加。マスタ編集 UI に入力欄追加。
+1. ~~**DB**：`jo_customers.email`（＋必要なら `ccEmail`）をマイグレーションで追加。マスタ編集 UI に入力欄追加。~~ → **実装済（2026-07-01）**：`jo_customers` に `email`(送付先To)/`ccEmail`(CC) を追加（schema.sql＋`db/migrations/2026-07-01_customer_email.sql`・staging DB 適用済）。bootstrap 投影・master 顧客 upsert 許可列・master.js 顧客エディタ入力欄（任意・カンマ区切りで複数可）を配線。**環境非依存の下準備として先行実施**（SMTP/本番は後続）。実アドレスの入力は運用作業。
 2. **ライブラリ**：PHPMailer 等を Composer で `vendor/` 同梱（mPDF と同じ配信運用に相乗り）。
 3. **設定**：差出人名・本文テンプレート・Reply-To は `jo_app_settings`。**SMTP 接続情報・パスワードは `config.php`（公開フォルダ外）**に保持（DB／JS には置かない）。
 4. **API**：`sendInvoiceMail`（admin 認可・CSRF・PDF 添付・`sent` 記録）。**発行トランザクションとは分離**（SMTP は遅く失敗しうるため、発行の原子性に巻き込まない）。
