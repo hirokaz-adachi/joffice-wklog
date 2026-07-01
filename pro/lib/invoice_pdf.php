@@ -45,7 +45,7 @@ function jo_render_invoice_pdf(array $h, array $lines, array $settings, array $o
     $mpdf->SetTitle('請求書 ' . (string) ($h['invoiceNo'] ?? ''));
     $mpdf->SetAuthor((string) ($settings['issuer.name'] ?? ''));
 
-    $html = jo_invoice_pdf_html($h, $lines, $settings);
+    $html = jo_invoice_pdf_html($h, $lines, $settings, (string) ($opts['verifyBase'] ?? ''));
     $mpdf->WriteHTML($html);
 
     $dest = $opts['dest'] ?? 'S';
@@ -57,7 +57,7 @@ function jo_render_invoice_pdf(array $h, array $lines, array $settings, array $o
 }
 
 /** 請求書 HTML（mPDF 互換・テーブルレイアウト）を組み立てる。 */
-function jo_invoice_pdf_html(array $h, array $lines, array $settings): string
+function jo_invoice_pdf_html(array $h, array $lines, array $settings, string $verifyBase = ''): string
 {
     $esc  = static fn($v) => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
     $yen  = static fn($n) => number_format((float) ($n ?? 0));
@@ -128,6 +128,13 @@ function jo_invoice_pdf_html(array $h, array $lines, array $settings): string
     $footNote = '本請求書は適格請求書（インボイス）として発行しています。'
         . ($regNo ? '' : '※登録番号は発行者設定で登録してください。');
 
+    // 真正性検証 QR（発行済みのみ・verifyBase と verifyToken が揃うとき）
+    $verifyToken = (string) ($h['verifyToken'] ?? '');
+    $isDraft     = (bool) preg_match('/^draft_/', $noRaw);
+    $verifyUrl   = ($verifyBase !== '' && $verifyToken !== '' && !$isDraft)
+        ? rtrim($verifyBase, '/') . '/verify.php?no=' . rawurlencode($noRaw) . '&t=' . $verifyToken
+        : '';
+
     // ===== mPDF 互換 CSS（flex 不使用・テーブルと width% で構成） =====
     $css = <<<CSS
 @page { margin: 13mm; }
@@ -177,6 +184,8 @@ table.pay td.v { padding:3px 0; line-height:1.7; }
 .remarks-tbl { width:100%; border-collapse:collapse; }
 .remarks-box { border:0.6px solid #9ca3af; border-radius:3px; height:30mm; vertical-align:top; padding:10px 12px; font-size:9pt; line-height:1.85; }
 .foot-note { color:#6b7280; font-size:8pt; margin-top:14px; }
+.qr-box { text-align:center; }
+.qr-cap { font-size:7pt; color:#6b7280; text-align:center; margin-top:2px; }
 CSS;
 
     // ===== 本文（テーブル構成） =====
@@ -246,8 +255,19 @@ CSS;
     $html .= '<div style="margin-top:18px;"><div class="remarks-lbl">備考</div>'
         . '<table class="remarks-tbl"><tr><td class="remarks-box">' . ($remarks !== '' ? $remarks : '&nbsp;') . '</td></tr></table></div>';
 
-    // 適格請求書フッター
-    $html .= '<div class="foot-note">' . $footNote . '</div>';
+    // 適格請求書フッター（左）＋真正性検証QR（右）
+    if ($verifyUrl !== '') {
+        $qr = '<barcode code="' . $esc($verifyUrl) . '" type="QR" error="M" size="0.6" />';
+        $html .= '<table class="tbl-layout" style="margin-top:14px;"><tr>'
+            . '<td style="vertical-align:top;"><div class="foot-note" style="margin-top:0;">' . $footNote . '</div>'
+            . '<div class="foot-note" style="margin-top:4px;">右のQRコードから、この請求書の発行元・番号・金額・発行日を確認できます。</div></td>'
+            . '<td width="60" style="vertical-align:top; text-align:center;">'
+            . '<div class="qr-box">' . $qr . '</div>'
+            . '</td>'
+            . '</tr></table>';
+    } else {
+        $html .= '<div class="foot-note">' . $footNote . '</div>';
+    }
 
     $html .= '</body></html>';
     return $html;

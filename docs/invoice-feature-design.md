@@ -149,6 +149,15 @@
 
 ## 15. 更新履歴
 
+### 2026-07-01（顧客メール列・請求書 真正性検証QR）
+- **顧客マスタにメール列 `email`/`ccEmail` 追加**（メール送信の下準備・環境非依存）。schema.sql＋migration・bootstrap投影・upsert許可列・master.js エディタ。staging適用/配信済（`7e6a33b`）。
+- **請求書の真正性検証（QR＋検証ページ）実装**（偽造防止/発行元証明・公的でない簡易方式・ユーザー選択=方式B）。
+  - `jo_invoices.verifyToken`（128bit・発行時 `bin2hex(random_bytes(16))` 生成・既存発行済みへ遡及付与）。schema.sql＋`db/migrations/2026-07-01_invoice_verifytoken.sql`。
+  - 請求書PDF右下に **QRコード**（mPDF＋`mpdf/qrcode`）。中身は検証URL `{base}/verify.php?no=..&t=token`（base は現ホストから自動導出、`invoice.verifyBaseUrl` 設定で上書き可）。
+  - **`verify.php`（公開・読取専用・最小開示）**：トークン一意照合。表示は**発行元・請求番号・発行日・宛先名・合計金額(税込)・ステータス**のみ（明細/住所/社内メモは非表示＝「PDF以上の情報を出さない」原則）。取消は「取消済み」表示。無効/不一致は一律「無効」。`noindex`・プリペアド・出力ホワイトリスト。トークン128bitで列挙不可。
+  - **セキュリティ担保**：検証ページはトークンを運んだPDF以上の情報を出さないため、トークン漏洩＝PDF漏洩以上の被害なし。staging は Basic 認証下（本番 X-Server で公開有効）。
+  - 実機確認：verify.php 有効/無効の表示・QR生成OK。QR体裁（サイズ0.6・左補足文言と上端揃え・キャプション無し）をユーザー確認で調整。
+
 ### 2026-06-30（mPDF サーバ生成 実装）
 - **mPDF v8.3.1 でサーバ生成を実装**（§11）。`pro/lib/invoice_pdf.php`＋API `getInvoicePdf`（GET/admin/PDF返却）。フロントを `joInvoicePdfUrl()` でサーバPDFに差し替え（invoice-print HTMLビューは不使用化）。
 - **フォント＝Noto Sans JP（Regular/Bold・可変→静的化・OFL同梱）**。IPAex は太字ウェイト無で見送り。レイアウトは invoice-print と同一体裁を mPDF互換CSSへ移植（flex→テーブル、中央寄せは td `align`、字間は文字間スペース）。

@@ -253,14 +253,15 @@ function jo_issue_invoice(string $no, array $user): array
 
         $now = jo_now();
         $issuerRegNo = (string) ($settings['issuer.regNo'] ?? '');
-        // ヘッダを実番号でINSERT（status=issued・登録番号スナップショット）
-        $db->prepare('INSERT INTO jo_invoices (invoiceNo, customerCode, billingMonth, issueDate, dueDate, dueRule, billToName, billToHonorific, billToAddress, subject, subtotal, tax, total, issuerRegNo, status, memo, remarks, createdBy, createdAt, updatedAt)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        $verifyToken = bin2hex(random_bytes(16)); // 128bit・真正性検証(QR)用の照合鍵
+        // ヘッダを実番号でINSERT（status=issued・登録番号スナップショット・検証トークン）
+        $db->prepare('INSERT INTO jo_invoices (invoiceNo, customerCode, billingMonth, issueDate, dueDate, dueRule, billToName, billToHonorific, billToAddress, subject, subtotal, tax, total, issuerRegNo, status, memo, remarks, verifyToken, createdBy, createdAt, updatedAt)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
            ->execute([
                $invoiceNo, $inv['customerCode'], $inv['billingMonth'], $inv['issueDate'], $inv['dueDate'], $inv['dueRule'],
                $inv['billToName'], $inv['billToHonorific'], $inv['billToAddress'], ($inv['subject'] ?? ''),
                $inv['subtotal'], $inv['tax'], $inv['total'], $issuerRegNo, 'issued', $inv['memo'], ($inv['remarks'] ?? ''),
-               (string) ($user['loginId'] ?? ''), $now, $now,
+               $verifyToken, (string) ($user['loginId'] ?? ''), $now, $now,
            ]);
         // 明細を実番号へコピー
         $ins = $db->prepare('INSERT INTO jo_invoice_lines (invoiceNo, lineNo, taskCode, itemName, quantity, unitPrice, amount, taxRate, sortOrder) VALUES (?,?,?,?,?,?,?,?,?)');

@@ -275,7 +275,16 @@ try {
                 jo_error('invoice_not_found', 404);
             }
             require_once __DIR__ . '/lib/invoice_pdf.php';
-            $pdf    = jo_render_invoice_pdf($inv['header'], $inv['lines'], jo_app_settings(), ['dest' => 'S']);
+            $settings = jo_app_settings();
+            // 検証QRのベースURL：設定があれば優先、なければ現在のホスト/ディレクトリから導出（verify.php は同ディレクトリ）
+            $verifyBase = (string) ($settings['invoice.verifyBaseUrl'] ?? '');
+            if ($verifyBase === '') {
+                $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host   = (string) ($_SERVER['HTTP_HOST'] ?? '');
+                $dir    = rtrim(str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? ''))), '/');
+                if ($host !== '') { $verifyBase = $scheme . '://' . $host . $dir; }
+            }
+            $pdf    = jo_render_invoice_pdf($inv['header'], $inv['lines'], $settings, ['dest' => 'S', 'verifyBase' => $verifyBase]);
             $fnSafe = preg_replace('/[^A-Za-z0-9_\-]/', '_', $no);
             $disp   = !empty($in['dl']) ? 'attachment' : 'inline';
             header('Content-Type: application/pdf');

@@ -173,13 +173,15 @@ CREATE TABLE jo_invoices (                    -- 請求書ヘッダ
   pdfPath         VARCHAR(255) NULL,
   memo            TEXT NULL,                  -- 社内メモ(PDF非表示)
   remarks         TEXT NULL,                  -- 備考(請求書PDFに表示)
+  verifyToken     VARCHAR(64) NULL,           -- 真正性検証(QR)用の照合鍵(128bit hex・発行時生成)
   createdBy       VARCHAR(50) NULL,
   createdAt       DATETIME NULL,
   updatedAt       DATETIME NULL,
   PRIMARY KEY (invoiceNo),
   KEY idx_inv_cust (customerCode),
   KEY idx_inv_month (billingMonth),
-  KEY idx_inv_status (status)
+  KEY idx_inv_status (status),
+  KEY idx_inv_verify (verifyToken)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE jo_invoice_lines (               -- 請求書明細
