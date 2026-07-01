@@ -70,7 +70,7 @@
     </section>
   </main>
 
-  <script src="backend.js?v=20260626-2"></script>
+  <script src="backend.js?v=20260630-pdf"></script>
   <script>
     var $ = function (id) { return document.getElementById(id); };
     var rows = [], customers = [];
@@ -97,7 +97,7 @@
           ops += '<button class="btn danger" data-del="' + esc(r.invoiceNo) + '">削除</button>';
         } else if (r.status === 'issued') {
           ops += '<a class="btn" href="invoice-edit.html?no=' + encodeURIComponent(r.invoiceNo) + '">表示</a>';
-          ops += '<a class="btn" href="invoice-print.html?no=' + encodeURIComponent(r.invoiceNo) + '" target="_blank">印刷/PDF</a>';
+          ops += '<a class="btn" href="' + joInvoicePdfUrl(r.invoiceNo) + '" target="_blank">印刷/PDF</a>';
           ops += '<button class="btn" data-dup="' + esc(r.invoiceNo) + '">複製</button>';
           ops += '<button class="btn danger" data-void="' + esc(r.invoiceNo) + '">取消</button>';
         } else { // void

@@ -266,6 +266,25 @@ try {
             jo_json(['ok' => true, 'data' => ['invoiceNo' => (string) ($in['invoiceNo'] ?? '')]]);
             break;
 
+        // 請求書 PDF（mPDF サーバ生成・GET・admin）。新規タブ表示/ダウンロード用のため JSON ではなく PDF を返す。
+        case 'getInvoicePdf':
+            jo_require_role(['admin']);
+            $no  = (string) ($in['invoiceNo'] ?? '');
+            $inv = jo_get_invoice($no);
+            if ($inv === null) {
+                jo_error('invoice_not_found', 404);
+            }
+            require_once __DIR__ . '/lib/invoice_pdf.php';
+            $pdf    = jo_render_invoice_pdf($inv['header'], $inv['lines'], jo_app_settings(), ['dest' => 'S']);
+            $fnSafe = preg_replace('/[^A-Za-z0-9_\-]/', '_', $no);
+            $disp   = !empty($in['dl']) ? 'attachment' : 'inline';
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: ' . $disp . '; filename="invoice-' . $fnSafe . '.pdf"');
+            header('Content-Length: ' . strlen($pdf));
+            header('Cache-Control: private, no-store');
+            echo $pdf;
+            break;
+
         default:
             jo_error('unknown_action: ' . $action, 404);
     }

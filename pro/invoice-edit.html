@@ -107,7 +107,7 @@
     </section>
   </main>
 
-  <script src="backend.js?v=20260626-2"></script>
+  <script src="backend.js?v=20260630-pdf"></script>
   <script>
     var $ = function (id) { return document.getElementById(id); };
     var customers = [], tasks = [], settings = {}, lines = [], curNo = '', READONLY = false;
@@ -211,13 +211,13 @@
       catch (e) { msg('保存失敗: ' + ((e.data && e.data.detail) || e.message || e), false); }
     });
     $('btnPreview').addEventListener('click', async function () {
-      if (READONLY) { window.open('invoice-print.html?no=' + encodeURIComponent(curNo), '_blank'); return; }
+      if (READONLY) { window.open(joInvoicePdfUrl(curNo), '_blank'); return; }
       if (!validate()) return;
       var w = window.open('about:blank', '_blank'); // 同期で開きポップアップブロックを回避
       try {
         var r = await saveDraft();
         if (!r) { if (w) w.close(); return; }
-        var url = 'invoice-print.html?no=' + encodeURIComponent(curNo);
+        var url = joInvoicePdfUrl(curNo);
         if (w) { w.location = url; } else { location.href = url; } // ブロック時は同一タブで遷移
         msg('現在の内容を下書き保存し、PDFプレビューを開きました。', true);
       } catch (e) { if (w) w.close(); msg('プレビュー失敗: ' + ((e.data && e.data.detail) || e.message || e), false); }
@@ -228,7 +228,8 @@
         if (!confirm('確定発行します。番号採番・請求データへの反映が行われ、以後は編集できません。よろしいですか？')) return;
         var iss = await joIssueInvoice(curNo);
         alert('発行しました：' + iss.invoiceNo);
-        location.href = 'invoice-print.html?no=' + encodeURIComponent(iss.invoiceNo);
+        window.open(joInvoicePdfUrl(iss.invoiceNo), '_blank'); // 発行PDFを別タブで表示（ブロック時は一覧から開ける）
+        location.href = 'invoice-list.html';
       } catch (e) { msg('発行失敗: ' + ((e.data && e.data.detail) || e.message || e), false); }
     });
 

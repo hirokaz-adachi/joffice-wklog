@@ -103,6 +103,9 @@ const joIssueInvoice = (invoiceNo) => joWrite('issueInvoice', { invoiceNo });
 const joVoidInvoice = (invoiceNo) => joWrite('voidInvoice', { invoiceNo });
 const joDuplicateInvoice = (invoiceNo, overrides = {}) => joWrite('duplicateInvoice', { invoiceNo, overrides });
 const joDeleteInvoiceDraft = (invoiceNo) => joWrite('deleteInvoiceDraft', { invoiceNo });
+// 請求書 PDF（mPDF サーバ生成）の URL。新規タブ表示用。dl=true で添付ダウンロード。
+const joInvoicePdfUrl = (invoiceNo, dl = false) =>
+  JO_API + '?action=getInvoicePdf&invoiceNo=' + encodeURIComponent(invoiceNo) + (dl ? '&dl=1' : '');
 
 // ---- 旧 WorklogBackend 互換シム ----
 // 既存画面（master.js 等）はインクルード差し替えのみで再利用するため、
