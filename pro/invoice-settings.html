@@ -58,6 +58,25 @@
     </section>
 
     <section class="panel">
+      <p class="hint warn">メール送付は現在 <b>ダミー送信</b>です（実際にはメールは送信されず、送信記録のみ作成されます）。SMTP 接続情報が整い次第、実送信へ切り替えます。</p>
+      <label>差出人名</label>
+      <input id="mail_fromName" type="text" placeholder="例）社会保険労務士法人 人事オフィス">
+      <label>差出人メールアドレス</label>
+      <input id="mail_fromAddress" type="text" placeholder="例）invoice@example.com（SMTP 設定後に有効）">
+      <label>Reply-To（返信先・任意）</label>
+      <input id="mail_replyTo" type="text" placeholder="例）office@example.com">
+      <label>BCC（自社控え・任意）</label>
+      <input id="mail_bccSelf" type="text" placeholder="例）office@example.com">
+      <label>件名テンプレート</label>
+      <input id="mail_subjectTemplate" type="text" placeholder="請求書送付のご案内（請求番号 {{invoiceNo}}）">
+      <label>本文テンプレート</label>
+      <textarea id="mail_bodyTemplate" rows="10" placeholder="空欄なら既定テンプレートを使用します。"></textarea>
+      <label>署名</label>
+      <textarea id="mail_signature" rows="3" placeholder="社会保険労務士法人 人事オフィス&#10;TEL 03-0000-0000"></textarea>
+      <div class="hint">差込タグ：<code>{{customer}}</code> <code>{{honorific}}</code> <code>{{invoiceNo}}</code> <code>{{billingMonth}}</code> <code>{{subject}}</code> <code>{{total}}</code> <code>{{dueDate}}</code> <code>{{issuerName}}</code> <code>{{signature}}</code>。<b>空欄の項目は既定値を使用</b>します。送信時に本文はさらに編集できます。</div>
+    </section>
+
+    <section class="panel">
       <label>支払期限の既定方式</label>
       <select id="invoice_dueRuleDefault">
         <option value="net30">発行日＋30日</option>
@@ -76,12 +95,14 @@
     </section>
   </main>
 
-  <script src="backend.js?v=20260626-2"></script>
+  <script src="backend.js?v=20260701-mail"></script>
   <script>
     var $ = function (id){ return document.getElementById(id); };
     var KEYS = {
       'issuer.name':'issuer_name','issuer.regNo':'issuer_regNo','issuer.address':'issuer_address','issuer.tel':'issuer_tel','issuer.bank':'issuer_bank','issuer.sealImage':'issuer_seal',
-      'invoice.dueRuleDefault':'invoice_dueRuleDefault','invoice.taxRoundMode':'invoice_taxRoundMode'
+      'invoice.dueRuleDefault':'invoice_dueRuleDefault','invoice.taxRoundMode':'invoice_taxRoundMode',
+      'mail.fromName':'mail_fromName','mail.fromAddress':'mail_fromAddress','mail.replyTo':'mail_replyTo','mail.bccSelf':'mail_bccSelf',
+      'mail.subjectTemplate':'mail_subjectTemplate','mail.bodyTemplate':'mail_bodyTemplate','mail.signature':'mail_signature'
     };
     function msg(t, ok){ var m=$('msg'); m.textContent=t; m.className='msg '+(ok?'ok':'err'); }
     $('logout').addEventListener('click', function(){ joLogout().then(function(){location.replace('login.html');}).catch(function(){location.replace('login.html');}); });

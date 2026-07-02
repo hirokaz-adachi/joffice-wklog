@@ -16,7 +16,7 @@ SET NAMES utf8mb4;
 -- 開発・検証での再適用用(本番初回適用時は不要)
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS
-  jo_invoice_seq, jo_invoice_lines, jo_invoices, jo_billings, jo_worklogs, jo_users,
+  jo_invoice_mails, jo_invoice_seq, jo_invoice_lines, jo_invoices, jo_billings, jo_worklogs, jo_users,
   jo_staff_targets, jo_customer_staff, jo_task_phases, jo_app_settings,
   jo_task_types, jo_customers, jo_staff;
 SET FOREIGN_KEY_CHECKS = 1;
@@ -176,6 +176,10 @@ CREATE TABLE jo_invoices (                    -- 請求書ヘッダ
   verifyToken     VARCHAR(64) NULL,           -- 真正性検証(QR)用の照合鍵(128bit hex・発行時生成)
   paidDate        DATE NULL,                  -- 入金日(手動消込・NULL=未入金)。status とは独立
   paidBy          VARCHAR(50) NULL,           -- 消込者(loginId)
+  sentDate        DATE NULL,                  -- 送付日(NULL=未送付)。status とは独立(§14)
+  sentBy          VARCHAR(50) NULL,           -- 送付操作者(loginId)
+  sentCount       INT NOT NULL DEFAULT 0,     -- 送付回数(再送/再郵送含む・テスト送信は除く)
+  sentMethod      VARCHAR(10) NULL,           -- 最後の送付手段 email/post
   createdBy       VARCHAR(50) NULL,
   createdAt       DATETIME NULL,
   updatedAt       DATETIME NULL,
@@ -206,6 +210,26 @@ CREATE TABLE jo_invoice_seq (                 -- 採番カウンタ(年月リセ
   periodKey CHAR(6) NOT NULL,                 -- 'YYYYMM' (請求対象月)
   lastSeq   INT NOT NULL DEFAULT 0,
   PRIMARY KEY (periodKey)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE jo_invoice_mails (               -- 請求書 送付履歴(メール/郵送・アウトボックス・§14)
+  id        BIGINT NOT NULL AUTO_INCREMENT,
+  invoiceNo VARCHAR(30) NOT NULL,
+  method    VARCHAR(10) NOT NULL DEFAULT 'email',  -- 送付手段 email/post
+  toAddr    VARCHAR(500) NULL,                 -- To(カンマ区切りスナップショット)
+  ccAddr    VARCHAR(500) NULL,
+  subject   VARCHAR(255) NULL,
+  body      TEXT NULL,                         -- 実際に送った本文スナップショット
+  pdfName   VARCHAR(120) NULL,
+  driver    VARCHAR(20) NOT NULL DEFAULT 'dummy',  -- dummy / smtp
+  result    ENUM('sent','failed','test') NOT NULL DEFAULT 'sent',
+  isTest    TINYINT(1) NOT NULL DEFAULT 0,     -- テスト送信(送信状況を更新しない)
+  errorText TEXT NULL,
+  sentBy    VARCHAR(50) NULL,                  -- 送信操作者(loginId)
+  createdAt DATETIME NULL,
+  PRIMARY KEY (id),
+  KEY idx_mail_inv (invoiceNo),
+  CONSTRAINT fk_mail_inv FOREIGN KEY (invoiceNo) REFERENCES jo_invoices(invoiceNo) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================================

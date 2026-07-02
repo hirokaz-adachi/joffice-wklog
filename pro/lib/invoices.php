@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/mutations.php'; // jo_now / jo_exec 等
+require_once __DIR__ . '/mailer.php';    // メール送付（§14・ダミードライバ）
 
 // ---- 設定（jo_app_settings） ----
 function jo_app_settings(): array
@@ -89,10 +90,12 @@ function jo_list_invoices(array $f = []): array
     if (!empty($f['status']))       { $where[] = 'i.status = ?';       $params[] = (string) $f['status']; }
     $sql = 'SELECT i.invoiceNo, i.customerCode, c.name AS customer, i.billingMonth, i.issueDate, i.dueDate,'
          . ' i.subtotal, i.tax, i.total, i.status, i.paidDate, i.paidBy, pu.displayName AS paidByName,'
+         . ' i.sentDate, i.sentBy, i.sentCount, i.sentMethod, su.displayName AS sentByName,'
          . ' i.createdBy, u.displayName AS createdByName, i.createdAt, i.updatedAt'
          . ' FROM jo_invoices i LEFT JOIN jo_customers c ON c.code = i.customerCode'
          . ' LEFT JOIN jo_users u ON u.loginId = i.createdBy'
          . ' LEFT JOIN jo_users pu ON pu.loginId = i.paidBy'
+         . ' LEFT JOIN jo_users su ON su.loginId = i.sentBy'
          . ($where ? (' WHERE ' . implode(' AND ', $where)) : '')
          . ' ORDER BY (i.status = "draft") DESC, i.billingMonth DESC, i.invoiceNo DESC';
     $st = jo_db()->prepare($sql);
@@ -113,6 +116,11 @@ function jo_list_invoices(array $f = []): array
             'paidDate'     => $r['paidDate'],
             'paidBy'       => (string) ($r['paidBy'] ?? ''),
             'paidByName'   => (string) ($r['paidByName'] ?? ''),
+            'sentDate'     => $r['sentDate'],
+            'sentBy'       => (string) ($r['sentBy'] ?? ''),
+            'sentByName'   => (string) ($r['sentByName'] ?? ''),
+            'sentCount'    => (int) ($r['sentCount'] ?? 0),
+            'sentMethod'   => (string) ($r['sentMethod'] ?? ''),
             'createdBy'    => (string) ($r['createdBy'] ?? ''),
             'createdByName'=> (string) ($r['createdByName'] ?? ''),
             'updatedAt'    => $r['updatedAt'],
@@ -433,4 +441,280 @@ function jo_delete_invoice_draft(string $invoiceNo): void
         throw new InvalidArgumentException('cannot_delete_issued');
     }
     $db->prepare('DELETE FROM jo_invoices WHERE invoiceNo = ?')->execute([$invoiceNo]); // 明細CASCADE
+}
+
+// ---- ダッシュボード集計（請求書払い運用の実務指標・1リクエストで返却） ----
+// 発行済＝status が draft/void 以外（現行は issued のみ。将来 sent/paid が入っても集計対象）。
+// 未入金は status='issued' かつ paidDate IS NULL で判定（入金は paidDate 独立管理のため）。
+function jo_invoice_dashboard(array $opts = []): array
+{
+    $db = jo_db();
+    $today     = date('Y-m-d');
+    $thisMonth = date('Y-m');
+
+    // 対象月（既定＝前月）。'YYYY-MM'。請求漏れ・対象月KPIの基準。
+    $tm = (string) ($opts['month'] ?? '');
+    if (!preg_match('/^\d{4}-\d{2}$/', $tm)) {
+        $tm = date('Y-m', strtotime('-1 month', strtotime(date('Y-m-01'))));
+    }
+    $prevM = date('Y-m', strtotime('-1 month', strtotime($tm . '-01')));
+
+    // --- KPI: 売掛（未入金残高）全体 ---
+    $ar = $db->query("SELECT COUNT(*) c, COALESCE(SUM(total),0) s FROM jo_invoices WHERE status='issued' AND paidDate IS NULL")->fetch();
+    // --- KPI: 延滞（期限超過・未入金）全体 ---
+    $ov = $db->prepare("SELECT COUNT(*) c, COALESCE(SUM(total),0) s FROM jo_invoices WHERE status='issued' AND paidDate IS NULL AND dueDate IS NOT NULL AND dueDate < ?");
+    $ov->execute([$today]);
+    $ovr = $ov->fetch();
+    // --- KPI: 対象月の請求（発行済） ---
+    $bm = $db->prepare("SELECT COUNT(*) c, COALESCE(SUM(total),0) s FROM jo_invoices WHERE billingMonth=? AND status NOT IN ('draft','void')");
+    $bm->execute([$tm]);
+    $bmr = $bm->fetch();
+    // --- KPI: 対象月の入金（回収済） ---
+    $cm = $db->prepare("SELECT COUNT(*) c, COALESCE(SUM(total),0) s FROM jo_invoices WHERE billingMonth=? AND status NOT IN ('draft','void') AND paidDate IS NOT NULL");
+    $cm->execute([$tm]);
+    $cmr = $cm->fetch();
+    // --- KPI: 未送付（発行済・未送付＝メール/郵送のいずれも未実施）全体 ---
+    $un = $db->query("SELECT COUNT(*) c, COALESCE(SUM(total),0) s FROM jo_invoices WHERE status='issued' AND sentDate IS NULL")->fetch();
+
+    // --- ステータス内訳（全体） ---
+    $sb = $db->query("SELECT
+        SUM(status='draft') d,
+        SUM(status='issued' AND paidDate IS NULL) u,
+        SUM(status='issued' AND paidDate IS NOT NULL) p,
+        SUM(status='void') v
+      FROM jo_invoices")->fetch();
+
+    // --- 請求漏れ（請求書払いの有効顧客で対象月に請求書が無い先） ---
+    $elig = $db->query("SELECT code, name FROM jo_customers WHERE paymentMethod='invoice' AND isActive=1 ORDER BY sortOrder, code")->fetchAll();
+    $billed = [];
+    $bq = $db->prepare("SELECT DISTINCT customerCode FROM jo_invoices WHERE billingMonth=? AND status NOT IN ('draft','void')");
+    $bq->execute([$tm]);
+    foreach ($bq->fetchAll() as $r) {
+        $billed[(string) $r['customerCode']] = true;
+    }
+    // 前月の請求額（顧客別・参考表示用）
+    $prevMap = [];
+    $pq = $db->prepare("SELECT customerCode, COALESCE(SUM(total),0) s FROM jo_invoices WHERE billingMonth=? AND status NOT IN ('draft','void') GROUP BY customerCode");
+    $pq->execute([$prevM]);
+    foreach ($pq->fetchAll() as $r) {
+        $prevMap[(string) $r['customerCode']] = (int) $r['s'];
+    }
+    $missing = [];
+    foreach ($elig as $c) {
+        $code = (string) $c['code'];
+        if (!isset($billed[$code])) {
+            $missing[] = ['code' => $code, 'name' => (string) $c['name'], 'prevTotal' => (int) ($prevMap[$code] ?? 0)];
+        }
+    }
+
+    // --- 月次トレンド（直近12ヶ月・請求対象月ベース・当月まで） ---
+    $months = [];
+    for ($i = 11; $i >= 0; $i--) {
+        $months[] = date('Y-m', strtotime("-$i month", strtotime($thisMonth . '-01')));
+    }
+    $trendMap = [];
+    $tq = $db->prepare("SELECT billingMonth, COUNT(*) c, COALESCE(SUM(total),0) s FROM jo_invoices WHERE status NOT IN ('draft','void') AND billingMonth BETWEEN ? AND ? GROUP BY billingMonth");
+    $tq->execute([$months[0], $months[11]]);
+    foreach ($tq->fetchAll() as $r) {
+        $trendMap[(string) $r['billingMonth']] = ['count' => (int) $r['c'], 'total' => (int) $r['s']];
+    }
+    $trend = array_map(static function ($m) use ($trendMap) {
+        return ['month' => $m, 'count' => (int) ($trendMap[$m]['count'] ?? 0), 'total' => (int) ($trendMap[$m]['total'] ?? 0)];
+    }, $months);
+
+    return [
+        'targetMonth' => $tm,
+        'prevMonth'   => $prevM,
+        'today'       => $today,
+        'ar'        => ['count' => (int) $ar['c'],  'total' => (int) $ar['s']],
+        'overdue'   => ['count' => (int) $ovr['c'], 'total' => (int) $ovr['s']],
+        'billed'    => ['count' => (int) $bmr['c'], 'total' => (int) $bmr['s']],
+        'collected' => ['count' => (int) $cmr['c'], 'total' => (int) $cmr['s']],
+        'unsent'    => ['count' => (int) $un['c'],  'total' => (int) $un['s']],
+        'status'    => [
+            'draft'        => (int) $sb['d'],
+            'issuedUnpaid' => (int) $sb['u'],
+            'paid'         => (int) $sb['p'],
+            'void'         => (int) $sb['v'],
+        ],
+        'missing' => ['eligible' => count($elig), 'count' => count($missing), 'list' => $missing],
+        'trend'   => $trend,
+    ];
+}
+
+// =====================================================================
+// メール送付（§14）。実送信はダミードライバ（lib/mailer.php）。単票送信・admin。
+// 送信状態は sentDate/sentBy/sentCount（status とは独立）。履歴は jo_invoice_mails。
+// =====================================================================
+
+// 送信モーダル用の下書き（宛先＝顧客マスタ email/ccEmail、件名/本文＝テンプレ展開）。
+function jo_get_invoice_mail_draft(string $invoiceNo): array
+{
+    $inv = jo_get_invoice($invoiceNo);
+    if ($inv === null) {
+        throw new InvalidArgumentException('invoice_not_found');
+    }
+    $h = $inv['header'];
+    $settings = jo_app_settings();
+    $mset = jo_mail_settings($settings);
+
+    $to = '';
+    $cc = '';
+    $cst = jo_db()->prepare('SELECT email, ccEmail FROM jo_customers WHERE code = ?');
+    $cst->execute([(string) $h['customerCode']]);
+    if ($c = $cst->fetch()) {
+        $to = (string) ($c['email'] ?? '');
+        $cc = (string) ($c['ccEmail'] ?? '');
+    }
+    $vars = jo_mail_build_vars($h, $settings);
+    return [
+        'invoiceNo'    => $invoiceNo,
+        'customerCode' => (string) $h['customerCode'],
+        'to'           => $to,
+        'cc'           => $cc,
+        'subject'      => jo_mail_render_template($mset['mail.subjectTemplate'], $vars),
+        'body'         => jo_mail_render_template($mset['mail.bodyTemplate'], $vars),
+        'pdfName'      => 'invoice-' . preg_replace('/[^A-Za-z0-9_\-]/', '_', $invoiceNo) . '.pdf',
+        'driver'       => $mset['mail.driver'],
+        'status'       => (string) $h['status'],
+        'canSend'      => ($h['status'] === 'issued'),
+        'sentDate'     => $h['sentDate'] ?? null,
+        'sentCount'    => (int) ($h['sentCount'] ?? 0),
+    ];
+}
+
+// 送信実行。発行済のみ。PDF はダミーでも実生成しパイプライン検証。履歴を必ず記録。
+function jo_send_invoice_mail(string $invoiceNo, array $in, array $user): array
+{
+    $inv = jo_get_invoice($invoiceNo);
+    if ($inv === null) {
+        throw new InvalidArgumentException('invoice_not_found');
+    }
+    $h = $inv['header'];
+    if ($h['status'] !== 'issued') {
+        throw new InvalidArgumentException('not_sendable'); // 下書き/取消は送信不可
+    }
+    $isTest  = !empty($in['isTest']);
+    $subject = trim((string) ($in['subject'] ?? ''));
+    $body    = (string) ($in['body'] ?? '');
+    $toList  = jo_mail_parse_addrs((string) ($in['to'] ?? ''));
+    $ccList  = jo_mail_parse_addrs((string) ($in['cc'] ?? ''));
+    if (!$toList) {
+        throw new InvalidArgumentException('to_required');
+    }
+    foreach (array_merge($toList, $ccList) as $a) {
+        if (!filter_var($a, FILTER_VALIDATE_EMAIL)) {
+            throw new InvalidArgumentException('invalid_email:' . $a);
+        }
+    }
+    if ($subject === '') {
+        throw new InvalidArgumentException('subject_required');
+    }
+
+    $settings = jo_app_settings();
+    $mset = jo_mail_settings($settings);
+
+    // PDF 生成（ダミーでも実生成して整合性検証・将来の実送信を前倒しで担保）。
+    require_once __DIR__ . '/invoice_pdf.php';
+    $pdf = jo_render_invoice_pdf($h, $inv['lines'], $settings, ['dest' => 'S']);
+    $pdfName = 'invoice-' . preg_replace('/[^A-Za-z0-9_\-]/', '_', $invoiceNo) . '.pdf';
+
+    $res = jo_mail_send([
+        'to'          => $toList,
+        'cc'          => $ccList,
+        'subject'     => $subject,
+        'body'        => $body,
+        'fromName'    => $mset['mail.fromName'],
+        'fromAddress' => $mset['mail.fromAddress'],
+        'replyTo'     => $mset['mail.replyTo'],
+        'pdf'         => $pdf,
+        'pdfName'     => $pdfName,
+    ], $mset['mail.driver']);
+
+    $now = jo_now();
+    $result = $isTest ? 'test' : ($res['ok'] ? 'sent' : 'failed');
+    // 履歴は成否によらず記録（監査・失敗の可視化）。method=email。
+    jo_db()->prepare('INSERT INTO jo_invoice_mails (invoiceNo, toAddr, ccAddr, subject, body, pdfName, driver, result, isTest, errorText, sentBy, createdAt, method) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        ->execute([
+            $invoiceNo, implode(', ', $toList), implode(', ', $ccList), $subject, $body, $pdfName,
+            $res['driver'], $result, $isTest ? 1 : 0, ($res['error'] !== '' ? $res['error'] : null),
+            (string) ($user['loginId'] ?? ''), $now, 'email',
+        ]);
+    // 本送信かつ成功のときのみ送付状態を更新（テストは更新しない）。sentMethod=email。
+    if ($res['ok'] && !$isTest) {
+        jo_db()->prepare('UPDATE jo_invoices SET sentDate = ?, sentBy = ?, sentMethod = ?, sentCount = sentCount + 1, updatedAt = ? WHERE invoiceNo = ?')
+            ->execute([substr($now, 0, 10), (string) ($user['loginId'] ?? ''), 'email', $now, $invoiceNo]);
+    }
+    if (!$res['ok']) {
+        // 失敗（現行ドライバでは発生しない。SMTP 実装後の保険）。履歴は残しつつ 400 で理由返却。
+        throw new InvalidArgumentException('send_failed:' . ($res['error'] !== '' ? $res['error'] : 'unknown'));
+    }
+    return [
+        'invoiceNo' => $invoiceNo,
+        'result'    => $result,
+        'driver'    => $res['driver'],
+        'messageId' => $res['messageId'],
+        'isTest'    => $isTest ? 1 : 0,
+        'pdfBytes'  => strlen($pdf),
+    ];
+}
+
+// 郵送済みにする（手動記録）。PDFを印刷・郵送したケースを送付済として記録。
+// メール送信と同じく sentDate/sentBy/sentCount を更新し、送付履歴に method=post で1行残す。
+function jo_mark_invoice_posted(string $invoiceNo, array $user, string $postDate = ''): array
+{
+    $db = jo_db();
+    $st = $db->prepare('SELECT status FROM jo_invoices WHERE invoiceNo = ?');
+    $st->execute([$invoiceNo]);
+    $row = $st->fetch();
+    if (!$row) {
+        throw new InvalidArgumentException('invoice_not_found');
+    }
+    if ($row['status'] !== 'issued') {
+        throw new InvalidArgumentException('not_sendable'); // 下書き/取消は送付記録不可
+    }
+    $pd = preg_match('/^\d{4}-\d{2}-\d{2}$/', $postDate) ? $postDate : substr(jo_now(), 0, 10);
+    $now = jo_now();
+    $db->prepare('INSERT INTO jo_invoice_mails (invoiceNo, toAddr, ccAddr, subject, body, pdfName, driver, result, isTest, errorText, sentBy, createdAt, method) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        ->execute([$invoiceNo, '', '', '郵送', '', '', 'post', 'sent', 0, null, (string) ($user['loginId'] ?? ''), $now, 'post']);
+    $db->prepare('UPDATE jo_invoices SET sentDate = ?, sentBy = ?, sentMethod = ?, sentCount = sentCount + 1, updatedAt = ? WHERE invoiceNo = ?')
+        ->execute([$pd, (string) ($user['loginId'] ?? ''), 'post', $now, $invoiceNo]);
+    return ['invoiceNo' => $invoiceNo, 'sentDate' => $pd, 'sentMethod' => 'post'];
+}
+
+// 送付取消（送付状態のクリア）。誤って送付済にした場合に未送付へ戻す。履歴は監査のため残す。
+function jo_unmark_invoice_sent(string $invoiceNo): array
+{
+    $db = jo_db();
+    $st = $db->prepare('SELECT status FROM jo_invoices WHERE invoiceNo = ?');
+    $st->execute([$invoiceNo]);
+    if (!$st->fetch()) {
+        throw new InvalidArgumentException('invoice_not_found');
+    }
+    $db->prepare('UPDATE jo_invoices SET sentDate = NULL, sentBy = NULL, sentMethod = NULL, sentCount = 0, updatedAt = ? WHERE invoiceNo = ?')
+        ->execute([jo_now(), $invoiceNo]);
+    return ['invoiceNo' => $invoiceNo];
+}
+
+// 送付履歴（新しい順・メール/郵送を一元表示）。
+function jo_list_invoice_mails(string $invoiceNo): array
+{
+    $st = jo_db()->prepare('SELECT m.*, u.displayName AS sentByName FROM jo_invoice_mails m LEFT JOIN jo_users u ON u.loginId = m.sentBy WHERE m.invoiceNo = ? ORDER BY m.id DESC');
+    $st->execute([$invoiceNo]);
+    return array_map(static function ($r) {
+        return [
+            'id'         => (int) $r['id'],
+            'method'     => (string) ($r['method'] ?? 'email'),
+            'toAddr'     => (string) ($r['toAddr'] ?? ''),
+            'ccAddr'     => (string) ($r['ccAddr'] ?? ''),
+            'subject'    => (string) ($r['subject'] ?? ''),
+            'driver'     => (string) ($r['driver'] ?? ''),
+            'result'     => (string) ($r['result'] ?? ''),
+            'isTest'     => (int) $r['isTest'],
+            'errorText'  => (string) ($r['errorText'] ?? ''),
+            'sentBy'     => (string) ($r['sentBy'] ?? ''),
+            'sentByName' => (string) ($r['sentByName'] ?? ''),
+            'createdAt'  => $r['createdAt'],
+        ];
+    }, $st->fetchAll());
 }

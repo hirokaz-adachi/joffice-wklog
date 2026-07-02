@@ -65,6 +65,53 @@
     .view-title { margin: 0; font-size: 20px; }
     .view-eyebrow { margin: 0; color: var(--muted); font-size: 12px; font-weight: 700; }
     [data-view] { display: none; }
+
+    /* ===== 請求ダッシュボード（Invoice ビュー冒頭） ===== */
+    :root { --danger: #b91c1c; --danger-soft: #fee2e2; --success: #047857; --success-soft: #d1fae5; }
+    .inv-dash { display: grid; gap: 12px; }
+    .dash-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .dash-toolbar label { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+    .dash-toolbar input[type="month"] { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; color: var(--ink); }
+    .dash-btn { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
+    .dash-btn:hover { border-color: var(--accent); color: var(--accent-dark); }
+    .dash-note { font-size: 12px; color: var(--muted); }
+    .dash-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+    .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+    .kpi .k-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .kpi .k-value { font-size: 22px; font-weight: 800; letter-spacing: .01em; }
+    .kpi .k-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .kpi.k-danger { background: var(--danger-soft); border-color: #f3b4b4; }
+    .kpi.k-danger .k-label, .kpi.k-danger .k-value, .kpi.k-danger .k-sub { color: var(--danger); }
+    .kpi.k-warn { background: var(--invoice-soft); border-color: #fcd9a5; }
+    .kpi.k-warn .k-label, .kpi.k-warn .k-value, .kpi.k-warn .k-sub { color: var(--invoice); }
+    .kpi.k-success .k-value { color: var(--success); }
+    .dash-mid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .dash-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); }
+    .dash-card h3 { margin: 0 0 10px; font-size: 14px; }
+    .miss-head { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+    .miss-strong { color: var(--invoice); font-weight: 800; }
+    .miss-list { display: flex; flex-direction: column; gap: 6px; max-height: 168px; overflow: auto; }
+    .miss-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--invoice-soft); color: var(--invoice); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+    .miss-row span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .miss-row span:last-child { white-space: nowrap; }
+    .miss-ok { font-size: 13px; color: var(--success); }
+    .stat-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--muted); padding: 6px 0; border-top: 1px dashed var(--line); }
+    .stat-row:first-of-type { border-top: 0; }
+    .stat-row b { color: var(--ink); font-weight: 800; }
+    .stat-row.is-paid b { color: var(--success); }
+    .trend-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .trend-head h3 { margin: 0; }
+    .trend-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .trend-toggle button { border: 0; background: #fff; padding: 5px 12px; font-size: 12px; cursor: pointer; color: var(--muted); }
+    .trend-toggle button.on { background: var(--accent-soft); color: var(--accent-dark); font-weight: 700; }
+    .trend-bars { display: flex; align-items: flex-end; gap: 6px; height: 130px; }
+    .trend-bars .tb { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; }
+    .trend-bars .tb .bar { width: 100%; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 2px; }
+    .trend-bars .tb .lab { font-size: 10px; color: var(--muted); }
+    .trend-bars .tb.now .bar { background: var(--invoice); }
+    .dash-loading, .dash-error { font-size: 13px; color: var(--muted); padding: 10px 0; }
+    .dash-error { color: var(--danger); }
+    @media (max-width: 640px) { .dash-mid { grid-template-columns: 1fr; } }
   </style>
   <link rel="stylesheet" href="header.css?v=20260626-1">
 </head>
@@ -166,6 +213,17 @@
         <a class="back-btn" href="#hub">← カテゴリ選択</a>
         <div><p class="view-eyebrow">J-Office Invoice</p><h2 class="view-title">請求書発行</h2></div>
       </div>
+      <section class="menu-group" id="inv-dash-group">
+        <h2 class="group-title">請求ダッシュボード <span class="group-note">未入金・延滞・請求漏れを一目で</span></h2>
+        <div class="inv-dash" id="invDash">
+          <div class="dash-toolbar">
+            <label>対象月 <input type="month" id="dashMonth"></label>
+            <button type="button" class="dash-btn" id="dashReload">更新</button>
+            <span class="dash-note" id="dashAsOf"></span>
+          </div>
+          <div id="dashBody"><div class="dash-loading">読み込み中…</div></div>
+        </div>
+      </section>
       <section class="menu-group">
         <h2 class="group-title">請求書 <span class="group-note">請求書払い分の発行・連携</span></h2>
         <div class="cards">
@@ -203,7 +261,7 @@
     </section>
   </main>
 
-  <script src="backend.js?v=20260626-2"></script>
+  <script src="backend.js?v=20260701-1"></script>
   <script>
     document.getElementById('logout').addEventListener('click', function () {
       joLogout().then(function () { location.replace('login.html'); }).catch(function () { location.replace('login.html'); });
@@ -225,9 +283,88 @@
       document.querySelectorAll('[data-view]').forEach(function (v) {
         v.style.display = (v.getAttribute('data-view') === target) ? 'block' : 'none';
       });
+      if (target === 'invoice') initDashOnce();
       window.scrollTo(0, 0);
     }
     window.addEventListener('hashchange', showView);
+
+    // ===== 請求ダッシュボード（Invoice ビューを開いた初回に遅延ロード） =====
+    var dashLoaded = false, dashData = null, dashTrendMode = 'total';
+    function joYen(n) { return '¥' + (Number(n) || 0).toLocaleString('ja-JP'); }
+    function joEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+    function joYmLabel(ym) { var p = String(ym).split('-'); return p[1] ? (Number(p[1]) + '月') : ym; }
+    function kpiCard(label, value, sub, cls) {
+      return '<div class="kpi ' + cls + '"><div class="k-label">' + label + '</div><div class="k-value">' + value + '</div><div class="k-sub">' + sub + '</div></div>';
+    }
+    function statRow(label, n, cls) { return '<div class="stat-row ' + cls + '"><span>' + label + '</span><b>' + n + '</b></div>'; }
+    function renderTrend(trend) {
+      var vals = trend.map(function (t) { return dashTrendMode === 'count' ? t.count : t.total; });
+      var max = Math.max.apply(null, vals.concat([1]));
+      var last = trend.length ? trend[trend.length - 1].month : '';
+      var bars = trend.map(function (t) {
+        var v = dashTrendMode === 'count' ? t.count : t.total;
+        var h = Math.max(2, Math.round(v / max * 100));
+        var now = t.month === last ? ' now' : '';
+        var tip = t.month + '：' + (dashTrendMode === 'count' ? (t.count + '件') : joYen(t.total));
+        return '<div class="tb' + now + '" title="' + tip + '"><div class="bar" style="height:' + h + '%"></div><span class="lab">' + joYmLabel(t.month) + '</span></div>';
+      }).join('');
+      var unit = dashTrendMode === 'count' ? '件数' : '金額';
+      return '<div class="dash-card dash-trend"><div class="trend-head"><h3>月次 請求' + unit + '（直近12ヶ月・請求対象月ベース）</h3>' +
+        '<span class="trend-toggle"><button type="button" data-mode="total" class="' + (dashTrendMode === 'total' ? 'on' : '') + '">金額</button>' +
+        '<button type="button" data-mode="count" class="' + (dashTrendMode === 'count' ? 'on' : '') + '">件数</button></span></div>' +
+        '<div class="trend-bars">' + bars + '</div></div>';
+    }
+    function renderDash() {
+      var d = dashData; if (!d) return;
+      var kpis = '<div class="dash-kpis">' +
+        kpiCard('未入金残高', joYen(d.ar.total), '発行済・未回収 ' + d.ar.count + '件', '') +
+        kpiCard('延滞（期限超過）', joYen(d.overdue.total), '要督促 ' + d.overdue.count + '件', d.overdue.count > 0 ? 'k-danger' : '') +
+        kpiCard('未送付', (d.unsent ? d.unsent.count : 0) + '件', '発行済・未送付 ' + joYen(d.unsent ? d.unsent.total : 0), (d.unsent && d.unsent.count > 0) ? 'k-warn' : '') +
+        kpiCard('対象月の請求', joYen(d.billed.total), '発行 ' + d.billed.count + '件', '') +
+        kpiCard('対象月の入金', joYen(d.collected.total), '回収 ' + d.collected.count + '件', 'k-success') +
+        '</div>';
+      var miss = d.missing, missInner;
+      if (miss.count === 0) {
+        missInner = '<div class="miss-ok">対象月の請求漏れアラートはありません（請求書払い ' + miss.eligible + '社）</div>';
+      } else {
+        var rows = miss.list.map(function (m) {
+          var prev = m.prevTotal > 0 ? ('前月 ' + joYen(m.prevTotal)) : '前月実績なし';
+          return '<div class="miss-row"><span>' + joEsc(m.code) + ' ・ ' + joEsc(m.name) + '</span><span>' + prev + '</span></div>';
+        }).join('');
+        missInner = '<div class="miss-head">請求書払い ' + miss.eligible + '社中 <span class="miss-strong">' + miss.count + '社</span> が対象月 未請求</div><div class="miss-list">' + rows + '</div>';
+      }
+      var st = d.status;
+      var mid = '<div class="dash-mid">' +
+        '<div class="dash-card"><h3>請求漏れアラート</h3>' + missInner + '</div>' +
+        '<div class="dash-card"><h3>ステータス内訳</h3>' +
+          statRow('下書き', st.draft, '') + statRow('発行済（未入金）', st.issuedUnpaid, '') +
+          statRow('入金済', st.paid, 'is-paid') + statRow('取消', st.void, '') + '</div>' +
+        '</div>';
+      document.getElementById('dashBody').innerHTML = kpis + mid + renderTrend(d.trend);
+      document.querySelectorAll('.trend-toggle button').forEach(function (b) {
+        b.addEventListener('click', function () { dashTrendMode = b.getAttribute('data-mode'); renderDash(); });
+      });
+    }
+    function loadDash() {
+      var body = document.getElementById('dashBody');
+      body.innerHTML = '<div class="dash-loading">読み込み中…</div>';
+      joInvoiceDashboard(document.getElementById('dashMonth').value || '').then(function (d) {
+        dashData = d;
+        var mi = document.getElementById('dashMonth');
+        if (!mi.value && d.targetMonth) mi.value = d.targetMonth;
+        document.getElementById('dashAsOf').textContent = '本日 ' + d.today + ' 時点';
+        renderDash();
+      }).catch(function (e) {
+        body.innerHTML = '<div class="dash-error">ダッシュボードの取得に失敗しました（' + joEsc(e && e.message || 'error') + '）</div>';
+      });
+    }
+    function initDashOnce() {
+      if (dashLoaded || ROLE !== 'admin') return;
+      dashLoaded = true;
+      document.getElementById('dashReload').addEventListener('click', loadDash);
+      document.getElementById('dashMonth').addEventListener('change', loadDash);
+      loadDash();
+    }
 
     // 認証ガード＋役割別の表示制御
     joMe().then(function (u) {
@@ -237,9 +374,9 @@
       document.querySelectorAll('.card[data-roles], .cat-card[data-roles]').forEach(function (c) {
         if (!canSee(c)) c.style.display = 'none';
       });
-      // 機能カードが0のサブグループ見出しを隠す
+      // 機能カードが0のサブグループ見出しを隠す（カードを持つグループのみ対象。ダッシュボード等の非カードグループは除外）
       document.querySelectorAll('section[data-view] .menu-group').forEach(function (g) {
-        if (!g.querySelectorAll('.card:not([style*="display: none"])').length) g.style.display = 'none';
+        if (g.querySelector('.card') && !g.querySelectorAll('.card:not([style*="display: none"])').length) g.style.display = 'none';
       });
       showView();
     }).catch(function () { location.replace('login.html'); });

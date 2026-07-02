@@ -14,13 +14,14 @@
     .btn { padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--fg); font-size:13px; cursor:pointer; text-decoration:none; }
     .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
     .btn.danger { color:var(--danger); border-color:#fecaca; }
-    main { max-width:1080px; margin:22px auto; padding:0 20px; }
+    main { max-width:min(1400px, 96vw); margin:22px auto; padding:0 20px; }
     .panel { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:16px; }
+    .sub-date { display:block; color:var(--muted); font-size:11px; margin-top:2px; white-space:nowrap; }
     .filters { display:flex; gap:12px; align-items:end; flex-wrap:wrap; }
     label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
     input, select { padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:#fff; }
     table { width:100%; border-collapse:collapse; font-size:14px; }
-    th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+    th, td { text-align:left; padding:8px 9px; border-bottom:1px solid var(--line); white-space:nowrap; }
     th { color:var(--muted); font-weight:600; font-size:12px; }
     td.num { text-align:right; font-variant-numeric:tabular-nums; }
     .tag { font-size:11px; border-radius:999px; padding:1px 8px; background:#e5e7eb; color:#374151; }
@@ -39,6 +40,26 @@
     .msg { margin-top:12px; font-size:13px; white-space:pre-wrap; padding:9px 12px; border-radius:8px; display:none; }
     .msg.err { background:#fef2f2; color:var(--danger); display:block; } .msg.ok { background:#f0fdf4; color:#15803d; display:block; }
     .spacer { flex:1; }
+    .tag.sent { background:#dbeafe; color:#1e40af; } .tag.unsent { background:#f3f4f6; color:#6b7280; }
+    /* メール送信・送信履歴モーダル */
+    .modal-back { position:fixed; inset:0; background:rgba(0,0,0,.4); display:flex; align-items:flex-start; justify-content:center; z-index:50; padding:40px 16px; overflow:auto; }
+    .modal { background:#fff; border-radius:12px; width:min(640px,100%); box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    .modal-head { display:flex; justify-content:space-between; align-items:center; padding:14px 18px; border-bottom:1px solid var(--line); }
+    .modal-head b { font-size:15px; }
+    .modal-x { border:0; background:none; font-size:22px; line-height:1; cursor:pointer; color:var(--muted); }
+    .modal-body { padding:16px 18px; }
+    .modal-body label { display:block; font-size:12px; color:var(--muted); margin:12px 0 4px; }
+    .modal-body input, .modal-body textarea { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:inherit; }
+    .modal-foot { display:flex; justify-content:flex-end; gap:10px; padding:14px 18px; border-top:1px solid var(--line); }
+    .dummy-banner { background:#fef3c7; color:#92400e; font-size:12px; padding:9px 18px; border-bottom:1px solid #fde68a; }
+    .mail-meta { font-size:13px; color:var(--fg); }
+    .mail-attach { margin-top:10px; font-size:12px; color:var(--muted); }
+    .attach-chip { display:inline-block; background:#eef2ff; color:#3730a3; border-radius:6px; padding:2px 8px; }
+    .mail-test { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); margin-top:14px; }
+    .mail-test input { width:auto; }
+    table.hist { width:100%; border-collapse:collapse; font-size:13px; }
+    table.hist th, table.hist td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+    table.hist th { color:var(--muted); font-weight:600; font-size:12px; }
   </style>
   <link rel="stylesheet" href="header.css?v=20260626-1">
 </head>
@@ -67,6 +88,10 @@
         <div><label>入金</label><select id="f_pay">
           <option value="">すべて</option><option value="unpaid">未入金</option><option value="overdue">期限超過</option><option value="paid">入金済</option>
         </select></div>
+        <div><label>送付</label><select id="f_send">
+          <option value="">すべて</option><option value="unsent">未送付</option><option value="sent">送付済</option>
+        </select></div>
+        <div style="align-self:center"><label style="display:flex;align-items:center;gap:6px;margin:0;cursor:pointer;font-size:13px;color:var(--fg)"><input type="checkbox" id="f_showVoid" style="margin:0"> 取消を表示</label></div>
         <button id="btnClear" class="btn" type="button">クリア</button>
         <div class="spacer"></div>
         <a class="btn primary" href="invoice-edit.html">＋ 新規作成</a>
@@ -76,13 +101,47 @@
 
     <section class="panel">
       <table>
-        <thead><tr><th>請求番号</th><th>顧客</th><th>請求月</th><th>発行日</th><th>支払期限</th><th class="num">税込</th><th>状態</th><th>入金状況</th><th>発行者</th><th class="ops">操作</th></tr></thead>
+        <thead><tr><th>請求番号</th><th>顧客</th><th>請求月</th><th>発行日</th><th>支払期限</th><th class="num">税込</th><th>状態</th><th>入金状況</th><th>送付状況</th><th class="ops">操作</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </section>
   </main>
 
-  <script src="backend.js?v=20260701-pay"></script>
+  <!-- メール送信モーダル -->
+  <div id="mailModal" class="modal-back" style="display:none">
+    <div class="modal">
+      <div class="modal-head"><b>メール送信</b><button class="modal-x" id="mailClose" type="button" aria-label="閉じる">×</button></div>
+      <div class="dummy-banner" id="mailDummyBanner">※現在はダミー送信です。実際にはメールは送信されません（送信記録のみ作成されます）。</div>
+      <div class="modal-body">
+        <div class="mail-meta" id="mailMeta"></div>
+        <label>宛先 To（カンマ区切りで複数可）</label>
+        <input id="mailTo" type="text" autocomplete="off">
+        <label>Cc（任意）</label>
+        <input id="mailCc" type="text" autocomplete="off">
+        <label>件名</label>
+        <input id="mailSubject" type="text">
+        <label>本文</label>
+        <textarea id="mailBody" rows="10"></textarea>
+        <div class="mail-attach" id="mailAttach"></div>
+        <label class="mail-test"><input type="checkbox" id="mailTest"> テスト送信（送信状況を更新しません。履歴には「テスト」として残ります）</label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" id="mailCancel" type="button">キャンセル</button>
+        <button class="btn primary" id="mailSend" type="button">送信</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 送信履歴モーダル -->
+  <div id="histModal" class="modal-back" style="display:none">
+    <div class="modal">
+      <div class="modal-head"><b>送信履歴</b><button class="modal-x" id="histClose" type="button" aria-label="閉じる">×</button></div>
+      <div class="modal-body"><div id="histBody"></div></div>
+      <div class="modal-foot"><button class="btn" id="histCancel" type="button">閉じる</button></div>
+    </div>
+  </div>
+
+  <script src="backend.js?v=20260701-post"></script>
   <script>
     var $ = function (id) { return document.getElementById(id); };
     var rows = [], customers = [];
@@ -93,8 +152,8 @@
 
     $('logout').addEventListener('click', function () { joLogout().then(function(){ location.replace('login.html'); }).catch(function(){ location.replace('login.html'); }); });
     // 全フィルタをクライアント側で即時絞り込み（絞込ボタン廃止・挙動統一）
-    ['f_month', 'f_customer', 'f_status', 'f_pay'].forEach(function (id) { $(id).addEventListener('change', render); });
-    $('btnClear').addEventListener('click', function () { $('f_month').value = ''; $('f_customer').value = ''; $('f_status').value = ''; $('f_pay').value = ''; render(); });
+    ['f_month', 'f_customer', 'f_status', 'f_pay', 'f_send', 'f_showVoid'].forEach(function (id) { $(id).addEventListener('change', render); });
+    $('btnClear').addEventListener('click', function () { $('f_month').value = ''; $('f_customer').value = ''; $('f_status').value = ''; $('f_pay').value = ''; $('f_send').value = ''; $('f_showVoid').checked = false; render(); });
     // 「⋯」メニュー：外側クリックで閉じる
     document.addEventListener('click', function (ev) {
       document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(ev.target)) d.removeAttribute('open'); });
@@ -109,16 +168,32 @@
       var d = new Date();
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
+    // 前月（当月−1）の 'YYYY-MM'。初期表示の請求月フィルタ既定（ダッシュボードと同じ）。
+    function prevMonthStr() {
+      var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    }
     // 入金状況（発行済みのみ派生表示・タグクリックで消込/取消）: paid/overdue/unpaid、下書き/取消は na
     function payInfo(r) {
       if (r.status !== 'issued') return { key: 'na', html: '<span style="color:var(--muted)">—</span>' };
       if (r.paidDate) {
         var by = r.paidByName || r.paidBy || '';
         // 入金済タグは表示専用（取消は誤操作防止のため⋯メニューから）
-        return { key: 'paid', html: '<span class="tag paid" title="入金確認者: ' + esc(by) + '">入金済</span> <span style="color:var(--muted);font-size:12px">' + esc(String(r.paidDate).slice(0, 10)) + '</span>' };
+        return { key: 'paid', html: '<span class="tag paid" title="入金確認者: ' + esc(by) + '">入金済</span><span class="sub-date">' + esc(String(r.paidDate).slice(0, 10)) + '</span>' };
       }
       if (r.dueDate && String(r.dueDate).slice(0, 10) < todayStr()) return { key: 'overdue', html: '<span class="tag overdue clickable" data-paid="' + esc(r.invoiceNo) + '" title="クリックで入金済にする">期限超過</span>' };
       return { key: 'unpaid', html: '<span class="tag unpaid clickable" data-paid="' + esc(r.invoiceNo) + '" title="クリックで入金済にする">未入金</span>' };
+    }
+    // 送付状況（発行済みのみ派生表示・未送付タグクリックでメール送信モーダル）: sent/unsent、下書き/取消は na
+    function methodLabel(m) { return m === 'post' ? '郵送' : 'メール'; }
+    function sendInfo(r) {
+      if (r.status !== 'issued') return { key: 'na', html: '<span style="color:var(--muted)">—</span>' };
+      if (r.sentDate) {
+        var by = r.sentByName || r.sentBy || '';
+        var cnt = r.sentCount > 1 ? '（' + r.sentCount + '回）' : '';
+        return { key: 'sent', html: '<span class="tag sent" title="送付者: ' + esc(by) + '">送付済（' + methodLabel(r.sentMethod) + '）</span><span class="sub-date">' + esc(String(r.sentDate).slice(0, 10)) + cnt + '</span>' };
+      }
+      return { key: 'unsent', html: '<span class="tag unsent clickable" data-mail="' + esc(r.invoiceNo) + '" title="クリックでメール送信">未送付</span>' };
     }
     // 「⋯」オーバーフローメニュー（低頻度・破壊的操作を格納）
     function menu(items, no) {
@@ -129,12 +204,15 @@
     }
 
     function render() {
-      var mf = $('f_month').value, cf = $('f_customer').value, sf = $('f_status').value, pf = $('f_pay').value;
+      var mf = $('f_month').value, cf = $('f_customer').value, sf = $('f_status').value, pf = $('f_pay').value, sdf = $('f_send').value, showVoid = $('f_showVoid').checked;
       var list = rows.filter(function (r) {
+        // 取消はデフォルト非表示。「取消を表示」ON、または状態で明示的に「取消」を選んだ時のみ表示。
+        if (r.status === 'void' && !showVoid && sf !== 'void') return false;
         if (mf && r.billingMonth !== mf) return false;
         if (cf && r.customerCode !== cf) return false;
         if (sf && r.status !== sf) return false;
         if (pf && payInfo(r).key !== pf) return false;
+        if (sdf && sendInfo(r).key !== sdf) return false;
         return true;
       });
       $('tbody').innerHTML = list.map(function (r) {
@@ -147,8 +225,9 @@
           ops += menu([{ t: '削除', d: 'data-del', danger: true }], r.invoiceNo);
         } else if (r.status === 'issued') {
           ops += view;
-          ops += '<a class="btn" href="' + joInvoicePdfUrl(r.invoiceNo) + '" target="_blank">PDF</a>';
-          var items = [{ t: '複製', d: 'data-dup' }];
+          ops += '<button class="btn" data-mail="' + esc(r.invoiceNo) + '">' + (r.sentDate ? '再送' : 'メール') + '</button>';
+          var items = [{ t: 'PDF', d: 'data-pdf' }, { t: '複製', d: 'data-dup' }, { t: '郵送済みにする', d: 'data-posted' }, { t: '送付履歴', d: 'data-history' }];
+          if (r.sentDate) items.push({ t: '送付取消', d: 'data-unsent' });
           if (r.paidDate) items.push({ t: '入金取消', d: 'data-unpaid' }); // 入金済は先に入金取消（void不可）
           else items.push({ t: '取消', d: 'data-void', danger: true });
           ops += menu(items, r.invoiceNo);
@@ -165,7 +244,7 @@
           + '<td class="num">' + yen(r.total) + '</td>'
           + '<td>' + statusTag(r.status) + '</td>'
           + '<td>' + payInfo(r).html + '</td>'
-          + '<td>' + (r.isDraft ? '<span style="color:var(--muted)">—</span>' : esc(r.createdByName || r.createdBy || '—')) + '</td>'
+          + '<td>' + sendInfo(r).html + '</td>'
           + '<td class="ops">' + ops + '</td>'
           + '</tr>';
       }).join('') || '<tr><td colspan="10" style="color:var(--muted)">該当する請求書がありません。</td></tr>';
@@ -182,12 +261,23 @@
       var t = ev.target;
       var issue = t.getAttribute('data-issue'), del = t.getAttribute('data-del'), vd = t.getAttribute('data-void'), dup = t.getAttribute('data-dup');
       var paid = t.getAttribute('data-paid'), unpaid = t.getAttribute('data-unpaid');
+      var posted = t.getAttribute('data-posted'), unsent = t.getAttribute('data-unsent');
+      var mail = t.getAttribute('data-mail'), hist = t.getAttribute('data-history'), pdf = t.getAttribute('data-pdf');
+      if (mail || hist || pdf) {
+        document.querySelectorAll('details.menu[open]').forEach(function (d) { d.removeAttribute('open'); });
+        if (pdf) window.open(joInvoicePdfUrl(pdf), '_blank');
+        else if (mail) openMail(mail);
+        else openHistory(hist);
+        return;
+      }
       try {
         if (issue) { if (!confirm('この下書きを確定発行します。番号採番・請求データへの反映が行われます。よろしいですか？')) return; var r = await joIssueInvoice(issue); msg('発行しました：' + r.invoiceNo, true); await load(); }
         else if (del) { if (!confirm('この下書きを削除しますか？')) return; await joDeleteInvoiceDraft(del); msg('削除しました。', true); await load(); }
         else if (vd) { if (!confirm('発行済み請求書を取消します。請求データへの反映も取り消されます（請求書は取消として保持）。よろしいですか？')) return; await joVoidInvoice(vd); msg('取消しました。', true); await load(); }
         else if (paid) { var pd = prompt('入金日を入力してください（YYYY-MM-DD）。', todayStr()); if (pd === null) return; await joMarkInvoicePaid(paid, pd.trim()); msg('入金済にしました：' + paid, true); await load(); }
         else if (unpaid) { if (!confirm('入金記録を取り消して未入金に戻しますか？')) return; await joUnmarkInvoicePaid(unpaid); msg('入金を取り消しました：' + unpaid, true); await load(); }
+        else if (posted) { var qd = prompt('郵送日を入力してください（YYYY-MM-DD）。', todayStr()); if (qd === null) return; await joMarkInvoicePosted(posted, qd.trim()); msg('郵送済みにしました：' + posted, true); await load(); }
+        else if (unsent) { if (!confirm('送付記録を取り消して未送付に戻しますか？（送付履歴は残ります）')) return; await joUnmarkInvoiceSent(unsent); msg('送付を取り消しました：' + unsent, true); await load(); }
         else if (dup) { var d = await joDuplicateInvoice(dup, {}); location.href = 'invoice-edit.html?no=' + encodeURIComponent(d.invoiceNo); }
       } catch (e) {
         var code = (e.data && e.data.detail) || e.message || String(e);
@@ -196,12 +286,75 @@
       }
     });
 
+    // ===== メール送信モーダル =====
+    var mailNo = null;
+    function openMail(no) {
+      mailNo = no;
+      $('mailTo').value = ''; $('mailCc').value = ''; $('mailSubject').value = ''; $('mailBody').value = ''; $('mailTest').checked = false;
+      $('mailAttach').innerHTML = '';
+      $('mailMeta').textContent = '読み込み中…';
+      $('mailModal').style.display = 'flex';
+      joGetInvoiceMailDraft(no).then(function (d) {
+        var warn = d.to ? '' : ' <span style="color:#b45309">※顧客マスタに送付先メール未登録</span>';
+        $('mailMeta').innerHTML = '請求番号 <b>' + esc(d.invoiceNo) + '</b> ／ ' + esc(custName(d.customerCode)) + warn;
+        $('mailTo').value = d.to || ''; $('mailCc').value = d.cc || '';
+        $('mailSubject').value = d.subject || ''; $('mailBody').value = d.body || '';
+        $('mailAttach').innerHTML = '添付：<span class="attach-chip">' + esc(d.pdfName) + '</span>';
+        $('mailDummyBanner').style.display = (d.driver === 'dummy') ? 'block' : 'none';
+      }).catch(function (e) { $('mailMeta').textContent = '取得失敗: ' + (e.message || e); });
+    }
+    function closeMail() { $('mailModal').style.display = 'none'; mailNo = null; }
+    $('mailClose').addEventListener('click', closeMail);
+    $('mailCancel').addEventListener('click', closeMail);
+    $('mailModal').addEventListener('click', function (ev) { if (ev.target === this) closeMail(); });
+    $('mailSend').addEventListener('click', async function () {
+      if (!mailNo) return;
+      var no = mailNo, to = $('mailTo').value.trim();
+      if (!to) { alert('宛先（To）を入力してください。'); return; }
+      var isTest = $('mailTest').checked;
+      if (!confirm('この内容で' + (isTest ? 'テスト送信' : '送信') + 'します。よろしいですか？\n宛先: ' + to)) return;
+      var btn = this; btn.disabled = true;
+      try {
+        var r = await joSendInvoiceMail(no, { to: to, cc: $('mailCc').value.trim(), subject: $('mailSubject').value, body: $('mailBody').value, isTest: isTest ? 1 : 0 });
+        closeMail();
+        msg((r.driver === 'dummy' ? '（ダミー送信）' : '') + (r.isTest ? 'テスト送信を記録しました' : '送信しました') + '：' + r.invoiceNo, true);
+        await load();
+      } catch (e) {
+        var code = (e.data && e.data.detail) || e.message || String(e);
+        var map = { to_required: '宛先（To）を入力してください。', subject_required: '件名を入力してください。', not_sendable: '発行済みの請求書のみ送信できます。', invoice_not_found: '請求書が見つかりません。' };
+        if (/^invalid_email:/.test(code)) code = 'メールアドレスの形式が不正です：' + code.slice(14);
+        else if (/^send_failed:/.test(code)) code = '送信に失敗しました：' + code.slice(12);
+        msg('送信失敗: ' + (map[code] || code), false);
+      } finally { btn.disabled = false; }
+    });
+
+    // ===== 送信履歴モーダル =====
+    function openHistory(no) {
+      $('histBody').innerHTML = '読み込み中…';
+      $('histModal').style.display = 'flex';
+      joListInvoiceMails(no).then(function (list) {
+        if (!list.length) { $('histBody').innerHTML = '<div style="color:var(--muted)">送信履歴はありません。</div>'; return; }
+        $('histBody').innerHTML = '<table class="hist"><thead><tr><th>日時</th><th>手段</th><th>結果</th><th>宛先</th><th>件名</th><th>操作者</th></tr></thead><tbody>' +
+          list.map(function (m) {
+            var res = m.isTest ? '<span class="tag">テスト</span>' : (m.result === 'sent' ? '<span class="tag sent">送付済</span>' : '<span class="tag void">失敗</span>');
+            var drv = (m.method !== 'post' && m.driver === 'dummy') ? ' <span style="color:var(--muted);font-size:11px">(ダミー)</span>' : '';
+            var when = esc(String(m.createdAt || '').slice(0, 16).replace('T', ' '));
+            return '<tr><td>' + when + '</td><td>' + methodLabel(m.method) + '</td><td>' + res + drv + '</td><td>' + esc(m.toAddr) + '</td><td>' + esc(m.subject) + '</td><td>' + esc(m.sentByName || m.sentBy || '') + '</td></tr>';
+          }).join('') + '</tbody></table>';
+      }).catch(function (e) { $('histBody').innerHTML = '取得失敗: ' + (e.message || e); });
+    }
+    function closeHistory() { $('histModal').style.display = 'none'; }
+    $('histClose').addEventListener('click', closeHistory);
+    $('histCancel').addEventListener('click', closeHistory);
+    $('histModal').addEventListener('click', function (ev) { if (ev.target === this) closeHistory(); });
+
     joMe().then(async function (u) {
       if (u.mustChangePassword) { location.replace('change-password.html'); return; }
       if (u.role !== 'admin') { location.replace('index.html'); return; }
       var boot = await joBootstrap();
       customers = boot.customers || [];
       $('f_customer').innerHTML = '<option value="">すべて</option>' + customers.map(function (c){ return '<option value="' + esc(c.code) + '">' + esc(c.code + ' ' + c.name) + '</option>'; }).join('');
+      $('f_month').value = prevMonthStr(); // 初期表示は前月（当月−1）で絞り込み。クリアで全件表示。
       await load();
     }).catch(function () { location.replace('login.html'); });
   </script>

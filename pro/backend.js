@@ -96,6 +96,7 @@ const joDeleteUser = (id) => joWrite('deleteUser', { id });
 const joChangePassword = (current, next) => joWrite('changePassword', { current, next });
 
 // 請求書発行（admin）
+const joInvoiceDashboard = (month = '') => joCall('invoiceDashboard', month ? { month } : {}).then((r) => r.data);
 const joListInvoices = (filters = {}) => joCall('listInvoices', filters).then((r) => r.data);
 const joGetInvoice = (invoiceNo) => joCall('getInvoice', { invoiceNo }).then((r) => r.data);
 const joSaveInvoiceDraft = (invoice) => joWrite('saveInvoiceDraft', { invoice });
@@ -104,6 +105,12 @@ const joVoidInvoice = (invoiceNo) => joWrite('voidInvoice', { invoiceNo });
 const joMarkInvoicePaid = (invoiceNo, paidDate = '') => joWrite('markInvoicePaid', { invoiceNo, paidDate });
 const joUnmarkInvoicePaid = (invoiceNo) => joWrite('unmarkInvoicePaid', { invoiceNo });
 const joDuplicateInvoice = (invoiceNo, overrides = {}) => joWrite('duplicateInvoice', { invoiceNo, overrides });
+// 請求書メール送付（§14・ダミードライバ）
+const joGetInvoiceMailDraft = (invoiceNo) => joCall('getInvoiceMailDraft', { invoiceNo }).then((r) => r.data);
+const joSendInvoiceMail = (invoiceNo, payload) => joWrite('sendInvoiceMail', Object.assign({ invoiceNo }, payload));
+const joListInvoiceMails = (invoiceNo) => joCall('listInvoiceMails', { invoiceNo }).then((r) => r.data);
+const joMarkInvoicePosted = (invoiceNo, postDate = '') => joWrite('markInvoicePosted', { invoiceNo, postDate });
+const joUnmarkInvoiceSent = (invoiceNo) => joWrite('unmarkInvoiceSent', { invoiceNo });
 const joDeleteInvoiceDraft = (invoiceNo) => joWrite('deleteInvoiceDraft', { invoiceNo });
 // 請求書 PDF（mPDF サーバ生成）の URL。新規タブ表示用。dl=true で添付ダウンロード。
 const joInvoicePdfUrl = (invoiceNo, dl = false) =>

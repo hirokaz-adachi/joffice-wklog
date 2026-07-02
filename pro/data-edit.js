@@ -236,6 +236,10 @@
   }
 
   function fillFilters() {
+    if (!el.bFrom.value && !el.bTo.value) {
+      el.bFrom.value = currentMonth();
+      el.bTo.value = currentMonth();
+    }
     const cc = el.bCust.value;
     el.bCust.innerHTML = [`<option value="すべて">顧客：すべて</option>`]
       .concat(state.customers.map((c) => `<option value="${esc(c.code)}">${esc(c.code)} ${esc(c.name)}</option>`)).join("");

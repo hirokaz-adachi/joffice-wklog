@@ -231,6 +231,10 @@ try {
                 'status'       => $in['status'] ?? '',
             ])]);
             break;
+        case 'invoiceDashboard':
+            jo_require_role(['admin']);
+            jo_json(['ok' => true, 'data' => jo_invoice_dashboard(['month' => $in['month'] ?? ''])]);
+            break;
         case 'getInvoice':
             jo_require_role(['admin']);
             $inv = jo_get_invoice((string) ($in['invoiceNo'] ?? ''));
@@ -263,6 +267,30 @@ try {
             jo_require_role(['admin']);
             jo_check_csrf($in);
             jo_json(['ok' => true, 'data' => jo_unmark_invoice_paid((string) ($in['invoiceNo'] ?? ''))]);
+            break;
+        // 請求書メール送付（§14・ダミードライバ・admin）。
+        case 'getInvoiceMailDraft':
+            jo_require_role(['admin']);
+            jo_json(['ok' => true, 'data' => jo_get_invoice_mail_draft((string) ($in['invoiceNo'] ?? ''))]);
+            break;
+        case 'sendInvoiceMail':
+            $u = jo_require_role(['admin']);
+            jo_check_csrf($in);
+            jo_json(['ok' => true, 'data' => jo_send_invoice_mail((string) ($in['invoiceNo'] ?? ''), $in, $u)]);
+            break;
+        case 'listInvoiceMails':
+            jo_require_role(['admin']);
+            jo_json(['ok' => true, 'data' => jo_list_invoice_mails((string) ($in['invoiceNo'] ?? ''))]);
+            break;
+        case 'markInvoicePosted':
+            $u = jo_require_role(['admin']);
+            jo_check_csrf($in);
+            jo_json(['ok' => true, 'data' => jo_mark_invoice_posted((string) ($in['invoiceNo'] ?? ''), $u, (string) ($in['postDate'] ?? ''))]);
+            break;
+        case 'unmarkInvoiceSent':
+            jo_require_role(['admin']);
+            jo_check_csrf($in);
+            jo_json(['ok' => true, 'data' => jo_unmark_invoice_sent((string) ($in['invoiceNo'] ?? ''))]);
             break;
         case 'duplicateInvoice':
             $u = jo_require_role(['admin']);
